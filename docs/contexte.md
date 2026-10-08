@@ -22,7 +22,9 @@ gestionnaires (Bali d'abord, puis l'Australie et ailleurs).
 - **Cible : propriétaires ET gestionnaires.** Modèle de données : Organisation → Villas → Propriétaires
   (un propriétaire seul = une organisation à une villa ; le gestionnaire donne à chaque propriétaire un accès en lecture).
 - **Un seul code, configurable.** Le sur-mesure passe par des réglages et des modules activables, jamais par une copie du code. Pas de version à télécharger : un service hébergé en abonnement.
-- **Back-end en deux temps** : pilote sur Airtable (un compte payant par client) → SaaS sur Postgres/Supabase payant, avec Row Level Security, une web app (Next.js/Vercel), Stripe, et le moteur de tickets dans le cloud.
+- ~~Back-end en deux temps : pilote sur Airtable puis SaaS sur Supabase.~~ Remplacé le 08/10 (voir `cadrage.md` §4) :
+  **Supabase direct dès le pilote** (Postgres + Row Level Security), web app Next.js/Vercel, Stripe, moteur de tickets dans le cloud.
+- **Produit en libre-service** : le client utilise l'outil lui-même ; Pierre vend et maintient le système, il ne tient la compta de personne.
 
 ## Risques notés
 - ONBA est aussi une société de gestion locative : un frein possible pour vendre aux gestionnaires concurrents.
