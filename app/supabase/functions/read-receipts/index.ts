@@ -101,10 +101,11 @@ async function readItem(db: SupabaseClient, item: Item, ctx: Context, batchVilla
 }
 
 async function loadContext(db: SupabaseClient, orgId: string) {
-  const [{ data: cats }, { data: villas }] = await Promise.all([
+  const [{ data: cats }, { data: villas }, history] = await Promise.all([
     db.from("categories").select("id, name").eq("organization_id", orgId)
       .eq("kind", "expense").is("archived_at", null),
     db.from("villas").select("id, name, currency").eq("organization_id", orgId).is("archived_at", null),
+    loadHistory(db, orgId),
   ]);
   const currencies = (villas ?? []).map((v) => v.currency);
   const defaultCurrency = mostCommon(currencies) ?? "USD";
@@ -113,9 +114,34 @@ async function loadContext(db: SupabaseClient, orgId: string) {
     categories: (cats ?? []).map((c) => c.name),
     villas: (villas ?? []).map((v) => v.name),
     defaultCurrency,
+    history,
     categoryIds: Object.fromEntries((cats ?? []).map((c) => [c.name, c.id])),
     villaIds: Object.fromEntries((villas ?? []).map((v) => [v.name, v.id])),
   };
+}
+
+const HISTORY_SIZE = 40;
+
+/** Recent reviewed receipts as "merchant: description → category", one line per distinct label. */
+async function loadHistory(db: SupabaseClient, orgId: string) {
+  const { data } = await db.from("transactions")
+    .select("description, category:categories (name), evidence (extracted)")
+    .eq("organization_id", orgId).eq("source", "receipt").eq("status", "validated")
+    .not("category_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(HISTORY_SIZE * 5);
+  type Row = { description: string | null; category: { name: string } | null; evidence: { extracted: { merchant?: string } | null }[] };
+  const seen = new Set<string>();
+  const out: { label: string; category: string }[] = [];
+  for (const row of (data ?? []) as unknown as Row[]) {
+    const merchant = row.evidence?.[0]?.extracted?.merchant;
+    const label = [merchant, row.description].filter(Boolean).join(": ");
+    if (!label || !row.category || seen.has(label)) continue;
+    seen.add(label);
+    out.push({ label, category: row.category.name });
+    if (out.length === HISTORY_SIZE) break;
+  }
+  return out;
 }
 
 /** Same date, currency and amount already in the books: likely the same receipt twice. */

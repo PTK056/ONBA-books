@@ -2,12 +2,14 @@
 
 import { assertEquals, assertRejects } from "jsr:@std/assert@^1";
 import {
+  type Extracted,
   ExtractionError,
   extractReceipt,
   type MessagesClient,
   normalize,
   outputSchema,
   type ReceiptContext,
+  systemPrompt,
   UnsupportedFileError,
 } from "./extract.ts";
 
@@ -17,16 +19,19 @@ const ctx: ReceiptContext = {
   defaultCurrency: "IDR",
 };
 
-const good = {
+const good: Extracted = {
   is_receipt: true,
+  document_type: "receipt",
   merchant: "Toko Kolam",
   date: "2026-09-14",
   currency: "IDR",
   total: 150000,
+  printed_total: null,
   tax: null,
   description: "Pool chlorine, 2 kg",
   category: "Pool & garden",
   villa: null,
+  uncertain_fields: [],
   confidence: 0.92,
   notes: null,
 };
@@ -84,17 +89,17 @@ Deno.test("rejects unsupported files before calling the API", async () => {
 Deno.test("surfaces refusals and truncation as extraction errors", async () => {
   await assertRejects(
     () => extractReceipt(stub({ stop_reason: "refusal", stop_details: { category: "bio" } }), jpeg, ctx),
-    ExtractionError,
+  ExtractionError,
     "declined",
   );
   await assertRejects(
     () => extractReceipt(stub({ stop_reason: "max_tokens" }), jpeg, ctx),
-    ExtractionError,
+  ExtractionError,
     "cut off",
   );
   await assertRejects(
     () => extractReceipt(stub({ content: [{ type: "text", text: "{not json" }] }), jpeg, ctx),
-    ExtractionError,
+  ExtractionError,
     "invalid JSON",
   );
 });
@@ -111,6 +116,7 @@ Deno.test("normalize cleans values the schema cannot constrain", () => {
   assertEquals(out.category, null);
   assertEquals(out.villa, null);
   assertEquals(out.notes, 'Unreadable date "14/09/2026"');
+  assertEquals(out.uncertain_fields, ["date", "total"]);
 
   const bad = normalize({ ...good, currency: "Rupiah" }, ctx);
   assertEquals(bad.currency, null);
@@ -124,4 +130,25 @@ Deno.test("schema lists the organization's categories and villas", () => {
   assertEquals(s.required.length, Object.keys(s.properties).length);
   // An organization without villas yet: the field must be null, not an empty enum.
   assertEquals((outputSchema({ ...ctx, villas: [] }) as any).properties.villa, { type: "null" });
+});
+
+Deno.test("normalize drops unknown uncertain fields and a printed total equal to the total", () => {
+  const out = normalize({ ...good, printed_total: 150000, uncertain_fields: ["total", "mood"] } as unknown, ctx);
+  assertEquals(out.printed_total, null);
+  assertEquals(out.uncertain_fields, ["total"]);
+});
+
+Deno.test("prompt includes the organization's categorization history only when there is one", () => {
+  assertEquals(systemPrompt(ctx).includes("recent receipts"), false);
+  const p = systemPrompt({ ...ctx, history: [{ label: "Toko Kolam: Pool chlorine", category: "Pool & garden" }] });
+  assertEquals(p.includes("- Toko Kolam: Pool chlorine → Pool & garden"), true);
+});
+
+Deno.test("refuses password-protected PDFs before calling the API", async () => {
+  const calls: unknown[] = [];
+  const pdf = (trailer: string) => ({ mimeType: "application/pdf", base64: btoa(`%PDF-1.7\n1 0 obj\n<<>>\nendobj\ntrailer\n<< /Root 1 0 R ${trailer}>>\n%%EOF`) });
+  await assertRejects(() => extractReceipt(stub({}, calls), pdf("/Encrypt 9 0 R "), ctx), UnsupportedFileError, "password");
+  assertEquals(calls.length, 0);
+  await extractReceipt(stub({ content: [{ type: "text", text: JSON.stringify(good) }] }, calls), pdf(""), ctx);
+  assertEquals(calls.length, 1);
 });

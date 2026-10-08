@@ -27,7 +27,10 @@ that month; corrections go in as `source = 'adjustment'` rows in an open month.
    `receipt_item` per file.
 2. It calls the `read-receipts` Edge Function with `{ batch_id }` and the user's JWT. The function
    runs with the caller's rights, reads up to 20 unread items with Claude (4 at a time), stores
-   the fields in `receipt_items.proposed` and `evidence.extracted`, flags a possible duplicate
+   the fields in `receipt_items.proposed` and `evidence.extracted` (including `uncertain_fields`
+   for the reviewer to check, and `printed_total` when a handwritten claim differs from the
+   printed total), follows how the organization categorized its last 40 distinct receipts,
+   flags a possible duplicate
    (same date, currency and amount already in the books), and moves the batch to `to_review`.
    Call it again while `remaining > 0`; rate limits and API outages leave the item unread for
    the next call, other failures are recorded as `proposed.error`.
