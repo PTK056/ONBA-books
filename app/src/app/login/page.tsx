@@ -13,6 +13,13 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
 }
 
 async function Form({ searchParams }: Pick<PageProps<"/login">, "searchParams">) {
-  const { next } = await searchParams;
-  return <LoginForm next={typeof next === "string" ? next : "/review"} />;
+  const { next, error } = await searchParams;
+  return (
+    <>
+      {error === "link" && (
+        <p role="alert" className="text-sm text-red-600">That sign-in link has expired or was already used. Ask for a new one.</p>
+      )}
+      <LoginForm next={typeof next === "string" ? next : "/review"} />
+    </>
+  );
 }

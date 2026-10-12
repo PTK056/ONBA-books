@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import type {
   AcceptInput,
@@ -46,6 +47,9 @@ export function ReviewQueue({ items: initial, options, accept, reject }: Props) 
         <p className="text-sm text-zinc-500">
           {reviewed ? `${reviewed} receipt${reviewed > 1 ? "s" : ""} reviewed in this session.` : "New receipts will appear here once they have been read."}
         </p>
+        <Link href="/upload" className="mt-2 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">
+          Add receipts
+        </Link>
       </div>
     );
   }
@@ -56,6 +60,7 @@ export function ReviewQueue({ items: initial, options, accept, reject }: Props) 
         <div className="text-sm">
           <span className="font-medium">{options.organizationName}</span>
           <span className="text-zinc-500"> · Receipts to review</span>
+          <Link href="/upload" className="ml-3 text-zinc-500 underline-offset-2 hover:underline">Add receipts</Link>
         </div>
         <nav className="flex items-center gap-1 text-sm" aria-label="Queue">
           <button

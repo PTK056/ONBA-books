@@ -1,16 +1,18 @@
 import "server-only";
+import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import type { Proposed, ReviewItem, ReviewOptions } from "./types";
+import type { Proposed, ReviewItem, ReviewOptions, UnreadSummary } from "./types";
 
 const SIGNED_URL_TTL = 60 * 60; // seconds
 
 export type ReviewQueueData =
   | { kind: "signed_out" }
   | { kind: "no_organization" }
-  | { kind: "ready"; items: ReviewItem[]; options: ReviewOptions };
+  | { kind: "ready"; items: ReviewItem[]; options: ReviewOptions; unread: UnreadSummary };
 
 /** Read receipts waiting for review in the user's organization (admin or staff). */
 export async function loadReviewQueue(orgId?: string): Promise<ReviewQueueData> {
+  await connection(); // per-request data: never prerender (the Supabase client reads the clock)
   const db = await createClient();
   const { data: claims } = await db.auth.getClaims();
   if (!claims?.claims) return { kind: "signed_out" };
@@ -26,9 +28,9 @@ export async function loadReviewQueue(orgId?: string): Promise<ReviewQueueData> 
   if (!m) return { kind: "no_organization" };
   const org = m.organization_id;
 
-  const [items, categories, villas, rates] = await Promise.all([
+  const [items, categories, villas, rates, unread] = await Promise.all([
     db.from("receipt_items")
-      .select("id, proposed, evidence:evidence_id (storage_path, mime_type)")
+      .select("id, proposed, evidence (storage_path, mime_type)")
       .eq("organization_id", org).eq("status", "pending").not("read_at", "is", null)
       .order("read_at", { ascending: true }),
     db.from("categories").select("id, name").eq("organization_id", org)
@@ -37,6 +39,8 @@ export async function loadReviewQueue(orgId?: string): Promise<ReviewQueueData> 
       .is("archived_at", null).order("name"),
     db.from("transactions").select("currency, fx_rate").eq("organization_id", org)
       .order("date", { ascending: false }).limit(200),
+    db.from("receipt_items").select("batch_id").eq("organization_id", org)
+      .eq("status", "pending").is("read_at", null),
   ]);
 
   type Row = { id: string; proposed: Proposed; evidence: { storage_path: string; mime_type: string } };
@@ -49,8 +53,10 @@ export async function loadReviewQueue(orgId?: string): Promise<ReviewQueueData> 
   const lastRates: Record<string, number> = {};
   for (const r of rates.data ?? []) lastRates[r.currency] ??= Number(r.fx_rate);
 
+  const unreadRows = unread.data ?? [];
   return {
     kind: "ready",
+    unread: { count: unreadRows.length, batchIds: [...new Set(unreadRows.map((r) => r.batch_id))] },
     items: rows.map((r) => ({
       id: r.id,
       fileUrl: urlByPath.get(r.evidence.storage_path) ?? null,

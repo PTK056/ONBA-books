@@ -30,6 +30,9 @@ export interface ReviewItem {
   proposed: Proposed;
 }
 
+/** Uploaded receipts the engine has not read yet (e.g. after an outage). */
+export interface UnreadSummary { count: number; batchIds: string[] }
+
 export interface ReviewOptions {
   organizationName: string;
   reportingCurrency: string;

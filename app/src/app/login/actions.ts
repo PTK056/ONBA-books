@@ -15,11 +15,15 @@ export async function sendMagicLink(_prev: LoginState, formData: FormData): Prom
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      shouldCreateUser: false, // accounts are created by invitation, not from the login page
+      shouldCreateUser: true, // self-serve: the first link creates the account, which then goes to /setup
       emailRedirectTo: `${origin}/auth/confirm?next=${encodeURIComponent(safeNext(next))}`,
     },
   });
-  if (error) return { error: "We couldn't send the link. Check the address or ask your admin for an invitation." };
+  if (error) {
+    console.error("[login] signInWithOtp:", error.status, error.code, error.message);
+    if (error.status === 429) return { error: "Too many sign-in e-mails were sent. Wait a few minutes and try again." };
+    return { error: "We couldn't send the link. Check the address and try again." };
+  }
   return { sent: email };
 }
 

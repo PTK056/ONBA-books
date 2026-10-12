@@ -14,7 +14,16 @@ const CONCURRENCY = 4;
 
 const anthropic = new Anthropic(); // ANTHROPIC_API_KEY from the function's secrets
 
+// The web app calls this function from the browser, which first sends a CORS preflight.
+// Access is still decided by the caller's JWT and RLS, not by the origin.
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
 
   const auth = req.headers.get("Authorization");
@@ -36,7 +45,7 @@ Deno.serve(async (req) => {
 
   const { data: items, error: itemsErr } = await db
     .from("receipt_items")
-    .select("id, evidence:evidence_id (id, storage_path, mime_type)")
+    .select("id, evidence (id, storage_path, mime_type)")
     .eq("batch_id", batch_id)
     .eq("status", "pending")
     .is("read_at", null)
@@ -181,5 +190,5 @@ function toBase64(bytes: Uint8Array): string {
 }
 
 function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 }

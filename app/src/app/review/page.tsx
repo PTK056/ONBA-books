@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { ReadPending } from "@/components/review/ReadPending";
 import { ReviewQueue } from "@/components/review/ReviewQueue";
+import { getCurrentOrg } from "@/lib/org";
 import { loadReviewQueue } from "@/lib/review/data";
 import { acceptItem, rejectItem } from "./actions";
 
@@ -19,7 +21,14 @@ async function Queue({ searchParams }: Pick<PageProps<"/review">, "searchParams"
   const data = await loadReviewQueue(typeof org === "string" ? org : undefined);
   if (data.kind === "signed_out") redirect("/login?next=/review");
   if (data.kind === "no_organization") {
-    return <p className="p-6 text-sm text-zinc-600">You don&apos;t review receipts for any organization yet.</p>;
+    // Owner viewers belong to an organization but have nothing to review.
+    if ((await getCurrentOrg()).kind === "none") redirect("/setup");
+    return <p className="p-6 text-sm text-zinc-600">Receipt review is done by your organization&apos;s admins and staff.</p>;
   }
-  return <ReviewQueue items={data.items} options={data.options} accept={acceptItem} reject={rejectItem} />;
+  return (
+    <>
+      <ReadPending unread={data.unread} />
+      <ReviewQueue items={data.items} options={data.options} accept={acceptItem} reject={rejectItem} />
+    </>
+  );
 }

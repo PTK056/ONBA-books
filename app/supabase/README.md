@@ -5,7 +5,7 @@
 - `tests/*.sql` — tenant isolation, roles, closed months, receipt engine. Each file runs as a
   superuser inside a transaction that is rolled back and raises `FAILED: …` on the first broken
   check: `psql "$DB_URL" -f tests/rls_smoke.sql` against a local `supabase start`.
-- `functions/read-receipts/extract_test.ts` — `deno test --allow-env functions/read-receipts/`
+- `functions/read-receipts/extract_test.ts` — `deno test --node-modules-dir=none --allow-env functions/read-receipts/`
   (no network: the Claude client is stubbed).
 
 ## Core model (v0.1)
