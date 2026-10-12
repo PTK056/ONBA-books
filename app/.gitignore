@@ -43,3 +43,6 @@ next-env.d.ts
 # local preview data (real receipts)
 /public/dev-fixtures/
 !.env.example
+
+# created by `deno check` runs on the Edge Functions
+/deno.lock

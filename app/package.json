@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:queries": "node --env-file-if-exists=.env.local scripts/check-queries.mts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
