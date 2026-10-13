@@ -50,6 +50,11 @@ test("derives the rate from the payout that paid the lines", () => {
   assert.equal(stays.HMFFF.payoutRates.IDR, 1); // booked in IDR
 });
 
+test("weights the rate over instalments paid at different rates", () => {
+  // HMDDD: 99.29 EUR paid 2,048,659 IDR and 1,227.33 EUR paid 25,000,000 IDR
+  assert.equal(Math.round(stays.HMDDD.net * stays.HMDDD.payoutRates.IDR), 2048659 + 25000000);
+});
+
 test("handles refunds and adjustments", () => {
   assert.equal(stays.HMAAA.net, 0.01);
   assert.ok(parseAirbnbCsv(csv).warnings.some((w) => w.startsWith("HMAAA: refunded")));

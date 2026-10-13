@@ -96,15 +96,14 @@ export function parseAirbnbCsv(text: string): ParseResult {
     }
   }
 
-  // Rate per payout: payout amount / sum of the lines it pays (in the booking currency).
-  const payoutRate = new Map<Line["payout"], number>();
+  // What each line was actually paid: its share of its payout (payout amount × line / lines).
+  const paidFor = new Map<Line, number>();
   for (const p of new Set(lines.map((l) => l.payout))) {
     if (!p) continue;
     const own = lines.filter((l) => l.payout === p);
     const sum = own.reduce((s, l) => s + (num(l.row.Amount) ?? 0), 0);
-    const currencies = new Set(own.map((l) => l.row.Currency));
-    if (sum > 0 && currencies.size === 1 && !currencies.has(p.currency)) payoutRate.set(p, p.amount / sum);
-    if (currencies.size === 1 && currencies.has(p.currency)) payoutRate.set(p, 1);
+    if (!sum) continue;
+    for (const l of own) paidFor.set(l, (p.amount * (num(l.row.Amount) ?? 0)) / sum);
   }
 
   const byCode = new Map<string, Line[]>();
@@ -144,10 +143,14 @@ export function parseAirbnbCsv(text: string): ParseResult {
       }
     }
 
+    // Rate per payout currency, weighted over every payout that paid this booking, so a
+    // stay paid in instalments at different rates converts to exactly what was received.
     const payoutRates: Record<string, number> = {};
-    for (const l of own) {
-      const rate = l.payout && payoutRate.get(l.payout);
-      if (l.payout && rate) payoutRates[l.payout.currency] ??= rate;
+    for (const cur of new Set(own.flatMap((l) => (l.payout ? [l.payout.currency] : [])))) {
+      const paid = own.filter((l) => l.payout?.currency === cur && paidFor.has(l));
+      const amount = paid.reduce((s, l) => s + (num(l.row.Amount) ?? 0), 0);
+      const received = paid.reduce((s, l) => s + paidFor.get(l)!, 0);
+      if (amount > 0 && received > 0) payoutRates[cur] = cur === r.Currency ? 1 : received / amount;
     }
     if (own.some((l) => /resolution/i.test(l.row.Type)) && gross - fees < 0.05 * gross) {
       warnings.push(`${code}: refunded to the guest; only what Airbnb kept is booked.`);
