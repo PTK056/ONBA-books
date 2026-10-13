@@ -7,7 +7,7 @@ export type LoginState = { sent?: string; error?: string };
 
 export async function sendMagicLink(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const email = String(formData.get("email") ?? "").trim();
-  const next = String(formData.get("next") ?? "/review");
+  const next = String(formData.get("next") ?? "/overview");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "Enter a valid e-mail address." };
 
   const origin = (await headers()).get("origin") ?? "";
@@ -28,5 +28,5 @@ export async function sendMagicLink(_prev: LoginState, formData: FormData): Prom
 }
 
 function safeNext(next: string) {
-  return next.startsWith("/") && !next.startsWith("//") ? next : "/review";
+  return next.startsWith("/") && !next.startsWith("//") ? next : "/overview";
 }

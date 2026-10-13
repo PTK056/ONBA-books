@@ -8,7 +8,7 @@ import { acceptItem, rejectItem } from "./actions";
 
 export default function ReviewPage({ searchParams }: PageProps<"/review">) {
   return (
-    <main className="flex h-dvh flex-col">
+    <main className="flex h-[calc(100dvh-3.5rem)] flex-col bg-white lg:h-dvh dark:bg-zinc-950">
       <Suspense fallback={<p className="p-6 text-sm text-zinc-500">Loading receipts…</p>}>
         <Queue searchParams={searchParams} />
       </Suspense>
@@ -23,7 +23,7 @@ async function Queue({ searchParams }: Pick<PageProps<"/review">, "searchParams"
   if (data.kind === "no_organization") {
     // Owner viewers belong to an organization but have nothing to review.
     if ((await getCurrentOrg()).kind === "none") redirect("/setup");
-    return <p className="p-6 text-sm text-zinc-600">Receipt review is done by your organization&apos;s admins and staff.</p>;
+    return <p className="p-8 text-sm text-zinc-600">Receipt review is done by your organization&apos;s admins and staff.</p>;
   }
   return (
     <>

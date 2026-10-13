@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/review";
+  const next = searchParams.get("next") ?? "/overview";
   const target = request.nextUrl.clone();
   target.search = "";
 
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
       ? await supabase.auth.exchangeCodeForSession(code)
       : await supabase.auth.verifyOtp({ type: type!, token_hash: tokenHash! });
     if (!error) {
-      target.pathname = next.startsWith("/") && !next.startsWith("//") ? next : "/review";
+      target.pathname = next.startsWith("/") && !next.startsWith("//") ? next : "/overview";
       return NextResponse.redirect(target);
     }
   }

@@ -12,7 +12,7 @@ import { fakeAccept, fakeReject } from "./actions";
 export default function DevReviewPage() {
   if (process.env.NODE_ENV !== "development") notFound();
   return (
-    <main className="flex h-dvh flex-col">
+    <main className="flex h-[calc(100dvh-3.5rem)] flex-col bg-white lg:h-dvh dark:bg-zinc-950">
       <Suspense>
         <Preview />
       </Suspense>
