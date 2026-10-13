@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, ScanLine, Upload } from "lucide-react";
+import { BedDouble, LayoutDashboard, ScanLine, Upload } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "./Logo";
@@ -9,6 +9,7 @@ const NAV = [
   { href: "/overview", label: "Overview", icon: LayoutDashboard },
   { href: "/upload", label: "Add receipts", icon: Upload },
   { href: "/review", label: "Review", icon: ScanLine, badge: true },
+  { href: "/import", label: "Import stays", icon: BedDouble },
 ] as const;
 
 interface Props {

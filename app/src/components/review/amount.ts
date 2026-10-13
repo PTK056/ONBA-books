@@ -1,12 +1,13 @@
 // Amount formatting and parsing for the review form.
 
+// Currencies written without cents. Fixed here rather than read from Intl, whose data
+// differs between Node and browsers (Node says 2 for IDR, Chrome says 0), which made the
+// server and the browser render different text.
+const NO_CENTS = new Set(["IDR", "JPY", "KRW", "VND", "CLP", "ISK", "PYG", "UGX", "XAF", "XOF"]);
+
 /** Minor-unit digits shown for a currency (IDR is written without cents). */
 export function fractionDigits(currency: string): number {
-  try {
-    return new Intl.NumberFormat("en", { style: "currency", currency }).resolvedOptions().maximumFractionDigits ?? 2;
-  } catch {
-    return 2;
-  }
+  return NO_CENTS.has(currency.toUpperCase()) ? 0 : 2;
 }
 
 export function formatAmount(value: number, currency: string): string {

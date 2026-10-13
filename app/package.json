@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "check:queries": "node --env-file-if-exists=.env.local scripts/check-queries.mts"
+    "check:queries": "node --env-file-if-exists=.env.local scripts/check-queries.mts",
+    "test": "node --test src/lib/**/*.test.ts",
+    "test:db": "node supabase/tests/run.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -19,6 +21,7 @@
     "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

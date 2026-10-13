@@ -58,7 +58,7 @@ from ids o, ids vi,
 join categories c on c.name = t.cat
 where o.k = 'orgA' and vi.k = t.villa;
 
-select pg_temp.expect((select count(*) from categories) = 16, 'admin A sees the 16 default categories');
+select pg_temp.expect((select count(*) from categories) = 17, 'admin A sees the 17 default categories');
 select pg_temp.expect((select count(*) from transactions) = 4, 'admin A sees all 4 transactions');
 select pg_temp.expect(
   (select net from villa_month_totals where villa_id = (select v from ids where k='villa1')) = 900.00,
@@ -71,7 +71,7 @@ insert into ids select 'orgB', public.create_organization('Org B', 'AUD');
 select pg_temp.expect((select count(*) from villas) = 0,       'admin B sees no villa of org A');
 select pg_temp.expect((select count(*) from transactions) = 0, 'admin B sees no transaction of org A');
 select pg_temp.expect((select count(*) from organizations) = 1, 'admin B sees only their organization');
-select pg_temp.expect((select count(*) from categories) = 16,  'admin B sees only their own categories');
+select pg_temp.expect((select count(*) from categories) = 17,  'admin B sees only their own categories');
 
 do $$ begin
   insert into transactions (organization_id, villa_id, date, direction, currency, amount)
