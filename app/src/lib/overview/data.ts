@@ -6,8 +6,20 @@ import { createClient } from "@/lib/supabase/server";
 export const TREND_MONTHS = 12;
 const MAX_ENTRIES = 5000; // 12 months of validated entries; far above a villa's volume
 const SIGNED_URL_TTL = 60 * 60;
+const REFUNDED_SHARE = 0.05; // net under 5% of gross: treated as refunded for occupancy
 
 export interface MonthTotals { month: string; income: number; expenses: number; net: number }
+
+/** Nights booked vs available, and income from stays, for one month. */
+export interface MonthOccupancy {
+  month: string;
+  booked: number;
+  available: number;
+  stayIncome: number;     // reporting currency, from imported stays only
+  occupancy: number;      // booked / available, 0..1
+  adr: number | null;     // average daily rate: stay income per booked night
+  revpar: number;         // stay income per available night
+}
 
 export interface Entry {
   id: string;
@@ -37,6 +49,10 @@ export interface VillaMonth {
   expenses: number;
   net: number;
   closed: { at: string } | null;
+  booked: number;
+  available: number;
+  occupancy: number;
+  adr: number | null;
 }
 
 export interface Overview {
@@ -45,7 +61,12 @@ export interface Overview {
   trend: MonthTotals[];
   totals: MonthTotals;
   previous: MonthTotals;
-  year: { from: string; income: number; expenses: number; net: number; months: number; averageExpenses: number; costliest: MonthTotals | null };
+  occupancy: MonthOccupancy[];          // same months as `trend`
+  year: {
+    from: string; income: number; expenses: number; net: number; months: number;
+    averageExpenses: number; costliest: MonthTotals | null;
+    occupancy: number | null; adr: number | null;
+  };
   categories: CategoryLine[];
   merchants: { name: string; amount: number; count: number }[];
   entries: Entry[];
@@ -67,6 +88,7 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
 
 type Row = {
   id: string;
+  source: string;
   date: string;
   direction: "in" | "out";
   amount: number;
@@ -99,10 +121,10 @@ export async function loadOverview(requested?: string): Promise<OverviewResult> 
   const to = iso(addMonths(month, 1));
   const windowFrom = iso(addMonths(month, -(TREND_MONTHS - 1)));
 
-  const [orgRow, txs, missing, closes, toReview, toRead] = await Promise.all([
+  const [orgRow, txs, missing, closes, toReview, toRead, stays] = await Promise.all([
     db.from("organizations").select("fiscal_year_start").eq("id", org.id).single(),
     db.from("transactions")
-      .select("id, date, direction, amount, currency, amount_reporting, description, villa_id, category:categories (name), evidence (storage_path, extracted)")
+      .select("id, date, direction, source, amount, currency, amount_reporting, description, villa_id, category:categories (name), evidence (storage_path, extracted)")
       .eq("organization_id", org.id).eq("status", "validated")
       .gte("date", windowFrom).lt("date", to)
       .order("date", { ascending: false }).limit(MAX_ENTRIES),
@@ -114,6 +136,8 @@ export async function loadOverview(requested?: string): Promise<OverviewResult> 
       .eq("organization_id", org.id).eq("status", "pending").not("read_at", "is", null),
     db.from("receipt_items").select("id", { count: "exact", head: true })
       .eq("organization_id", org.id).eq("status", "pending").is("read_at", null),
+    db.from("stays").select("villa_id, check_in, check_out, gross_amount, net_amount")
+      .eq("organization_id", org.id).lt("check_in", to).gt("check_out", windowFrom).limit(MAX_ENTRIES),
   ]);
   const rows = (txs.data ?? []) as unknown as Row[];
   const villaName = new Map(org.villas.map((v) => [v.id, v.name]));
@@ -140,6 +164,40 @@ export async function loadOverview(requested?: string): Promise<OverviewResult> 
   }
   const trend = [...byMonth.values()];
   const totals = trend[trend.length - 1];
+
+  // Occupancy: a night belongs to the month it starts in; available = days × villas.
+  const bookedBy = new Map<string, number>();          // "YYYY-MM-01" or "YYYY-MM-01|villa"
+  for (const st of stays.data ?? []) {
+    // A booking refunded to the guest (net close to nothing) did not occupy the villa.
+    if (Number(st.net_amount) <= REFUNDED_SHARE * Number(st.gross_amount)) continue;
+    for (let d = Date.parse(`${st.check_in}T00:00:00Z`); d < Date.parse(`${st.check_out}T00:00:00Z`); d += 86_400_000) {
+      const m = `${new Date(d).toISOString().slice(0, 7)}-01`;
+      if (!byMonth.has(m)) continue;
+      bookedBy.set(m, (bookedBy.get(m) ?? 0) + 1);
+      bookedBy.set(`${m}|${st.villa_id}`, (bookedBy.get(`${m}|${st.villa_id}`) ?? 0) + 1);
+    }
+  }
+  const stayIncomeBy = new Map<string, number>();
+  for (const r of rows) {
+    if (r.source !== "stay" || r.direction !== "in") continue;
+    const m = `${r.date.slice(0, 7)}-01`;
+    stayIncomeBy.set(m, (stayIncomeBy.get(m) ?? 0) + Number(r.amount_reporting));
+    stayIncomeBy.set(`${m}|${r.villa_id}`, (stayIncomeBy.get(`${m}|${r.villa_id}`) ?? 0) + Number(r.amount_reporting));
+  }
+  const daysIn = (m: string) => new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7), 0)).getUTCDate();
+  const occupancyFor = (m: string, villaCount: number, key = m): MonthOccupancy => {
+    const booked = bookedBy.get(key) ?? 0;
+    const available = daysIn(m) * villaCount;
+    const stayIncome = stayIncomeBy.get(key) ?? 0;
+    return {
+      month: m, booked, available, stayIncome,
+      occupancy: available ? Math.min(1, booked / available) : 0,
+      adr: booked ? stayIncome / booked : null,
+      revpar: available ? stayIncome / available : 0,
+    };
+  };
+  const villaCount = Math.max(1, org.villas.length);
+  const occupancy = trend.map((t) => occupancyFor(t.month, villaCount));
   const previous = trend[trend.length - 2];
 
   // Year to date, from the organization's fiscal year start (within the 12-month window).
@@ -205,7 +263,15 @@ export async function loadOverview(requested?: string): Promise<OverviewResult> 
         months: activeMonths.length,
         averageExpenses: activeMonths.length ? yearExpenses / activeMonths.length : 0,
         costliest: activeMonths.length ? activeMonths.reduce((a, b) => (b.expenses > a.expenses ? b : a)) : null,
+        ...(() => {
+          const ys = occupancy.filter((o) => o.month >= yearFrom);
+          const booked = ys.reduce((n, o) => n + o.booked, 0);
+          const available = ys.reduce((n, o) => n + o.available, 0);
+          const income = ys.reduce((n, o) => n + o.stayIncome, 0);
+          return { occupancy: available ? booked / available : null, adr: booked ? income / booked : null };
+        })(),
       },
+      occupancy,
       categories,
       merchants: [...merchants].map(([name, m]) => ({ name, ...m })).sort((a, b) => b.amount - a.amount).slice(0, 6),
       entries: monthRows.map((r) => ({
@@ -225,7 +291,12 @@ export async function loadOverview(requested?: string): Promise<OverviewResult> 
         const rs = monthRows.filter((r) => r.villa_id === v.id);
         const income = rs.filter((r) => r.direction === "in").reduce((s, r) => s + Number(r.amount_reporting), 0);
         const exp = rs.filter((r) => r.direction === "out").reduce((s, r) => s + Number(r.amount_reporting), 0);
-        return { id: v.id, name: v.name, income, expenses: exp, net: income - exp, closed: closedBy.has(v.id) ? { at: closedBy.get(v.id)! } : null };
+        const occ = occupancyFor(from, 1, `${from}|${v.id}`);
+        return {
+          id: v.id, name: v.name, income, expenses: exp, net: income - exp,
+          closed: closedBy.has(v.id) ? { at: closedBy.get(v.id)! } : null,
+          booked: occ.booked, available: occ.available, occupancy: occ.occupancy, adr: occ.adr,
+        };
       }),
       missingEvidence: (missing.data ?? []).map((m) => ({ ...m, amount: Number(m.amount) })),
       toReview: toReview.count ?? 0,

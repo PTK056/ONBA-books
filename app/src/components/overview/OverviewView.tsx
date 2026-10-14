@@ -1,9 +1,10 @@
-import { ArrowDownRight, ArrowUpRight, ChevronLeft, ChevronRight, Plus, ReceiptText, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, BedDouble, ChevronLeft, ChevronRight, Moon, Plus, ReceiptText, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { CategoryBars } from "@/components/overview/CategoryBars";
 import { money, monthLabel } from "@/components/overview/format";
 import { MonthClose } from "@/components/overview/MonthClose";
+import { OccupancyChart } from "@/components/overview/OccupancyChart";
 import { TrendChart } from "@/components/overview/TrendChart";
 import type { Overview } from "@/lib/overview/data";
 import "@/components/overview/chart.css";
@@ -17,6 +18,9 @@ export function OverviewView({ data: o }: { data: Overview }) {
   const editor = o.org.role !== "owner_viewer";
   const monthName = monthLabel(o.month, "long").split(" ")[0];
   const margin = o.totals.income ? o.totals.net / o.totals.income : null;
+  const occ = o.occupancy[o.occupancy.length - 1];
+  const occPrev = o.occupancy[o.occupancy.length - 2];
+  const hasStays = o.occupancy.some((m) => m.booked > 0);
 
   return (
     <>
@@ -45,11 +49,14 @@ export function OverviewView({ data: o }: { data: Overview }) {
           )}
         </div>
 
-        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Stat label="Income" icon={<TrendingUp size={16} />} tint="blue" value={o.totals.income} previous={o.previous.income} currency={cur} goodWhenUp />
           <Stat label="Expenses" icon={<TrendingDown size={16} />} tint="orange" value={o.totals.expenses} previous={o.previous.expenses} currency={cur} goodWhenUp={false} />
           <Stat label="Net result" icon={<Wallet size={16} />} tint="emerald" value={o.totals.net} previous={o.previous.net} currency={cur} goodWhenUp
             note={margin !== null ? `${Math.round(margin * 100)}% margin` : undefined} />
+          <OccupancyStat current={occ} previous={occPrev} />
+          <Stat label="Nightly rate" icon={<Moon size={16} />} tint="violet" value={occ.adr ?? 0} previous={occPrev.adr ?? 0} currency={cur} goodWhenUp
+            note={occ.booked ? `RevPAR ${money(occ.revpar, cur)}` : "No nights booked"} />
           <Coverage expenses={o.evidence.expenses} withReceipt={o.evidence.withReceipt} />
         </section>
         {o.totals.income === 0 && o.totals.expenses > 0 && (
@@ -69,6 +76,13 @@ export function OverviewView({ data: o }: { data: Overview }) {
               <Panel title="Last 12 months"><TrendChart trend={o.trend} currency={cur} selected={o.month} /></Panel>
               <YearPanel year={o.year} currency={cur} />
             </div>
+
+            {hasStays && (
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+                <Panel title="Occupancy · last 12 months"><OccupancyChart months={o.occupancy} currency={cur} selected={o.month} /></Panel>
+                <StaysPanel month={occ} monthName={monthName} currency={cur} />
+              </div>
+            )}
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
               <Panel title={`Expenses by category · ${monthLabel(o.month, "short")}`}>
@@ -127,6 +141,7 @@ const TINTS = {
   blue: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-300",
   orange: "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-300",
   emerald: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300",
+  violet: "bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
   zinc: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300",
 } as const;
 
@@ -181,12 +196,58 @@ function Coverage({ expenses, withReceipt }: { expenses: number; withReceipt: nu
   );
 }
 
+function OccupancyStat({ current, previous }: { current: Overview["occupancy"][number]; previous: Overview["occupancy"][number] }) {
+  const points = previous.available ? Math.round((current.occupancy - previous.occupancy) * 100) : null;
+  return (
+    <div className="card p-5">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium text-zinc-500">Occupancy</p>
+        <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${TINTS.violet}`}><BedDouble size={16} /></span>
+      </div>
+      <p className="mt-3 text-2xl font-semibold tracking-tight tabular-nums">
+        {Math.round(current.occupancy * 100)}% <span className="text-sm font-normal text-zinc-400">{current.booked} of {current.available} nights</span>
+      </p>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+        <div className="h-full rounded-full" style={{ width: `${current.occupancy * 100}%`, background: "var(--series-occupancy)" }} />
+      </div>
+      <p className="mt-2 text-xs text-zinc-400">
+        {points === null ? "No figures last month" : `${points >= 0 ? "+" : "−"}${Math.abs(points)} pts vs last month`}
+      </p>
+    </div>
+  );
+}
+
+function StaysPanel({ month, monthName, currency }: { month: Overview["occupancy"][number]; monthName: string; currency: string }) {
+  const rows: [string, string][] = [
+    ["Nights booked", `${month.booked} of ${month.available}`],
+    ["Occupancy", `${Math.round(month.occupancy * 100)}%`],
+    ["Income from stays", money(month.stayIncome, currency)],
+    ["Average nightly rate", month.adr === null ? "—" : money(month.adr, currency)],
+    ["RevPAR", money(month.revpar, currency)],
+  ];
+  return (
+    <Panel title={`Stays · ${monthName}`}>
+      <dl className="flex flex-col gap-2 text-sm">
+        {rows.map(([k, v]) => (
+          <div key={k} className="flex justify-between gap-3 border-b border-zinc-100 pb-2 last:border-0 dark:border-zinc-900">
+            <dt className="text-zinc-600 dark:text-zinc-400">{k}</dt>
+            <dd className="tabular-nums font-medium">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 text-xs text-zinc-500">RevPAR: income from stays per available night, booked or not.</p>
+    </Panel>
+  );
+}
+
 function YearPanel({ year, currency }: { year: Overview["year"]; currency: string }) {
   const rows: [string, string][] = [
     ["Income", money(year.income, currency)],
     ["Expenses", money(year.expenses, currency)],
     ["Net", money(year.net, currency)],
     ["Average monthly expenses", money(year.averageExpenses, currency)],
+    ...(year.occupancy !== null ? [["Occupancy", `${Math.round(year.occupancy * 100)}%`] as [string, string]] : []),
+    ...(year.adr !== null ? [["Average nightly rate", money(year.adr, currency)] as [string, string]] : []),
   ];
   return (
     <Panel title={`Year to date · since ${monthLabel(year.from)}`}>
@@ -292,12 +353,14 @@ function VillaTable({ villas, currency }: { villas: Overview["villas"]; currency
     <Panel title="By villa">
       <table className="w-full text-sm tabular-nums">
         <thead className="text-left text-xs text-zinc-500">
-          <tr><th className="font-normal">Villa</th><th className="text-right font-normal">Income</th><th className="text-right font-normal">Expenses</th><th className="text-right font-normal">Net</th></tr>
+          <tr><th className="font-normal">Villa</th><th className="text-right font-normal">Occupancy</th><th className="text-right font-normal">Nightly rate</th><th className="text-right font-normal">Income</th><th className="text-right font-normal">Expenses</th><th className="text-right font-normal">Net</th></tr>
         </thead>
         <tbody>
           {villas.map((v) => (
             <tr key={v.id} className="border-t border-zinc-100 dark:border-zinc-900">
               <td className="py-1.5">{v.name}</td>
+              <td className="text-right">{Math.round(v.occupancy * 100)}% <span className="text-xs text-zinc-400">{v.booked}/{v.available}</span></td>
+              <td className="text-right">{v.adr === null ? "—" : money(v.adr, currency)}</td>
               <td className="text-right">{money(v.income, currency)}</td>
               <td className="text-right">{money(v.expenses, currency)}</td>
               <td className="text-right font-medium">{money(v.net, currency)}</td>

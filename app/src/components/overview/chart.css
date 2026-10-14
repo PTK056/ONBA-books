@@ -2,12 +2,14 @@
 .viz-root {
   --series-income: #2a78d6;
   --series-expenses: #eb6834;
+  --series-occupancy: #4a3aa7;
   --grid: #e4e4e7;
 }
 @media (prefers-color-scheme: dark) {
   .viz-root {
     --series-income: #3987e5;
     --series-expenses: #d95926;
+    --series-occupancy: #9085e9;
     --grid: #27272a;
   }
 }
