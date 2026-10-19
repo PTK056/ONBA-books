@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { readBatches, type ReadSummary } from "@/lib/receipts/read";
-import { prepareFile } from "./prepare";
+import { uploadEvidenceFile } from "@/lib/receipts/upload";
 
 type Status = "waiting" | "uploading" | "uploaded" | "failed";
 interface Entry { key: string; file: File; status: Status; message?: string }
@@ -54,10 +54,7 @@ export function Uploader({ organizationId, villas }: Props) {
       if (entry.status === "uploaded") continue;
       update(entry.key, { status: "uploading", message: undefined });
       try {
-        const { blob, mimeType, extension } = await prepareFile(entry.file);
-        const path = `${organizationId}/${crypto.randomUUID()}.${extension}`;
-        const up = await db.storage.from("evidence").upload(path, blob, { contentType: mimeType });
-        if (up.error) throw new Error("Upload failed");
+        const { path, mimeType } = await uploadEvidenceFile(db, organizationId, entry.file);
         const { data: ev, error: evErr } = await db.from("evidence")
           .insert({ organization_id: organizationId, storage_path: path, mime_type: mimeType })
           .select("id").single();

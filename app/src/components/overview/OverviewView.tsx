@@ -306,7 +306,7 @@ function EntriesTable({ entries, currency, showVilla }: { entries: Overview["ent
     <tr key={e.id} className="border-t border-zinc-100 align-top dark:border-zinc-900">
       <td className="whitespace-nowrap py-2 pr-3 text-zinc-500">{e.date.slice(8)} {monthLabel(`${e.date.slice(0, 7)}-01`, "short")}</td>
       <td className="min-w-40 py-2 pr-3">
-        <span className="block">{e.description ?? "—"}</span>
+        <Link href={`/transactions/${e.id}`} className="block hover:underline">{e.description ?? "—"}</Link>
         {e.merchant && <span className="block text-xs text-zinc-500">{e.merchant}</span>}
       </td>
       <td className="hidden py-2 pr-3 text-zinc-600 sm:table-cell dark:text-zinc-400">{e.category}</td>

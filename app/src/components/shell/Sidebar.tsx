@@ -1,12 +1,14 @@
 "use client";
 
-import { BedDouble, LayoutDashboard, ScanLine, Upload } from "lucide-react";
+import { ArrowLeftRight, BedDouble, FolderOpen, LayoutDashboard, ScanLine, Upload } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "./Logo";
 
 const NAV = [
   { href: "/overview", label: "Overview", icon: LayoutDashboard },
+  { href: "/transactions", label: "Transactions", icon: ArrowLeftRight },
+  { href: "/documents", label: "Documents", icon: FolderOpen },
   { href: "/upload", label: "Add receipts", icon: Upload },
   { href: "/review", label: "Review", icon: ScanLine, badge: true },
   { href: "/import", label: "Import stays", icon: BedDouble },
@@ -19,9 +21,13 @@ interface Props {
 }
 
 /** Fixed sidebar on large screens; a compact top bar with tabs below that. */
-export function Sidebar({ org, reviewBadge, user }: Props) {
-  const path = usePathname();
-  const active = (href: string) => path === href || path.startsWith(`${href}/`);
+export function Sidebar(props: Props) {
+  return <SidebarView {...props} path={usePathname()} />;
+}
+
+/** The same sidebar with no current page highlighted, shown while the path is resolved. */
+export function SidebarView({ org, reviewBadge, user, path }: Props & { path: string | null }) {
+  const active = (href: string) => path !== null && (path === href || path.startsWith(`${href}/`));
 
   return (
     <>
