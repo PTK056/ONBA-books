@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { OverviewView } from "@/components/overview/OverviewView";
+import { PeriodView } from "@/components/overview/PeriodView";
 import { loadOverview } from "@/lib/overview/data";
+import { loadPeriod } from "@/lib/overview/period";
 
 export default function OverviewPage({ searchParams }: PageProps<"/overview">) {
   return (
@@ -14,7 +16,13 @@ export default function OverviewPage({ searchParams }: PageProps<"/overview">) {
 }
 
 async function Content({ searchParams }: Pick<PageProps<"/overview">, "searchParams">) {
-  const { month } = await searchParams;
+  const { month, view, year } = await searchParams;
+  if (view === "year" || view === "all") {
+    const period = await loadPeriod(view, typeof year === "string" ? year : undefined);
+    if (period.kind === "signed_out") redirect("/login?next=/overview");
+    if (period.kind === "no_organization") redirect("/setup");
+    return <PeriodView data={period.data} />;
+  }
   const result = await loadOverview(typeof month === "string" ? month : undefined);
   if (result.kind === "signed_out") redirect("/login?next=/overview");
   if (result.kind === "no_organization") redirect("/setup");

@@ -1,17 +1,16 @@
-import { ArrowDownRight, ArrowUpRight, BedDouble, ChevronLeft, ChevronRight, FileText, Moon, ReceiptText, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, BedDouble, CheckCircle2, ChevronLeft, ChevronRight, CircleAlert, FileText, Moon, ReceiptText, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import Link from "next/link";
 import { NewMenu } from "@/components/shell/NewMenu";
+import { PeriodSwitch } from "@/components/overview/PeriodSwitch";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { CategoryBars } from "@/components/overview/CategoryBars";
 import { money, monthLabel } from "@/components/overview/format";
 import { MonthClose } from "@/components/overview/MonthClose";
-import { OccupancyChart } from "@/components/overview/OccupancyChart";
-import { TrendChart } from "@/components/overview/TrendChart";
 import { shortDate } from "@/lib/format/date";
 import type { Overview } from "@/lib/overview/data";
 import "@/components/overview/chart.css";
 
-const ENTRIES_SHOWN = 12;
+const LATEST_ENTRIES = 5;
 
 /** The overview of one month, from data loaded by the page (or fixtures in the dev preview). */
 export function OverviewView({ data: o }: { data: Overview }) {
@@ -22,101 +21,156 @@ export function OverviewView({ data: o }: { data: Overview }) {
   const margin = o.totals.income ? o.totals.net / o.totals.income : null;
   const occ = o.occupancy[o.occupancy.length - 1];
   const occPrev = o.occupancy[o.occupancy.length - 2];
-  const hasStays = o.occupancy.some((m) => m.booked > 0);
 
   return (
-    <>
-      <div className="viz-root mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 sm:px-8">
-        <PageHeader
-          title="Overview"
-          description={`${o.org.name} · figures in ${cur}`}
-          actions={
-            <>
-              <MonthNav month={o.month} />
-              <StatementLinks villas={o.villas} month={o.month} />
-              {editor && <NewMenu />}
-            </>
-          }
-        />
-        <div className="-mt-2 flex flex-wrap items-center justify-between gap-3">
-          {editor && (o.toReview > 0 || o.toRead > 0 || o.missingEvidence.length > 0) && (
-            <div className="flex flex-wrap gap-2 text-sm">
-              {o.toReview > 0 && <Action href="/review">{o.toReview} receipt{o.toReview === 1 ? "" : "s"} to review</Action>}
-              {o.toRead > 0 && <Action href="/review">{o.toRead} waiting to be read</Action>}
-              {o.missingEvidence.length > 0 && <Action href="#missing">{o.missingEvidence.length} without a receipt</Action>}
-            </div>
-          )}
-        </div>
-
-        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Stat label="Income" icon={<TrendingUp size={16} />} tint="blue" value={o.totals.income} previous={o.previous.income} currency={cur} goodWhenUp />
-          <Stat label="Expenses" icon={<TrendingDown size={16} />} tint="orange" value={o.totals.expenses} previous={o.previous.expenses} currency={cur} goodWhenUp={false} />
-          <Stat label="Net result" icon={<Wallet size={16} />} tint="emerald" value={o.totals.net} previous={o.previous.net} currency={cur} goodWhenUp
-            note={margin !== null ? `${Math.round(margin * 100)}% margin` : undefined} />
-          <OccupancyStat current={occ} previous={occPrev} />
-          <Stat label="Nightly rate" icon={<Moon size={16} />} tint="violet" value={occ.adr ?? 0} previous={occPrev.adr ?? 0} currency={cur} goodWhenUp
-            note={occ.booked ? `RevPAR ${money(occ.revpar, cur)}` : "No nights booked"} />
-          <Coverage expenses={o.evidence.expenses} withReceipt={o.evidence.withReceipt} />
-        </section>
-        {o.totals.income === 0 && o.totals.expenses > 0 && (
-          <p className="-mt-3 text-xs text-zinc-500">No income yet: the Airbnb stays import comes next.</p>
-        )}
-
-        {empty ? (
-          <div className="card flex flex-col items-center p-12 text-center">
-            <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950"><ReceiptText size={20} /></span>
-            <p className="font-medium">No validated entries yet</p>
-            <p className="mt-1 text-sm text-zinc-500">Scan receipts, add expenses by hand or import your Airbnb stays, and your months fill in here.</p>
-            <div className="mt-5"><NewMenu /></div>
-          </div>
-        ) : (
+    <div className="viz-root mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 sm:px-8">
+      <PageHeader
+        title="Overview"
+        description={`${o.org.name} · figures in ${cur}`}
+        actions={
           <>
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-              <Panel title="Last 12 months"><TrendChart trend={o.trend} currency={cur} selected={o.month} /></Panel>
-              <YearPanel year={o.year} currency={cur} />
-            </div>
-
-            {hasStays && (
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-                <Panel title="Occupancy · last 12 months"><OccupancyChart months={o.occupancy} currency={cur} selected={o.month} /></Panel>
-                <StaysPanel month={occ} monthName={monthName} currency={cur} />
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-              <Panel title={`Expenses by category · ${monthLabel(o.month, "short")}`}>
-                <CategoryBars categories={o.categories} currency={cur} />
-              </Panel>
-              <div className="flex flex-col gap-6">
-                <Panel title="Top suppliers"><Suppliers merchants={o.merchants} currency={cur} /></Panel>
-                <Panel title={`${monthName} status`}>
-                  <div className="flex flex-col gap-3">
-                    {o.villas.map((v) => (
-                      <MonthClose
-                        key={v.id} villaId={v.id} villaName={v.name} month={o.month} monthName={monthName}
-                        closed={Boolean(v.closed)} canEdit={o.org.role === "admin"}
-                        warnings={[
-                          ...(o.toReview ? [`${o.toReview} receipt${o.toReview === 1 ? "" : "s"} still to review`] : []),
-                          ...(o.toRead ? [`${o.toRead} receipt${o.toRead === 1 ? "" : "s"} not read yet`] : []),
-                          ...(o.missingEvidence.length ? [`${o.missingEvidence.length} expense${o.missingEvidence.length === 1 ? "" : "s"} without a receipt`] : []),
-                        ]}
-                      />
-                    ))}
-                  </div>
-                </Panel>
-              </div>
-            </div>
-
-            <Panel title={`${monthName} entries · ${o.entries.length}`}>
-              <EntriesTable entries={o.entries} currency={cur} showVilla={o.villas.length > 1} />
-            </Panel>
+            <PeriodSwitch view="month" year={o.month.slice(0, 4)} />
+            <MonthNav month={o.month} />
+            <StatementLinks villas={o.villas} month={o.month} />
+            {editor && <NewMenu />}
           </>
-        )}
+        }
+      />
 
-        {o.villas.length > 1 && <VillaTable villas={o.villas} currency={cur} />}
-        {o.missingEvidence.length > 0 && <MissingEvidence rows={o.missingEvidence} />}
+      {editor && <TodoBar o={o} monthName={monthName} />}
+
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <Stat label="Income" icon={<TrendingUp size={16} />} tint="blue" value={o.totals.income} previous={o.previous.income} currency={cur} goodWhenUp />
+        <Stat label="Expenses" icon={<TrendingDown size={16} />} tint="orange" value={o.totals.expenses} previous={o.previous.expenses} currency={cur} goodWhenUp={false} />
+        <Stat label="Net result" icon={<Wallet size={16} />} tint="emerald" value={o.totals.net} previous={o.previous.net} currency={cur} goodWhenUp
+          note={margin !== null ? `${Math.round(margin * 100)}% margin` : undefined} />
+        <OccupancyStat current={occ} previous={occPrev} />
+        <Stat label="Nightly rate" icon={<Moon size={16} />} tint="violet" value={occ.adr ?? 0} previous={occPrev.adr ?? 0} currency={cur} goodWhenUp
+          note={occ.booked ? `RevPAR ${money(occ.revpar, cur)}` : "No nights booked"} />
+      </section>
+
+      {empty ? (
+        <div className="card flex flex-col items-center p-12 text-center">
+          <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950"><ReceiptText size={20} /></span>
+          <p className="font-medium">No validated entries yet</p>
+          <p className="mt-1 text-sm text-zinc-500">Scan receipts, add expenses by hand or import your Airbnb stays, and your months fill in here.</p>
+          <div className="mt-5"><NewMenu /></div>
+        </div>
+      ) : (
+        <>
+          <div className="mt-2 flex items-center justify-between">
+            <SectionTitle>{monthName}</SectionTitle>
+            <Link href={`/overview?view=year&year=${o.month.slice(0, 4)}`} className="inline-flex items-center gap-0.5 text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">
+              See {o.month.slice(0, 4)} <ChevronRight size={13} />
+            </Link>
+          </div>
+          <div className="-mt-3 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Panel title="Where the money went">
+              <CategoryBars categories={o.categories} currency={cur} />
+              {o.merchants.length > 0 && (
+                <div className="mt-6 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+                  <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-zinc-400">Top suppliers</h3>
+                  <Suppliers merchants={o.merchants} currency={cur} />
+                </div>
+              )}
+            </Panel>
+            <StaysList stays={o.stays} currency={cur} showVilla={o.villas.length > 1} />
+          </div>
+
+          <Panel
+            title="Latest entries"
+            action={<Link href={`/transactions?month=${o.month.slice(0, 7)}`} className="inline-flex items-center gap-0.5 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">All {monthName} entries <ChevronRight size={14} /></Link>}
+          >
+            <EntriesTable entries={o.entries.slice(0, LATEST_ENTRIES)} currency={cur} showVilla={o.villas.length > 1} />
+          </Panel>
+        </>
+      )}
+
+      {o.villas.length > 1 && <VillaTable villas={o.villas} currency={cur} />}
+    </div>
+  );
+}
+
+export function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <h2 className="mt-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">{children}</h2>;
+}
+
+/** Everything that needs a hand this month, in one strip; quiet when there is nothing to do. */
+function TodoBar({ o, monthName }: { o: Overview; monthName: string }) {
+  const missing = o.missingEvidence.length;
+  const pct = o.evidence.expenses ? Math.round((o.evidence.withReceipt / o.evidence.expenses) * 100) : null;
+  const monthOver = o.monthEnded;
+  const openVillas = o.villas.filter((v) => !v.closed);
+  const items = [
+    o.toReview > 0 && <TodoLink key="r" href="/review">{o.toReview} receipt{o.toReview === 1 ? "" : "s"} to review</TodoLink>,
+    o.toRead > 0 && <TodoLink key="w" href="/review">{o.toRead} waiting to be read</TodoLink>,
+    missing > 0 && <TodoLink key="m" href={`/transactions?month=${o.month.slice(0, 7)}&receipt=missing`}>{missing} receipt{missing === 1 ? "" : "s"} missing{pct !== null && ` · ${pct}% backed`}</TodoLink>,
+  ].filter(Boolean);
+  const warnings = [
+    ...(o.toReview ? [`${o.toReview} receipt${o.toReview === 1 ? "" : "s"} still to review`] : []),
+    ...(o.toRead ? [`${o.toRead} receipt${o.toRead === 1 ? "" : "s"} not read yet`] : []),
+    ...(missing ? [`${missing} expense${missing === 1 ? "" : "s"} without a receipt`] : []),
+  ];
+  const allClosed = openVillas.length === 0;
+  // Quiet when there is nothing to act on: no pending items and no ended month left open.
+  if (items.length === 0 && !(monthOver && !allClosed)) return null;
+
+  return (
+    <section className={`card flex flex-col gap-3 p-4 ${items.length || (monthOver && !allClosed) ? "ring-amber-300/60" : ""}`}>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+        <span className="flex items-center gap-1.5 font-medium">
+          {items.length === 0 ? <CheckCircle2 size={16} className="text-emerald-600" /> : <CircleAlert size={16} className="text-amber-500" />}
+          {items.length === 0 ? `Nothing to do for ${monthName}` : "To do"}
+        </span>
+        {items}
+        <span className="ml-auto text-xs text-zinc-500">
+          {allClosed ? `🔒 ${monthName} closed` : `${monthName} open${o.villas.length > 1 ? ` for ${openVillas.length} of ${o.villas.length} villas` : ""}`}
+        </span>
       </div>
-    </>
+      {monthOver && o.org.role === "admin" && (
+        <div className="flex flex-col gap-2 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+          {o.villas.map((v) => (
+            <MonthClose
+              key={v.id} villaId={v.id} villaName={v.name} month={o.month} monthName={monthName}
+              closed={Boolean(v.closed)} canEdit warnings={warnings}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function TodoLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link href={href} className="inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-200 dark:ring-amber-900">
+      {children} <ChevronRight size={13} />
+    </Link>
+  );
+}
+
+function StaysList({ stays, currency, showVilla }: { stays: Overview["stays"]; currency: string; showVilla: boolean }) {
+  const total = stays.reduce((s, x) => s + x.net, 0);
+  const nights = stays.reduce((s, x) => s + x.nightsInMonth, 0);
+  return (
+    <Panel title={`Stays · ${stays.length}`} action={stays.length > 0 && <span className="text-xs text-zinc-500">{nights} nights · net {money(total, currency)}</span>}>
+      {stays.length === 0 ? (
+        <p className="text-sm text-zinc-500">No stays this month.</p>
+      ) : (
+        <ul className="divide-y divide-zinc-100 text-sm dark:divide-zinc-800">
+          {stays.map((x) => (
+            <li key={x.key} className={`flex items-center gap-3 py-2.5 ${x.upcoming ? "text-zinc-400" : ""}`}>
+              <BedDouble size={16} className={x.upcoming ? "text-zinc-300" : "text-violet-600 dark:text-violet-400"} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{x.guest ?? x.code}{x.upcoming && <span className="ml-2 text-xs font-normal">upcoming</span>}</span>
+                <span className="block text-xs text-zinc-500">{shortDate(x.checkIn)} – {shortDate(x.checkOut)} · {x.nightsInMonth} night{x.nightsInMonth === 1 ? "" : "s"} this month{showVilla && ` · ${x.villa}`}</span>
+              </span>
+              <span className="shrink-0 tabular-nums">{money(x.net, currency)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
   );
 }
 
@@ -136,7 +190,7 @@ function MonthNav({ month }: { month: string }) {
   );
 }
 
-const TINTS = {
+export const TINTS = {
   blue: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-300",
   orange: "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-300",
   emerald: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300",
@@ -144,9 +198,9 @@ const TINTS = {
   zinc: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300",
 } as const;
 
-function Stat({ label, icon, tint, value, previous, currency, goodWhenUp, note }: {
+export function Stat({ label, icon, tint, value, previous, currency, goodWhenUp, note, hideChange = false }: {
   label: string; icon: React.ReactNode; tint: keyof typeof TINTS; value: number; previous: number;
-  currency: string; goodWhenUp: boolean; note?: string;
+  currency: string; goodWhenUp: boolean; note?: string; hideChange?: boolean;
 }) {
   const change = previous ? (value - previous) / Math.abs(previous) : null;
   const good = change !== null && change !== 0 && (change > 0) === goodWhenUp;
@@ -160,7 +214,7 @@ function Stat({ label, icon, tint, value, previous, currency, goodWhenUp, note }
         {money(value, currency)} <span className="whitespace-nowrap text-sm font-normal text-zinc-400">{currency}</span>
       </p>
       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-        {change === null ? (
+        {hideChange ? null : change === null ? (
           <span className="text-zinc-400">No figures last month</span>
         ) : (
           <span className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 font-medium ${
@@ -171,29 +225,13 @@ function Stat({ label, icon, tint, value, previous, currency, goodWhenUp, note }
             {Math.abs(Math.round(change * 100))}%
           </span>
         )}
-        {change !== null && <span className="text-zinc-400">vs last month</span>}
-        {note && <span className="text-zinc-500">· {note}</span>}
+        {!hideChange && change !== null && <span className="text-zinc-400">vs last month</span>}
+        {note && <span className="text-zinc-500">{hideChange ? note : `· ${note}`}</span>}
       </div>
     </div>
   );
 }
 
-function Coverage({ expenses, withReceipt }: { expenses: number; withReceipt: number }) {
-  const pct = expenses ? Math.round((withReceipt / expenses) * 100) : null;
-  return (
-    <div className="card p-5">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-zinc-500">Backed by a receipt</p>
-        <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${TINTS.zinc}`}><ReceiptText size={16} /></span>
-      </div>
-      <p className="mt-3 text-2xl font-semibold tracking-tight tabular-nums">{pct === null ? "—" : `${pct}%`}</p>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-        <div className="h-full rounded-full bg-emerald-500" style={{ width: `${pct ?? 0}%` }} />
-      </div>
-      <p className="mt-2 text-xs text-zinc-400">{withReceipt} of {expenses} expense{expenses === 1 ? "" : "s"}</p>
-    </div>
-  );
-}
 
 function StatementLinks({ villas, month }: { villas: Overview["villas"]; month: string }) {
   const href = (id: string) => `/statements/${month.slice(0, 7)}?villa=${id}`;
@@ -234,57 +272,9 @@ function OccupancyStat({ current, previous }: { current: Overview["occupancy"][n
   );
 }
 
-function StaysPanel({ month, monthName, currency }: { month: Overview["occupancy"][number]; monthName: string; currency: string }) {
-  const rows: [string, string][] = [
-    ["Nights booked", `${month.booked} of ${month.available}`],
-    ["Occupancy", `${Math.round(month.occupancy * 100)}%`],
-    ["Income from stays", money(month.stayIncome, currency)],
-    ["Average nightly rate", month.adr === null ? "—" : money(month.adr, currency)],
-    ["RevPAR", money(month.revpar, currency)],
-  ];
-  return (
-    <Panel title={`Stays · ${monthName}`}>
-      <dl className="flex flex-col gap-2 text-sm">
-        {rows.map(([k, v]) => (
-          <div key={k} className="flex justify-between gap-3 border-b border-zinc-100 pb-2 last:border-0 dark:border-zinc-900">
-            <dt className="text-zinc-600 dark:text-zinc-400">{k}</dt>
-            <dd className="tabular-nums font-medium">{v}</dd>
-          </div>
-        ))}
-      </dl>
-      <p className="mt-3 text-xs text-zinc-500">RevPAR: income from stays per available night, booked or not.</p>
-    </Panel>
-  );
-}
 
-function YearPanel({ year, currency }: { year: Overview["year"]; currency: string }) {
-  const rows: [string, string][] = [
-    ["Income", money(year.income, currency)],
-    ["Expenses", money(year.expenses, currency)],
-    ["Net", money(year.net, currency)],
-    ["Average monthly expenses", money(year.averageExpenses, currency)],
-    ...(year.occupancy !== null ? [["Occupancy", `${Math.round(year.occupancy * 100)}%`] as [string, string]] : []),
-    ...(year.adr !== null ? [["Average nightly rate", money(year.adr, currency)] as [string, string]] : []),
-  ];
-  return (
-    <Panel title={`Year to date · since ${monthLabel(year.from)}`}>
-      <dl className="flex flex-col gap-2 text-sm">
-        {rows.map(([k, v]) => (
-          <div key={k} className="flex justify-between gap-3 border-b border-zinc-100 pb-2 last:border-0 dark:border-zinc-900">
-            <dt className="text-zinc-600 dark:text-zinc-400">{k}</dt>
-            <dd className="tabular-nums font-medium">{v}</dd>
-          </div>
-        ))}
-      </dl>
-      <p className="mt-3 text-xs text-zinc-500">
-        {year.months} month{year.months === 1 ? "" : "s"} with entries
-        {year.costliest && year.costliest.expenses > 0 && <> · costliest: {monthLabel(year.costliest.month)} ({money(year.costliest.expenses, currency)})</>}
-      </p>
-    </Panel>
-  );
-}
 
-function Suppliers({ merchants, currency }: { merchants: Overview["merchants"]; currency: string }) {
+export function Suppliers({ merchants, currency }: { merchants: Overview["merchants"]; currency: string }) {
   if (!merchants.length) return <p className="text-sm text-zinc-500">No supplier names on this month&apos;s receipts.</p>;
   return (
     <ul className="flex flex-col gap-2 text-sm">
@@ -333,27 +323,14 @@ function EntriesTable({ entries, currency, showVilla }: { entries: Overview["ent
             <th />
           </tr>
         </thead>
-        <tbody>{entries.slice(0, ENTRIES_SHOWN).map(row)}</tbody>
+        <tbody>{entries.map(row)}</tbody>
       </table>
-      {entries.length > ENTRIES_SHOWN && (
-        <details className="text-sm">
-          <summary className="mt-2 cursor-pointer text-zinc-500">Show all {entries.length} entries</summary>
-          <table className="w-full"><tbody>{entries.slice(ENTRIES_SHOWN).map(row)}</tbody></table>
-        </details>
-      )}
     </div>
   );
 }
 
-function Action({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <Link href={href} className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-200 dark:ring-amber-900">
-      {children} <ChevronRight size={14} />
-    </Link>
-  );
-}
 
-function Panel({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
+export function Panel({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
     <section className="card p-5">
       <div className="mb-5 flex items-center justify-between gap-3">
@@ -365,7 +342,7 @@ function Panel({ title, children, action }: { title: string; children: React.Rea
   );
 }
 
-function VillaTable({ villas, currency }: { villas: Overview["villas"]; currency: string }) {
+export function VillaTable({ villas, currency }: { villas: Overview["villas"]; currency: string }) {
   return (
     <Panel title="By villa">
       <table className="w-full text-sm tabular-nums">
@@ -389,19 +366,3 @@ function VillaTable({ villas, currency }: { villas: Overview["villas"]; currency
   );
 }
 
-function MissingEvidence({ rows }: { rows: Overview["missingEvidence"] }) {
-  return (
-    <section id="missing">
-      <Panel title="Expenses without a receipt">
-        <ul className="divide-y divide-zinc-100 text-sm dark:divide-zinc-900">
-          {rows.map((r) => (
-            <li key={r.id} className="flex justify-between gap-3 py-1.5">
-              <span className="min-w-0 truncate"><span className="text-zinc-500">{shortDate(r.date)}</span> · {r.description ?? "No description"}</span>
-              <span className="shrink-0 tabular-nums">{money(r.amount, r.currency)} {r.currency}</span>
-            </li>
-          ))}
-        </ul>
-      </Panel>
-    </section>
-  );
-}

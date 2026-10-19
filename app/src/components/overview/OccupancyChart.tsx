@@ -8,7 +8,8 @@ import "./chart.css";
 const TICKS = [0, 0.25, 0.5, 0.75, 1];
 
 /** Occupancy per month on a fixed 0–100% axis; nightly rate and RevPAR in the tooltip and table. */
-export function OccupancyChart({ months, currency, selected }: { months: MonthOccupancy[]; currency: string; selected: string }) {
+export function OccupancyChart({ months, currency, selected, byYear = false }: { months: MonthOccupancy[]; currency: string; selected: string; byYear?: boolean }) {
+  const label = (m: string, style: "long" | "short") => (byYear ? m.slice(0, 4) : monthLabel(m, style));
   const [hover, setHover] = useState<number | null>(null);
   const pct = (v: number) => `${Math.round(v * 100)}%`;
 
@@ -38,7 +39,7 @@ export function OccupancyChart({ months, currency, selected }: { months: MonthOc
                     role="tooltip"
                     className={`absolute bottom-full z-10 mb-1 w-max rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-xs shadow-sm dark:border-zinc-800 dark:bg-zinc-900 ${i >= months.length / 2 ? "right-0" : "left-0"}`}
                   >
-                    <p className="mb-1 font-medium">{monthLabel(m.month)}</p>
+                    <p className="mb-1 font-medium">{label(m.month, "long")}</p>
                     <Row k="Occupancy" v={`${pct(m.occupancy)} · ${m.booked} of ${m.available} nights`} />
                     <Row k="Nightly rate" v={m.adr === null ? "—" : `${money(m.adr, currency)} ${currency}`} />
                     <Row k="RevPAR" v={`${money(m.revpar, currency)} ${currency}`} />
@@ -46,8 +47,8 @@ export function OccupancyChart({ months, currency, selected }: { months: MonthOc
                 )}
               </div>
               <span className={`mt-1 text-center text-[10px] ${m.month === selected ? "font-semibold text-zinc-900 dark:text-zinc-100" : "text-zinc-500"}`}>
-                <span className="@md:hidden">{monthLabel(m.month, "short").charAt(0)}</span>
-                <span className="hidden @md:inline">{monthLabel(m.month, "short")}</span>
+                <span className="@md:hidden">{byYear ? label(m.month, "short") : label(m.month, "short").charAt(0)}</span>
+                <span className="hidden @md:inline">{label(m.month, "short")}</span>
               </span>
             </div>
           ))}
@@ -67,7 +68,7 @@ export function OccupancyChart({ months, currency, selected }: { months: MonthOc
           <tbody>
             {months.map((m) => (
               <tr key={m.month} className="border-t border-zinc-100 dark:border-zinc-900">
-                <td className="py-1">{monthLabel(m.month)}</td>
+                <td className="py-1">{label(m.month, "long")}</td>
                 <td className="text-right">{m.booked}/{m.available}</td>
                 <td className="text-right">{pct(m.occupancy)}</td>
                 <td className="text-right">{m.adr === null ? "—" : money(m.adr, currency)}</td>

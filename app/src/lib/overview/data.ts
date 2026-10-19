@@ -55,21 +55,32 @@ export interface VillaMonth {
   adr: number | null;
 }
 
+/** A booking with nights in the month shown, and what this month gets from it. */
+export interface MonthStay {
+  key: string;
+  code: string;
+  platform: string;
+  guest: string | null;      // first name only
+  villa: string;
+  checkIn: string;
+  checkOut: string;
+  nightsInMonth: number;
+  net: number;               // this month's share, reporting currency
+  upcoming: boolean;         // arrives after today
+}
+
 export interface Overview {
   org: { id: string; name: string; reportingCurrency: string; role: "admin" | "staff" | "owner_viewer"; fiscalYearStart: number };
   month: string;
+  monthEnded: boolean;                  // the month shown is over (closing it makes sense)
   trend: MonthTotals[];
   totals: MonthTotals;
   previous: MonthTotals;
   occupancy: MonthOccupancy[];          // same months as `trend`
-  year: {
-    from: string; income: number; expenses: number; net: number; months: number;
-    averageExpenses: number; costliest: MonthTotals | null;
-    occupancy: number | null; adr: number | null;
-  };
   categories: CategoryLine[];
   merchants: { name: string; amount: number; count: number }[];
   entries: Entry[];
+  stays: MonthStay[];
   evidence: { expenses: number; withReceipt: number };
   villas: VillaMonth[];
   missingEvidence: { id: string; date: string; description: string | null; amount: number; currency: string }[];
@@ -89,6 +100,8 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
 type Row = {
   id: string;
   source: string;
+  stay_id: string | null;
+  stay: { external_ref: string | null; platform: string; guest_name: string | null; check_in: string; check_out: string } | null;
   date: string;
   direction: "in" | "out";
   amount: number;
@@ -124,7 +137,7 @@ export async function loadOverview(requested?: string): Promise<OverviewResult> 
   const [orgRow, txs, missing, closes, toReview, toRead, stays] = await Promise.all([
     db.from("organizations").select("fiscal_year_start").eq("id", org.id).single(),
     db.from("transactions")
-      .select("id, date, direction, source, amount, currency, amount_reporting, description, villa_id, category:categories (name), evidence (storage_path, extracted)")
+      .select("id, date, direction, source, amount, currency, amount_reporting, description, villa_id, category:categories (name), evidence (storage_path, extracted), stay_id, stay:stays (external_ref, platform, guest_name, check_in, check_out)")
       .eq("organization_id", org.id).eq("status", "validated")
       .gte("date", windowFrom).lt("date", to)
       .order("date", { ascending: false }).limit(MAX_ENTRIES),
@@ -200,14 +213,7 @@ export async function loadOverview(requested?: string): Promise<OverviewResult> 
   const occupancy = trend.map((t) => occupancyFor(t.month, villaCount));
   const previous = trend[trend.length - 2];
 
-  // Year to date, from the organization's fiscal year start (within the 12-month window).
   const fyStart = orgRow.data?.fiscal_year_start ?? 1;
-  const fyYear = month.getUTCMonth() + 1 >= fyStart ? month.getUTCFullYear() : month.getUTCFullYear() - 1;
-  const yearFrom = iso(new Date(Date.UTC(fyYear, fyStart - 1, 1)));
-  const yearMonths = trend.filter((t) => t.month >= yearFrom);
-  const activeMonths = yearMonths.filter((t) => t.expenses > 0 || t.income > 0);
-  const yearIncome = yearMonths.reduce((s, t) => s + t.income, 0);
-  const yearExpenses = yearMonths.reduce((s, t) => s + t.expenses, 0);
 
   // The month itself.
   const monthRows = rows.filter((r) => r.date >= from && r.date < to);
@@ -252,29 +258,35 @@ export async function loadOverview(requested?: string): Promise<OverviewResult> 
     data: {
       org: { id: org.id, name: org.name, reportingCurrency: org.reportingCurrency, role: org.role, fiscalYearStart: fyStart },
       month: from,
+      monthEnded: from < `${new Date().toISOString().slice(0, 7)}-01`,
       trend,
       totals,
       previous,
-      year: {
-        from: yearFrom,
-        income: yearIncome,
-        expenses: yearExpenses,
-        net: yearIncome - yearExpenses,
-        months: activeMonths.length,
-        averageExpenses: activeMonths.length ? yearExpenses / activeMonths.length : 0,
-        costliest: activeMonths.length ? activeMonths.reduce((a, b) => (b.expenses > a.expenses ? b : a)) : null,
-        ...(() => {
-          const ys = occupancy.filter((o) => o.month >= yearFrom);
-          const booked = ys.reduce((n, o) => n + o.booked, 0);
-          const available = ys.reduce((n, o) => n + o.available, 0);
-          const income = ys.reduce((n, o) => n + o.stayIncome, 0);
-          return { occupancy: available ? booked / available : null, adr: booked ? income / booked : null };
-        })(),
-      },
       occupancy,
       categories,
       merchants: [...merchants].map(([name, m]) => ({ name, ...m })).sort((a, b) => b.amount - a.amount).slice(0, 6),
-      entries: monthRows.map((r) => ({
+      stays: (() => {
+        const today = new Date().toISOString().slice(0, 10);
+        const DAY = 86_400_000;
+        const by = new Map<string, MonthStay>();
+        for (const r of monthRows) {
+          if (r.source !== "stay" || !r.stay || !r.stay_id) continue;
+          const st = r.stay;
+          const inStart = Math.max(Date.parse(`${from}T00:00:00Z`), Date.parse(`${st.check_in}T00:00:00Z`));
+          const inEnd = Math.min(Date.parse(`${to}T00:00:00Z`), Date.parse(`${st.check_out}T00:00:00Z`));
+          const m = by.get(r.stay_id) ?? {
+            key: r.stay_id, code: st.external_ref ?? "-", platform: st.platform,
+            guest: st.guest_name?.split(/\s+/)[0] ?? null, villa: villaName.get(r.villa_id) ?? "",
+            checkIn: st.check_in, checkOut: st.check_out,
+            nightsInMonth: Math.max(0, Math.round((inEnd - inStart) / DAY)),
+            net: 0, upcoming: st.check_in > today,
+          };
+          m.net += (r.direction === "in" ? 1 : -1) * Number(r.amount_reporting);
+          by.set(r.stay_id, m);
+        }
+        return [...by.values()].sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+      })(),
+      entries: monthRows.filter((r) => r.source !== "stay").map((r) => ({
         id: r.id,
         date: r.date,
         description: r.description,

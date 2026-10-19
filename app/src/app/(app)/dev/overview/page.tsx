@@ -24,11 +24,11 @@ const OCCUPANCY = TREND.map((t, i) => {
 const DATA: Overview = {
   org: { id: "dev", name: "Casa Demo", reportingCurrency: "IDR", role: "admin", fiscalYearStart: 1 },
   month: "2026-09-01",
+  monthEnded: true,
   trend: TREND,
   totals: TREND[11],
   previous: TREND[10],
   occupancy: OCCUPANCY,
-  year: { from: "2026-01-01", income: 307_800_000, expenses: 83_500_000, net: 224_300_000, months: 7, averageExpenses: 11_928_571, costliest: TREND[8], occupancy: 0.67, adr: 2_160_000 },
   categories: [
     { name: "Staff", amount: 6_500_000, count: 2, share: 0.485, monthlyAverage: 6_500_000 },
     { name: "Cleaning & laundry", amount: 2_900_000, count: 9, share: 0.216, monthlyAverage: 1_800_000 },
@@ -51,6 +51,12 @@ const DATA: Overview = {
     { id: "5", date: "2026-09-01", description: "Airbnb payout", merchant: null, category: "Accommodation", villa: "Villa One", direction: "in", amount: 44_000_000, original: { amount: 2_750, currency: "USD" }, receiptUrl: null },
   ],
   evidence: { expenses: 31, withReceipt: 29 },
+  stays: [
+    { key: "s1", code: "HMCCC", platform: "airbnb", guest: "Cleo", villa: "Villa One", checkIn: "2026-08-28", checkOut: "2026-09-05", nightsInMonth: 4, net: 7_677_817, upcoming: false },
+    { key: "s2", code: "HMFYH", platform: "airbnb", guest: "Max", villa: "Villa One", checkIn: "2026-09-07", checkOut: "2026-09-11", nightsInMonth: 4, net: 5_766_035, upcoming: false },
+    { key: "s3", code: "HM8PN", platform: "airbnb", guest: "Lea", villa: "Villa One", checkIn: "2026-09-13", checkOut: "2026-09-16", nightsInMonth: 3, net: 4_311_373, upcoming: false },
+    { key: "s4", code: "HM535", platform: "airbnb", guest: "Tom", villa: "Villa One", checkIn: "2026-09-25", checkOut: "2026-09-29", nightsInMonth: 4, net: 2_139_976, upcoming: false },
+  ],
   villas: [{ id: "00000000-0000-0000-0000-000000000001", name: "Villa One", income: 44_000_000, expenses: 13_400_000, net: 30_600_000, closed: null, booked: 20, available: 30, occupancy: 20 / 30, adr: 2_200_000 }],
   missingEvidence: [
     { id: "m1", date: "2026-09-05", description: "Staff salary, Kadek", amount: 3_250_000, currency: "IDR" },

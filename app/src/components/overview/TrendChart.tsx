@@ -11,7 +11,8 @@ const SERIES = [
 ] as const;
 
 /** Income and expenses per month, grouped bars on one axis, with a hover tooltip and a table view. */
-export function TrendChart({ trend, currency, selected }: { trend: MonthTotals[]; currency: string; selected: string }) {
+export function TrendChart({ trend, currency, selected, byYear = false }: { trend: MonthTotals[]; currency: string; selected: string; byYear?: boolean }) {
+  const label = (m: string, style: "long" | "short") => (byYear ? m.slice(0, 4) : monthLabel(m, style));
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(1, ...trend.flatMap((t) => [t.income, t.expenses]));
   const ticks = niceTicks(max);
@@ -70,7 +71,7 @@ export function TrendChart({ trend, currency, selected }: { trend: MonthTotals[]
                       i >= trend.length / 2 ? "right-0" : "left-0"
                     }`}
                   >
-                    <p className="mb-1 font-medium">{monthLabel(m.month)}</p>
+                    <p className="mb-1 font-medium">{label(m.month, "long")}</p>
                     {SERIES.map((s) => (
                       <p key={s.key} className="flex items-center gap-1.5 tabular-nums">
                         <span className="h-2 w-2 rounded-sm" style={{ background: s.color }} />
@@ -84,8 +85,8 @@ export function TrendChart({ trend, currency, selected }: { trend: MonthTotals[]
                 )}
               </div>
               <span className={`mt-1 text-center text-[10px] ${m.month === selected ? "font-semibold text-zinc-900 dark:text-zinc-100" : "text-zinc-500"}`}>
-                <span className="@md:hidden">{monthLabel(m.month, "short").charAt(0)}</span>
-                <span className="hidden @md:inline">{monthLabel(m.month, "short")}</span>
+                <span className="@md:hidden">{byYear ? label(m.month, "short") : label(m.month, "short").charAt(0)}</span>
+                <span className="hidden @md:inline">{label(m.month, "short")}</span>
               </span>
             </div>
           ))}
@@ -101,7 +102,7 @@ export function TrendChart({ trend, currency, selected }: { trend: MonthTotals[]
           <tbody>
             {trend.map((m) => (
               <tr key={m.month} className="border-t border-zinc-100 dark:border-zinc-900">
-                <td className="py-1">{monthLabel(m.month)}</td>
+                <td className="py-1">{label(m.month, "long")}</td>
                 <td className="text-right">{money(m.income, currency)}</td>
                 <td className="text-right">{money(m.expenses, currency)}</td>
                 <td className="text-right">{money(m.net, currency)}</td>
