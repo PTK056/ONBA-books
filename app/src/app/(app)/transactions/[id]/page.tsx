@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { money } from "@/components/overview/format";
+import { shortDate } from "@/lib/format/date";
 import { AttachReceipt, DeleteEntry, ShareDownload } from "@/components/transactions/FileActions";
 import { TxForm } from "@/components/transactions/TxForm";
 import { getTransaction, needsReceipt } from "@/lib/transactions/data";
@@ -36,7 +37,7 @@ async function Content({ params, searchParams }: Pick<PageProps<"/transactions/[
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-sm text-zinc-500">{tx.date} · {tx.villa.name} · {SOURCES[tx.source]}</p>
+          <p className="text-sm text-zinc-500">{shortDate(tx.date)} · {tx.villa.name} · {SOURCES[tx.source]}</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">{tx.description ?? tx.merchant ?? "Entry"}</h1>
           {tx.merchant && tx.merchant !== tx.description && <p className="text-sm text-zinc-500">{tx.merchant}</p>}
         </div>
@@ -75,7 +76,7 @@ async function Content({ params, searchParams }: Pick<PageProps<"/transactions/[
                   {f.downloadUrl && (
                     <ShareDownload
                       evidenceId={f.id} name={f.name} mime={f.mime} downloadUrl={f.downloadUrl}
-                      label={`${tx.description ?? tx.merchant ?? "Receipt"} – ${tx.date} – ${money(tx.amount, tx.currency)} ${tx.currency}`}
+                      label={`${tx.description ?? tx.merchant ?? "Receipt"} – ${shortDate(tx.date)} – ${money(tx.amount, tx.currency)} ${tx.currency}`}
                     />
                   )}
                 </div>

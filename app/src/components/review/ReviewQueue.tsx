@@ -48,7 +48,7 @@ export function ReviewQueue({ items: initial, options, accept, reject }: Props) 
           {reviewed ? `${reviewed} receipt${reviewed > 1 ? "s" : ""} reviewed in this session.` : "New receipts will appear here once they have been read."}
         </p>
         <Link href="/upload" className="mt-2 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">
-          Add receipts
+          Scan receipts
         </Link>
       </div>
     );

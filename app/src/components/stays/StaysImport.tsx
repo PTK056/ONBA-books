@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { importAirbnb, type ImportSummary } from "@/app/(app)/import/actions";
 import { money } from "@/components/overview/format";
+import { shortDate } from "@/lib/format/date";
 import { allocateByNights, parseAirbnbCsv, type AirbnbStay } from "@/lib/stays/airbnb";
 
 interface Props {
@@ -118,7 +119,7 @@ export function StaysImport({ villas, reportingCurrency, initialFile }: Props) {
                             <span className="font-mono text-xs">{s.code}</span>
                             {s.guest && <span className="block text-xs text-zinc-500">{s.guest.split(" ")[0]}</span>}
                           </td>
-                          <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-300">{short(s.checkIn)} → {short(s.checkOut)} <span className="text-zinc-400">· {s.nights}n</span></td>
+                          <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-300">{shortDate(s.checkIn)} → {shortDate(s.checkOut)} <span className="text-zinc-400">· {s.nights}n</span></td>
                           <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">{money(s.gross, s.currency)} <span className="text-xs text-zinc-400">{s.currency}</span></td>
                           <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-zinc-500">{money(s.fees, s.currency)}</td>
                           <td className="whitespace-nowrap px-3 py-2 text-right font-medium tabular-nums">{money(s.net, s.currency)}</td>
@@ -165,7 +166,7 @@ function Totals({ stays }: { stays: AirbnbStay[] }) {
   const tiles: [string, string][] = [
     ["Stays", String(stays.length)],
     ["Nights", String(nights)],
-    ["Period", `${short(stays[0].checkIn, true)} – ${short(stays.at(-1)!.checkOut, true)}`],
+    ["Period", `${shortDate(stays[0].checkIn)} – ${shortDate(stays.at(-1)!.checkOut)}`],
     ...[...byCurrency].map(([c, t]): [string, string] => [`Net ${c}`, money(t.net, c)]),
   ];
   return (
@@ -219,6 +220,3 @@ function Done({ summary, onAgain }: { summary: ImportSummary; onAgain: () => voi
   );
 }
 
-function short(iso: string, withYear = false) {
-  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("en", { day: "numeric", month: "short", ...(withYear ? { year: "numeric" } : {}), timeZone: "UTC" });
-}

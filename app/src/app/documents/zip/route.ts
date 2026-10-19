@@ -6,17 +6,22 @@ import { createClient } from "@/lib/supabase/server";
 
 const MAX_FILES = 400;
 
-/** GET /documents/zip?month=YYYY-MM[&villa=…] → every document of the month, plus an index. */
+/**
+ * GET /documents/zip?month=YYYY-MM and/or ?category=<id> [&villa=…] → the matching documents
+ * (a month, a category all time, or both), plus an index.
+ */
 export async function GET(request: NextRequest) {
-  const month = request.nextUrl.searchParams.get("month") ?? "";
-  const villa = request.nextUrl.searchParams.get("villa") ?? undefined;
-  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return new Response("Choose a month", { status: 400 });
+  const sp = request.nextUrl.searchParams;
+  const month = sp.get("month")?.match(/^\d{4}-(0[1-9]|1[0-2])$/)?.[0];
+  const category = sp.get("category")?.match(/^[0-9a-f-]{36}$/i)?.[0];
+  const villa = sp.get("villa") ?? undefined;
+  if (!month && !category) return new Response("Choose a month or a category", { status: 400 });
 
-  const result = await listTransactions({ month, villa, receipt: "attached" });
+  const result = await listTransactions({ month, category, villa, receipt: "attached" });
   if (result.kind !== "ready") return new Response("Not signed in", { status: 401 });
   const files = result.rows.flatMap((tx) => tx.files.map((f, i) => ({ tx, f, i: tx.files.length > 1 ? i + 1 : undefined })));
   if (!files.length) return new Response("No documents for this month", { status: 404 });
-  if (files.length > MAX_FILES) return new Response("Too many documents; filter by villa", { status: 413 });
+  if (files.length > MAX_FILES) return new Response("Too many documents; narrow to a month or a villa", { status: 413 });
 
   const db = await createClient();
   const entries: Record<string, Uint8Array> = {};
@@ -40,8 +45,10 @@ export async function GET(request: NextRequest) {
   return new Response(new Uint8Array(zip), {
     headers: {
       "Content-Type": "application/zip",
-      "Content-Disposition": `attachment; filename="${org}-${month}-documents.zip"`,
+      "Content-Disposition": `attachment; filename="${[org, category && slug(result.categories.find((c) => c.id === category)?.name ?? "category"), month].filter(Boolean).join("-")}-documents.zip"`,
       "Cache-Control": "private, no-store",
     },
   });
 }
+
+const slug = (s: string) => s.replace(/[^\w]+/g, "-").replace(/^-+|-+$/g, "");

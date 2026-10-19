@@ -1,8 +1,10 @@
-import { Paperclip, Plus, Search } from "lucide-react";
+import { Paperclip, Search } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { money } from "@/components/overview/format";
+import { shortDate } from "@/lib/format/date";
+import { NewMenu } from "@/components/shell/NewMenu";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { listTransactions, needsReceipt, type TxFilters } from "@/lib/transactions/data";
 
@@ -42,12 +44,7 @@ async function Content({ searchParams }: Pick<PageProps<"/transactions">, "searc
       <PageHeader
         title="Transactions"
         description="Every validated entry, with its receipt."
-        actions={editor && (
-          <>
-            <Link href="/transactions/new?type=income" className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-white px-3 text-sm font-medium shadow-sm ring-1 ring-zinc-950/10 hover:bg-zinc-50 dark:bg-zinc-900 dark:ring-white/10"><Plus size={15} /> Add income</Link>
-            <Link href="/transactions/new" className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white shadow-sm hover:bg-emerald-700"><Plus size={15} /> Add expense</Link>
-          </>
-        )}
+        actions={editor && <NewMenu />}
       />
 
       <form className="card grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 lg:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto]">
@@ -105,7 +102,7 @@ async function Content({ searchParams }: Pick<PageProps<"/transactions">, "searc
               <tbody>
                 {rows.map((t) => (
                   <tr key={t.id} className="group border-t border-zinc-100 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/60">
-                    <td className="whitespace-nowrap px-5 py-3 text-zinc-500"><Link href={`/transactions/${t.id}`} className="block">{t.date}</Link></td>
+                    <td className="whitespace-nowrap px-5 py-3 text-zinc-500"><Link href={`/transactions/${t.id}`} className="block">{shortDate(t.date)}</Link></td>
                     <td className="px-3 py-3">
                       <Link href={`/transactions/${t.id}`} className="block">
                         <span className="block font-medium text-zinc-900 group-hover:underline dark:text-zinc-100">{t.description ?? t.merchant ?? "—"}</span>

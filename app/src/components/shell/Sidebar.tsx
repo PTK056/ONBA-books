@@ -9,7 +9,7 @@ const NAV = [
   { href: "/overview", label: "Overview", icon: LayoutDashboard },
   { href: "/transactions", label: "Transactions", icon: ArrowLeftRight },
   { href: "/documents", label: "Documents", icon: FolderOpen },
-  { href: "/upload", label: "Add receipts", icon: Upload },
+  { href: "/upload", label: "Scan receipts", icon: Upload },
   { href: "/review", label: "Review", icon: ScanLine, badge: true },
   { href: "/import", label: "Import stays", icon: BedDouble },
 ] as const;

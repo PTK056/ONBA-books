@@ -2,6 +2,7 @@
 
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { fractionDigits } from "@/components/review/amount";
+import { shortDate } from "@/lib/format/date";
 import type { Statement, StatementLine } from "./data";
 
 const C = {
@@ -42,10 +43,8 @@ function money(v: number, currency: string) {
 // Built-in PDF fonts (Helvetica) only cover WinAnsi: no "→" or "−", so plain "–" and "-" are
 // used. Month names are written out here so every server prints the same text.
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const parts = (iso: string) => ({ y: +iso.slice(0, 4), m: +iso.slice(5, 7) - 1, d: +iso.slice(8, 10) });
-const day = (iso: string) => { const { m, d } = parts(iso); return `${String(d).padStart(2, "0")} ${MONTHS[m].slice(0, 3)}`; };
-const monthName = (iso: string) => { const { y, m } = parts(iso); return `${MONTHS[m]} ${y}`; };
-const fullDate = (iso: string) => `${day(iso)} ${iso.slice(0, 4)}`;
+const day = shortDate;
+const monthName = (iso: string) => `${MONTHS[+iso.slice(5, 7) - 1]} ${iso.slice(0, 4)}`;
 
 /** Fixed-width cell helper: widths in % of the row. */
 const cell = (w: string, extra: object = {}) => ({ width: w, paddingHorizontal: 4, ...extra });
@@ -66,7 +65,7 @@ export function StatementPdf({ st }: { st: Statement }) {
           </View>
           <View style={s.meta}>
             <Text>Amounts in {cur}</Text>
-            <Text>Issued {fullDate(st.generatedAt.slice(0, 10))}</Text>
+            <Text>Issued {shortDate(st.generatedAt.slice(0, 10))}</Text>
             <Text>{st.closed ? "Month closed" : "Month open"}</Text>
           </View>
         </View>

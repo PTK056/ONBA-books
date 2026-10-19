@@ -1,11 +1,13 @@
-import { ArrowDownRight, ArrowUpRight, BedDouble, ChevronLeft, ChevronRight, FileText, Moon, Plus, ReceiptText, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, BedDouble, ChevronLeft, ChevronRight, FileText, Moon, ReceiptText, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import Link from "next/link";
+import { NewMenu } from "@/components/shell/NewMenu";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { CategoryBars } from "@/components/overview/CategoryBars";
 import { money, monthLabel } from "@/components/overview/format";
 import { MonthClose } from "@/components/overview/MonthClose";
 import { OccupancyChart } from "@/components/overview/OccupancyChart";
 import { TrendChart } from "@/components/overview/TrendChart";
+import { shortDate } from "@/lib/format/date";
 import type { Overview } from "@/lib/overview/data";
 import "@/components/overview/chart.css";
 
@@ -32,11 +34,7 @@ export function OverviewView({ data: o }: { data: Overview }) {
             <>
               <MonthNav month={o.month} />
               <StatementLinks villas={o.villas} month={o.month} />
-              {editor && (
-                <Link href="/upload" className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white shadow-sm hover:bg-emerald-700">
-                  <Plus size={16} /> Add receipts
-                </Link>
-              )}
+              {editor && <NewMenu />}
             </>
           }
         />
@@ -68,8 +66,8 @@ export function OverviewView({ data: o }: { data: Overview }) {
           <div className="card flex flex-col items-center p-12 text-center">
             <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950"><ReceiptText size={20} /></span>
             <p className="font-medium">No validated entries yet</p>
-            <p className="mt-1 text-sm text-zinc-500">Add receipts, review them, and your months fill in here.</p>
-            <Link href="/upload" className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700"><Plus size={16} /> Add receipts</Link>
+            <p className="mt-1 text-sm text-zinc-500">Scan receipts, add expenses by hand or import your Airbnb stays, and your months fill in here.</p>
+            <div className="mt-5"><NewMenu /></div>
           </div>
         ) : (
           <>
@@ -304,7 +302,7 @@ function EntriesTable({ entries, currency, showVilla }: { entries: Overview["ent
   if (!entries.length) return <p className="text-sm text-zinc-500">No entries this month.</p>;
   const row = (e: Overview["entries"][number]) => (
     <tr key={e.id} className="border-t border-zinc-100 align-top dark:border-zinc-900">
-      <td className="whitespace-nowrap py-2 pr-3 text-zinc-500">{e.date.slice(8)} {monthLabel(`${e.date.slice(0, 7)}-01`, "short")}</td>
+      <td className="whitespace-nowrap py-2 pr-3 text-zinc-500">{shortDate(e.date)}</td>
       <td className="min-w-40 py-2 pr-3">
         <Link href={`/transactions/${e.id}`} className="block hover:underline">{e.description ?? "—"}</Link>
         {e.merchant && <span className="block text-xs text-zinc-500">{e.merchant}</span>}
@@ -398,7 +396,7 @@ function MissingEvidence({ rows }: { rows: Overview["missingEvidence"] }) {
         <ul className="divide-y divide-zinc-100 text-sm dark:divide-zinc-900">
           {rows.map((r) => (
             <li key={r.id} className="flex justify-between gap-3 py-1.5">
-              <span className="min-w-0 truncate"><span className="text-zinc-500">{r.date.slice(8)} {monthLabel(`${r.date.slice(0, 7)}-01`, "short")}</span> · {r.description ?? "No description"}</span>
+              <span className="min-w-0 truncate"><span className="text-zinc-500">{shortDate(r.date)}</span> · {r.description ?? "No description"}</span>
               <span className="shrink-0 tabular-nums">{money(r.amount, r.currency)} {r.currency}</span>
             </li>
           ))}

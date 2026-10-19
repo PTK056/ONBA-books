@@ -8,7 +8,7 @@ export default function UploadPage() {
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8 sm:px-8">
       <PageHeader
-        title="Add receipts"
+        title="Scan receipts"
         description="Photos or PDFs of receipts, invoices and transfer slips. Each one is read for you, then waits for your review."
       />
       <Suspense fallback={<div className="card h-64 animate-pulse" />}>
