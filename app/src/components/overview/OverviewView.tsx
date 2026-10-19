@@ -1,4 +1,4 @@
-import { ArrowDownRight, ArrowUpRight, BedDouble, ChevronLeft, ChevronRight, Moon, Plus, ReceiptText, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, BedDouble, ChevronLeft, ChevronRight, FileText, Moon, Plus, ReceiptText, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { CategoryBars } from "@/components/overview/CategoryBars";
@@ -31,6 +31,7 @@ export function OverviewView({ data: o }: { data: Overview }) {
           actions={
             <>
               <MonthNav month={o.month} />
+              <StatementLinks villas={o.villas} month={o.month} />
               {editor && (
                 <Link href="/upload" className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white shadow-sm hover:bg-emerald-700">
                   <Plus size={16} /> Add receipts
@@ -193,6 +194,24 @@ function Coverage({ expenses, withReceipt }: { expenses: number; withReceipt: nu
       </div>
       <p className="mt-2 text-xs text-zinc-400">{withReceipt} of {expenses} expense{expenses === 1 ? "" : "s"}</p>
     </div>
+  );
+}
+
+function StatementLinks({ villas, month }: { villas: Overview["villas"]; month: string }) {
+  const href = (id: string) => `/statements/${month.slice(0, 7)}?villa=${id}`;
+  const cls = "inline-flex h-9 items-center gap-1.5 rounded-lg bg-white px-3 text-sm font-medium shadow-sm ring-1 ring-zinc-950/10 hover:bg-zinc-50 dark:bg-zinc-900 dark:ring-white/10 dark:hover:bg-zinc-800";
+  if (villas.length === 1) {
+    return <a href={href(villas[0].id)} target="_blank" rel="noreferrer" className={cls}><FileText size={15} /> Statement PDF</a>;
+  }
+  return (
+    <details className="relative">
+      <summary className={`${cls} cursor-pointer list-none`}><FileText size={15} /> Statements</summary>
+      <div className="card absolute right-0 z-20 mt-1 flex w-56 flex-col p-1">
+        {villas.map((v) => (
+          <a key={v.id} href={href(v.id)} target="_blank" rel="noreferrer" className="rounded-md px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">{v.name}</a>
+        ))}
+      </div>
+    </details>
   );
 }
 
