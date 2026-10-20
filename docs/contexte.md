@@ -31,6 +31,36 @@ gestionnaires (Bali d'abord, puis l'Australie et ailleurs).
 - Facturation : les codes d'activité (KBLI) de PT ONBA ne couvrent probablement pas le logiciel.
 - Données personnelles : RGPD, UU PDP (Indonésie), Privacy Act (Australie).
 
-## Prochaine étape
-`docs/cadrage.md` : tri des fonctionnalités (cœur commun / réglages / modules / propre à Casa ONBA),
-modèle de données, piste de prix, questions pour les 5 à 10 premiers prospects.
+## État au 20/10/2026
+Cadrage fait (`docs/cadrage.md`). Décisions depuis : **Supabase direct** (pas de phase Airtable),
+**produit en libre-service** (Pierre vend le système, ne tient la compta de personne),
+segment à trancher après 5–10 entretiens (base déjà prévue pour les gestionnaires).
+
+Code dans `app/` (Next.js 16 + Supabase), branche **`core-schema`**, pas encore fusionnée dans `main`.
+Projet Supabase `wnmukybwihyrxzcbfbdz` lié (CLI connectée sur le Mac de Pierre) ; migrations et
+Edge Function `read-receipts` déployées. L'app tourne en local (`npm run dev` dans `app/`) ;
+Casa ONBA y est la première organisation réelle (tickets de démo + 44 séjours Airbnb importés).
+
+Ce qui marche de bout en bout :
+- **Tickets** : Scan receipts → lecture Claude (Opus 5.5) → Review (champs douteux surlignés) → écriture validée + justificatif.
+- **Saisie à la main** (dépense / recette), justificatif joint tout de suite ou plus tard.
+- **Import Airbnb** (Transaction history CSV) : séjours, revenus et frais répartis par nuits, taux de chaque versement
+  (net = versé par Airbnb au rupiah près). Réimport idempotent.
+- **Overview** : vues Month / Year / All time, occupation, prix par nuit, clôture du mois.
+- **Transactions** (journal, recherche, fiche avec Download / Share / WhatsApp / lien 7 jours) et
+  **Documents** (dossiers année → mois, filtres par catégorie, ZIP).
+- **Relevé mensuel PDF** par villa.
+
+Vérifications : `npm test` (parser Airbnb), `npm run test:db` (SQL sur PGlite), `npm run check:queries`
+(requêtes de l'app rejouées contre le projet), `npx tsc --noEmit`, `npx eslint`, `npx next build`.
+Pages de démo sans connexion (dev seulement) : `/dev/overview`, `/dev/period`, `/dev/review`, `/dev/import`, `/dev/statement`.
+
+Secrets hors dépôt : clé Anthropic dans `~/.config/onbabooks/anthropic_key` (aussi en secret de la
+fonction Supabase) ; `app/.env.local` (URL + clé publique Supabase).
+
+## Prochaines étapes (ordre proposé)
+1. **Mise en ligne** (Vercel) + vrai service d'e-mails pour la connexion (l'envoi Supabase par défaut est
+   limité aux membres de l'équipe et à quelques e-mails/heure). Débloque l'usage sur téléphone.
+2. Rapprochement bancaire Danamon (Claude lit bien les relevés PDF).
+3. Couche gestionnaire : frais de gestion, relevés propriétaires à la marque, accès propriétaires.
+4. Entretiens prospects (questions dans `docs/cadrage.md` §6).
