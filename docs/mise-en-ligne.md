@@ -1,6 +1,14 @@
 # Mise en ligne (étape 1)
 
-But : l'app sur une vraie adresse (`app.onbabooks.com`), utilisable sur téléphone, avec des e-mails
+**État au 20/10/2026** : l'app est en ligne sur https://onba-books.vercel.app (Vercel Hobby, dépôt privé
+`PTK056/ONBA-books`, déploiement à chaque push sur `main`). Supabase connaît cette adresse (site et
+retours autorisés). Pierre s'y connecte depuis son téléphone. Clé Resend rangée dans
+`~/.config/onbabooks/resend_key`. **Reste** : le domaine, puis Resend + SMTP + modèle d'e-mail (points 1, 2 et 6).
+Le plan gratuit de Supabase **refuse de changer les modèles d'e-mail** sans SMTP personnalisé : l'e-mail
+ONBA Books (lien + code) attend donc le domaine. Les blocs sont commentés dans `config.toml`.
+Pour `config push` : relire le diff, ne pousser que ce qu'on veut changer (le CLI compare aussi stockage, MFA, etc.).
+
+But : l'app sur une vraie adresse (`app.onbabooks.com`, en attendant `onba-books.vercel.app`), utilisable sur téléphone, avec des e-mails
 de connexion envoyés à n'importe qui (aujourd'hui l'envoi Supabase par défaut ne part qu'aux membres
 de l'équipe Supabase, quelques e-mails par heure).
 

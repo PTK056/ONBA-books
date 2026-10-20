@@ -36,9 +36,10 @@ Cadrage fait (`docs/cadrage.md`). Décisions depuis : **Supabase direct** (pas d
 **produit en libre-service** (Pierre vend le système, ne tient la compta de personne),
 segment à trancher après 5–10 entretiens (base déjà prévue pour les gestionnaires).
 
-Code dans `app/` (Next.js 16 + Supabase), branche **`core-schema`**, pas encore fusionnée dans `main`.
+Code dans `app/` (Next.js 16 + Supabase), dépôt privé GitHub `PTK056/ONBA-books` ; `main` = `core-schema`.
+**En ligne** sur https://onba-books.vercel.app (Vercel Hobby, déploiement à chaque push sur `main`).
 Projet Supabase `wnmukybwihyrxzcbfbdz` lié (CLI connectée sur le Mac de Pierre) ; migrations et
-Edge Function `read-receipts` déployées. L'app tourne en local (`npm run dev` dans `app/`) ;
+Edge Function `read-receipts` déployées. L'app tourne aussi en local (`npm run dev` dans `app/`) ;
 Casa ONBA y est la première organisation réelle (tickets de démo + 44 séjours Airbnb importés).
 
 Ce qui marche de bout en bout :
@@ -59,8 +60,10 @@ Secrets hors dépôt : clé Anthropic dans `~/.config/onbabooks/anthropic_key` (
 fonction Supabase) ; `app/.env.local` (URL + clé publique Supabase).
 
 ## Prochaines étapes (ordre proposé)
-1. **Mise en ligne** (Vercel) + vrai service d'e-mails pour la connexion (l'envoi Supabase par défaut est
-   limité aux membres de l'équipe et à quelques e-mails/heure). Débloque l'usage sur téléphone.
+1. **Finir la mise en ligne** (`docs/mise-en-ligne.md`) : acheter `onbabooks.com`, le vérifier dans Resend,
+   activer le SMTP et l'e-mail de connexion ONBA Books. D'ici là, seul Pierre peut se connecter (envoi
+   Supabase par défaut, lien à ouvrir dans le navigateur qui l'a demandé, pas de code dans l'e-mail).
+   Passer Vercel en Pro avant le premier client payant.
 2. Rapprochement bancaire Danamon (Claude lit bien les relevés PDF).
 3. Couche gestionnaire : frais de gestion, relevés propriétaires à la marque, accès propriétaires.
 4. Entretiens prospects (questions dans `docs/cadrage.md` §6).
