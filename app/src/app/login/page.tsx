@@ -8,7 +8,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
       <Logo className="mb-8 text-lg" />
       <div className="card w-full max-w-sm p-6">
         <h1 className="text-lg font-semibold">Sign in</h1>
-        <p className="mb-5 mt-1 text-sm text-zinc-500">We&apos;ll e-mail you a link. New here? The same link creates your account.</p>
+        <p className="mb-5 mt-1 text-sm text-zinc-500">We&apos;ll e-mail you a link and a code. New here? The same link creates your account.</p>
         <Suspense>
           <Form searchParams={searchParams} />
         </Suspense>

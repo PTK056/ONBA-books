@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#18181b;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:440px;background:#ffffff;border:1px solid #e4e4e7;border-radius:12px;padding:32px;">
+            <tr>
+              <td style="font-size:16px;font-weight:600;padding-bottom:24px;">
+                <span style="display:inline-block;width:24px;height:24px;border-radius:6px;background:#059669;vertical-align:middle;"></span>
+                <span style="vertical-align:middle;margin-left:8px;">ONBA Books</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="font-size:20px;font-weight:600;padding-bottom:8px;">Sign in to ONBA Books</td>
+            </tr>
+            <tr>
+              <td style="font-size:14px;line-height:20px;color:#52525b;padding-bottom:24px;">
+                Tap the button to sign in. It works once and expires in one hour.
+              </td>
+            </tr>
+            <tr>
+              <td style="padding-bottom:24px;">
+                <a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email"
+                   style="display:inline-block;background:#059669;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 20px;border-radius:8px;">
+                  Sign in
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style="font-size:14px;line-height:20px;color:#52525b;padding-bottom:8px;">
+                Or enter this code on the sign-in page:
+              </td>
+            </tr>
+            <tr>
+              <td style="font-size:28px;font-weight:600;letter-spacing:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;padding-bottom:24px;">
+                {{ .Token }}
+              </td>
+            </tr>
+            <tr>
+              <td style="font-size:12px;line-height:18px;color:#a1a1aa;border-top:1px solid #e4e4e7;padding-top:16px;">
+                You asked to sign in with {{ .Email }}. If it wasn't you, ignore this e-mail.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

@@ -234,15 +234,27 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
+# Production SMTP: Resend, sending from the verified onbabooks.com domain (see docs/mise-en-ligne.md).
+# Uncomment once the domain is verified in Resend; RESEND_API_KEY must be set when running `config push`.
 # [auth.email.smtp]
 # enabled = true
-# host = "smtp.sendgrid.net"
-# port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# host = "smtp.resend.com"
+# port = 465
+# user = "resend"
+# pass = "env(RESEND_API_KEY)"
+# admin_email = "hello@onbabooks.com"
+# sender_name = "ONBA Books"
+
+# Sign-in e-mail: a token_hash link (works in any browser, unlike the PKCE ?code= link, which needs
+# the browser that asked for it) plus the 6-digit code for the sign-in page. New users get the
+# confirmation template, existing ones the magic link: same content for both.
+[auth.email.template.magic_link]
+subject = "Your ONBA Books sign-in link"
+content_path = "./supabase/templates/sign_in.html"
+
+[auth.email.template.confirmation]
+subject = "Your ONBA Books sign-in link"
+content_path = "./supabase/templates/sign_in.html"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
