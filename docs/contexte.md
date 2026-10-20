@@ -38,6 +38,8 @@ segment à trancher après 5–10 entretiens (base déjà prévue pour les gesti
 
 Code dans `app/` (Next.js 16 + Supabase), dépôt privé GitHub `PTK056/ONBA-books` ; `main` = `core-schema`.
 **En ligne** sur https://onba-books.vercel.app (Vercel Hobby, déploiement à chaque push sur `main`).
+Serveur Vercel à Tokyo (`hnd1`, `app/vercel.json`), à côté de la base Supabase (`ap-northeast-1`) :
+ne pas changer l'un sans l'autre.
 Projet Supabase `wnmukybwihyrxzcbfbdz` lié (CLI connectée sur le Mac de Pierre) ; migrations et
 Edge Function `read-receipts` déployées. L'app tourne aussi en local (`npm run dev` dans `app/`) ;
 Casa ONBA y est la première organisation réelle (tickets de démo + 44 séjours Airbnb importés).
