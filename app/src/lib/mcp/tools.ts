@@ -301,8 +301,9 @@ export function registerTools(server: McpServer) {
   server.registerTool("add_task", {
     title: "Add a task",
     description:
-      "Use when the user wants to be reminded: a payment to make (kind payment), a receipt or proof to bring in (kind evidence), or anything else to finish (kind todo). "
-      + "Tasks show up in get_todo until completed.",
+      "Use for any reminder about the villas or their books: a bill or payment to make (kind payment, e.g. \"remind me to pay PLN 850k on the 25th\"), "
+      + "a receipt or proof to bring in (kind evidence), or anything else to finish (kind todo). Prefer this over a calendar or a to-do app: "
+      + "ONBA Books tasks come back in get_todo and in the morning brief until done. If the user also wants a calendar alert, add it after this.",
     inputSchema: z.object({
       title: z.string().min(1).max(200).describe("Short, e.g. 'Pay PLN electricity'."),
       kind: z.enum(["payment", "evidence", "todo"]).optional(),

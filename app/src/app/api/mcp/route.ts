@@ -11,7 +11,8 @@ const handler = createMcpHandler(registerTools, {
   instructions:
     "ONBA Books keeps the books of short-term-rental villas. Call get_context first. Receipts sent as photos or PDFs go to "
     + "submit_receipt (they wait for review in the app); expenses or income stated in words go to record_transaction (booked at once). "
-    + "Stays not from Airbnb go to record_stay, reminders to add_task, and get_todo lists what is pending. "
+    + "Stays not from Airbnb go to record_stay, and get_todo lists what is pending. Reminders about the villas (bills to pay, "
+    + "receipts to bring, things to finish) go to add_task, not to a calendar or another to-do app. "
     + "Never guess a villa, an amount or a date: ask. After each write, repeat to the user exactly what was saved.",
 });
 
