@@ -91,7 +91,9 @@ export function registerTools(server: McpServer) {
       status: "to_review",
       message: p.is_receipt === false ? "This does not look like a receipt. It is in the review queue; reject it there if it is not one." : "Read and waiting in the review queue.",
       read: {
-        merchant: p.merchant, date: p.date, total: p.total, currency: p.currency, category: p.category, villa: p.villa,
+        merchant: p.merchant, date: p.date, total: p.total, currency: p.currency, category: p.category,
+        // The villa the review will use: read from the receipt, else the one given (or the only one).
+        villa: s.villas.find((v) => v.id === p.villa_id)?.name ?? "(to choose at review)",
         description: p.description, document_type: p.document_type,
       },
       uncertain_fields: p.uncertain_fields ?? [],
