@@ -36,6 +36,9 @@ export interface Session {
   role: "admin" | "staff" | "owner_viewer";
   villas: Villa[];
   categories: Category[];
+  /** Chat agent only: files the user sent, already stored in the evidence bucket. */
+  attachments?: Map<string, { path: string; mimeType: string }>;
+  usedAttachments?: Set<string>;
 }
 
 export class ToolError extends Error {}
@@ -44,7 +47,12 @@ export class ToolError extends Error {}
 export async function loadSession(auth: AuthInfo | undefined): Promise<Session> {
   const userId = auth?.extra?.userId;
   if (!auth || typeof userId !== "string") throw new ToolError("Not signed in. Reconnect ONBA Books in your assistant.");
-  const db = clientFor(auth.token);
+  return sessionFor(auth.token, userId);
+}
+
+/** Session for a user whose access token we already hold (MCP call or chat channel). */
+export async function sessionFor(token: string, userId: string): Promise<Session> {
+  const db = clientFor(token);
 
   const { data: m } = await db.from("memberships")
     .select("role, organization_id, organizations (name, reporting_currency, timezone, evidence_threshold)")
@@ -60,7 +68,7 @@ export async function loadSession(auth: AuthInfo | undefined): Promise<Session> 
     db.from("categories").select("id, name, kind").eq("organization_id", row.organization_id).is("archived_at", null).order("name"),
   ]);
   return {
-    db, token: auth.token, userId,
+    db, token, userId,
     org: {
       id: row.organization_id, name: row.organizations.name, reportingCurrency: row.organizations.reporting_currency,
       timezone: row.organizations.timezone, evidenceThreshold: Number(row.organizations.evidence_threshold),

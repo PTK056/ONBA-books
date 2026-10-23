@@ -11,32 +11,71 @@ const APP = "https://onba-books.vercel.app";
 const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD");
 const CURRENCY = z.string().regex(/^[A-Za-z]{3}$/, "three-letter code, e.g. IDR").transform((c) => c.toUpperCase());
 const UUID = z.string().uuid();
-const file = {
-  file_url: z.string().optional().describe("Public https link to the photo or PDF (as received in the chat)."),
-  file_base64: z.string().optional().describe("The file itself, base64 (a data: URL is fine). Use when there is no link."),
-  mime_type: z.string().optional().describe("e.g. image/jpeg or application/pdf, if known."),
+/** How a tool receives a file: MCP clients pass a link or base64; the chat agent points at a file the user sent. */
+const FILE_FIELDS = {
+  mcp: {
+    file_url: z.string().optional().describe("Public https link to the photo or PDF (as received in the chat)."),
+    file_base64: z.string().optional().describe("The file itself, base64 (a data: URL is fine). Use when there is no link."),
+    mime_type: z.string().optional().describe("e.g. image/jpeg or application/pdf, if known."),
+  },
+  chat: {
+    attachment_id: z.string().optional().describe("Id of a photo or PDF the user sent in this chat, e.g. \"att_1\" (shown next to each file)."),
+  },
 };
+export type Channel = keyof typeof FILE_FIELDS;
+
+/** One tool, shared by the MCP server and the chat agent. */
+export interface ToolDef {
+  name: string;
+  title: string;
+  description: string;
+  inputSchema: z.ZodObject;
+  annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean };
+  handler: (s: Session, args: never) => Promise<object>;
+}
 
 type Result = { content: { type: "text"; text: string }[]; isError?: boolean };
-const reply = (data: object): Result => ({ content: [{ type: "text", text: JSON.stringify(data, null, 1) }] });
 
-/** Runs a tool with the caller's session; known problems come back as a readable error, not a crash. */
-function run<A>(fn: (s: Session, args: A) => Promise<object>) {
-  return async (args: A, ctx: { http?: { authInfo?: AuthInfo } }): Promise<Result> => {
-    try {
-      return reply(await fn(await loadSession(ctx.http?.authInfo), args));
-    } catch (e) {
-      if (e instanceof ToolError) return { content: [{ type: "text", text: e.message }], isError: true };
-      console.error("[mcp]", e);
-      return { content: [{ type: "text", text: "Something went wrong in ONBA Books. Try again in a moment." }], isError: true };
-    }
-  };
+/** Runs a tool for the caller; known problems come back as a readable message, not a crash. */
+export async function runTool(t: ToolDef, s: Session, args: unknown): Promise<{ ok: boolean; text: string }> {
+  try {
+    return { ok: true, text: JSON.stringify(await t.handler(s, args as never), null, 1) };
+  } catch (e) {
+    if (e instanceof ToolError) return { ok: false, text: e.message };
+    console.error(`[tool ${t.name}]`, e);
+    return { ok: false, text: "Something went wrong in ONBA Books. Try again in a moment." };
+  }
 }
 
 const friendly = (message = "") =>
   message.includes("closed") ? "That month is closed for this villa. Use a date in an open month, or reopen the month in the app." : null;
 
+type Registrar = { registerTool(name: string, config: Omit<ToolDef, "name" | "handler">, handler: (s: Session, args: never) => Promise<object>): void };
+
+/** The tools, with file fields for the given channel. */
+export function toolDefs(channel: Channel): ToolDef[] {
+  const defs: ToolDef[] = [];
+  define({ registerTool: (name, config, handler) => defs.push({ name, ...config, handler }) }, channel);
+  return defs;
+}
+
+/** MCP server: each call loads the session from the caller's OAuth token. */
 export function registerTools(server: McpServer) {
+  for (const t of toolDefs("mcp")) {
+    server.registerTool(t.name, { title: t.title, description: t.description, inputSchema: t.inputSchema, annotations: t.annotations },
+      async (args: unknown, ctx: { http?: { authInfo?: AuthInfo } }): Promise<Result> => {
+        let s: Session;
+        try { s = await loadSession(ctx.http?.authInfo); } catch (e) {
+          return { content: [{ type: "text", text: e instanceof ToolError ? e.message : "Could not open ONBA Books." }], isError: true };
+        }
+        const r = await runTool(t, s, args);
+        return { content: [{ type: "text", text: r.text }], ...(r.ok ? {} : { isError: true }) };
+      });
+  }
+}
+
+function define(server: Registrar, channel: Channel) {
+  const file = FILE_FIELDS[channel];
   server.registerTool("get_context", {
     title: "Get context",
     description:
@@ -44,7 +83,7 @@ export function registerTools(server: McpServer) {
       + "the income and expense categories and the reporting currency. Use only these villa and category names in other tools; never invent one.",
     inputSchema: z.object({}),
     annotations: { readOnlyHint: true },
-  }, run(async (s) => ({
+  }, (async (s) => ({
     organization: s.org.name,
     your_role: s.role,
     today: today(s),
@@ -66,7 +105,7 @@ export function registerTools(server: McpServer) {
       ...file,
       villa: z.string().optional().describe("Villa name, if the user said which one. Leave empty to let the reading decide."),
     }),
-  }, run(async (s, a: { file_url?: string; file_base64?: string; mime_type?: string; villa?: string }) => {
+  }, (async (s, a: { file_url?: string; file_base64?: string; mime_type?: string; attachment_id?: string; villa?: string }) => {
     requireEditor(s);
     const villa = a.villa ? resolveVilla(s, a.villa) : s.villas.length === 1 ? s.villas[0] : null;
     const { data: batch, error } = await s.db.from("receipt_batches")
@@ -120,9 +159,9 @@ export function registerTools(server: McpServer) {
       fx_rate: z.number().positive().optional().describe("Only for a foreign currency with no rate on file: 1 unit = ? reporting currency."),
       ...file,
     }),
-  }, run(async (s, a: {
+  }, (async (s, a: {
     direction: "in" | "out"; amount: number; currency?: string; date?: string; villa?: string; category?: string;
-    description?: string; fx_rate?: number; file_url?: string; file_base64?: string; mime_type?: string;
+    description?: string; fx_rate?: number; file_url?: string; file_base64?: string; mime_type?: string; attachment_id?: string;
   }) => {
     requireEditor(s);
     const villa = resolveVilla(s, a.villa);
@@ -136,7 +175,7 @@ export function registerTools(server: McpServer) {
     }).select("id").single();
     if (error || !data) throw new ToolError(friendly(error?.message) ?? "Could not save. Try again.");
     let receipt = "none";
-    if (a.file_url || a.file_base64) {
+    if (a.file_url || a.file_base64 || a.attachment_id) {
       await storeEvidence(s, a, data.id);
       receipt = "attached";
     }
@@ -155,7 +194,7 @@ export function registerTools(server: McpServer) {
     description: "Deletes an entry that was entered by hand (record_transaction), e.g. when the user says it was a mistake. Confirm with the user before calling.",
     inputSchema: z.object({ transaction_id: UUID }),
     annotations: { destructiveHint: true },
-  }, run(async (s, a: { transaction_id: string }) => {
+  }, (async (s, a: { transaction_id: string }) => {
     requireEditor(s);
     const { data: tx } = await s.db.from("transactions").select("id, source, date, amount, currency, description")
       .eq("id", a.transaction_id).eq("organization_id", s.org.id).maybeSingle();
@@ -170,7 +209,7 @@ export function registerTools(server: McpServer) {
     title: "Attach a receipt to an entry",
     description: "Adds a photo or PDF as proof to an entry that already exists (find it with find_transactions or get_todo). Allowed in closed months.",
     inputSchema: z.object({ transaction_id: UUID, ...file }),
-  }, run(async (s, a: { transaction_id: string; file_url?: string; file_base64?: string; mime_type?: string }) => {
+  }, (async (s, a: { transaction_id: string; file_url?: string; file_base64?: string; mime_type?: string; attachment_id?: string }) => {
     requireEditor(s);
     const { data: tx } = await s.db.from("transactions").select("id, date, amount, currency, description")
       .eq("id", a.transaction_id).eq("organization_id", s.org.id).maybeSingle();
@@ -191,7 +230,7 @@ export function registerTools(server: McpServer) {
       limit: z.number().int().min(1).max(50).optional(),
     }),
     annotations: { readOnlyHint: true },
-  }, run(async (s, a: { from?: string; to?: string; villa?: string; category?: string; direction?: "in" | "out"; text?: string; missing_evidence?: boolean; limit?: number }) => {
+  }, (async (s, a: { from?: string; to?: string; villa?: string; category?: string; direction?: "in" | "out"; text?: string; missing_evidence?: boolean; limit?: number }) => {
     const villa = a.villa ? resolveVilla(s, a.villa) : null;
     const category = a.category ? resolveCategory(s, a.direction === "in" ? "income" : "expense", a.category) : null;
     let q = s.db.from(a.missing_evidence ? "expenses_missing_evidence" : "transactions")
@@ -221,7 +260,7 @@ export function registerTools(server: McpServer) {
     description: "Income, expenses and net result for a month, in the reporting currency, by villa and by category. Defaults to the current month.",
     inputSchema: z.object({ month: z.string().regex(/^\d{4}-\d{2}$/, "YYYY-MM").optional() }),
     annotations: { readOnlyHint: true },
-  }, run(async (s, a: { month?: string }) => {
+  }, (async (s, a: { month?: string }) => {
     const month = a.month ?? today(s).slice(0, 7);
     const start = `${month}-01`;
     const [y, m] = month.split("-").map(Number);
@@ -269,7 +308,7 @@ export function registerTools(server: McpServer) {
       reference: z.string().max(60).optional().describe("Booking reference, if any. Keeps re-sends from duplicating."),
       fx_rate: z.number().positive().optional(),
     }),
-  }, run(async (s, a: {
+  }, (async (s, a: {
     platform: "direct" | "booking" | "vrbo" | "airbnb" | "other"; check_in: string; check_out: string; gross: number; fees?: number;
     currency?: string; villa?: string; guest?: string; reference?: string; fx_rate?: number;
   }) => {
@@ -313,7 +352,7 @@ export function registerTools(server: McpServer) {
       villa: z.string().optional(),
       notes: z.string().max(1000).optional(),
     }),
-  }, run(async (s, a: { title: string; kind?: "payment" | "evidence" | "todo"; due_date?: string; amount?: number; currency?: string; villa?: string; notes?: string }) => {
+  }, (async (s, a: { title: string; kind?: "payment" | "evidence" | "todo"; due_date?: string; amount?: number; currency?: string; villa?: string; notes?: string }) => {
     requireEditor(s);
     const villa = a.villa ? resolveVilla(s, a.villa) : null;
     const currency = a.amount ? (a.currency ?? villa?.currency ?? s.org.reportingCurrency) : null;
@@ -329,7 +368,7 @@ export function registerTools(server: McpServer) {
     title: "Complete a task",
     description: "Marks a task as done (find its task_id with get_todo). If it was a payment, offer to record the expense with record_transaction.",
     inputSchema: z.object({ task_id: UUID }),
-  }, run(async (s, a: { task_id: string }) => {
+  }, (async (s, a: { task_id: string }) => {
     requireEditor(s);
     const { data, error } = await s.db.from("tasks").update({ done_at: new Date().toISOString(), done_by: s.userId })
       .eq("id", a.task_id).eq("organization_id", s.org.id).is("done_at", null).select("title, kind, amount, currency").maybeSingle();
@@ -345,7 +384,7 @@ export function registerTools(server: McpServer) {
       + "and last month if it is not closed. Use it for a morning brief or when the user asks what is pending. Summarize briefly; offer to help with each item.",
     inputSchema: z.object({}),
     annotations: { readOnlyHint: true },
-  }, run(async (s) => {
+  }, (async (s) => {
     const day = today(s);
     const [y, m] = day.split("-").map(Number);
     const lastMonth = new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 10);

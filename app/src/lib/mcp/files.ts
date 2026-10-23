@@ -6,7 +6,7 @@ const TYPES: Record<string, string> = {
   "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif", "application/pdf": "pdf",
 };
 
-export interface FileInput { file_url?: string; file_base64?: string; mime_type?: string; file_name?: string }
+export interface FileInput { file_url?: string; file_base64?: string; mime_type?: string; attachment_id?: string }
 
 /** Photo or PDF given as an https link or base64, checked for type and size. */
 export async function readFileInput(f: FileInput): Promise<{ bytes: Uint8Array; mimeType: string; extension: string }> {
@@ -38,15 +38,27 @@ export async function readFileInput(f: FileInput): Promise<{ bytes: Uint8Array; 
 
 /** Stores the file in the organization's private evidence folder and returns its evidence row id. */
 export async function storeEvidence(s: Session, f: FileInput, transactionId: string | null = null) {
-  const file = await readFileInput(f);
-  const path = `${s.org.id}/${crypto.randomUUID()}.${file.extension}`;
-  const up = await s.db.storage.from("evidence").upload(path, file.bytes, { contentType: file.mimeType });
-  if (up.error) throw new ToolError("Could not store the file. Try again.");
+  let path: string;
+  let mimeType: string;
+  if (f.attachment_id) {
+    // Sent in the chat: already in the organization's evidence folder.
+    const att = s.attachments?.get(f.attachment_id);
+    if (!att) throw new ToolError(`No file "${f.attachment_id}" in this chat. Ask the user to send it again.`);
+    if (s.usedAttachments?.has(f.attachment_id)) throw new ToolError(`${f.attachment_id} is already saved. Each file can be used once.`);
+    ({ path, mimeType } = att);
+    s.usedAttachments?.add(f.attachment_id);
+  } else {
+    const file = await readFileInput(f);
+    path = `${s.org.id}/${crypto.randomUUID()}.${file.extension}`;
+    mimeType = file.mimeType;
+    const up = await s.db.storage.from("evidence").upload(path, file.bytes, { contentType: mimeType });
+    if (up.error) throw new ToolError("Could not store the file. Try again.");
+  }
   const { data, error } = await s.db.from("evidence")
-    .insert({ organization_id: s.org.id, storage_path: path, mime_type: file.mimeType, transaction_id: transactionId })
+    .insert({ organization_id: s.org.id, storage_path: path, mime_type: mimeType, transaction_id: transactionId })
     .select("id").single();
   if (error || !data) throw new ToolError("Could not save the file. Try again.");
-  return { evidenceId: data.id as string, path, mimeType: file.mimeType };
+  return { evidenceId: data.id as string, path, mimeType };
 }
 
 function safeUrl(raw: string): URL {

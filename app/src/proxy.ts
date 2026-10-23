@@ -1,8 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// /api/mcp and the OAuth metadata authenticate with a bearer token, not the session cookie.
-const PUBLIC_PATHS = ["/login", "/auth/", "/api/mcp", "/.well-known/"];
+// /api/mcp and the OAuth metadata authenticate with a bearer token, the Telegram webhook with its
+// secret header: none of them uses the session cookie.
+const PUBLIC_PATHS = ["/login", "/auth/", "/api/mcp", "/.well-known/", "/api/channels/telegram"];
 
 /** Refreshes the Supabase session on every navigation and sends signed-out users to /login. */
 export async function proxy(request: NextRequest) {
