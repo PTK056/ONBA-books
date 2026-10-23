@@ -379,13 +379,15 @@ enabled = false
 # domain = "example.clerk.accounts.dev"
 
 # OAuth server configuration
+# ONBA Books is the authorization server for its MCP server (/api/mcp): an assistant (WhatsApp agent,
+# Claude...) signs the user in here and gets a token that acts as that user, so RLS applies as in the app.
 [auth.oauth_server]
 # Enable OAuth server functionality
-enabled = false
-# Path for OAuth consent flow UI
+enabled = true
+# Path for OAuth consent flow UI (relative to site_url)
 authorization_url_path = "/oauth/consent"
-# Allow dynamic client registration
-allow_dynamic_registration = false
+# Allow dynamic client registration: MCP clients register themselves.
+allow_dynamic_registration = true
 
 [edge_runtime]
 enabled = true

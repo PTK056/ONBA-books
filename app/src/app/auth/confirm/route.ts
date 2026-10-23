@@ -19,8 +19,9 @@ export async function GET(request: NextRequest) {
       ? await supabase.auth.exchangeCodeForSession(code)
       : await supabase.auth.verifyOtp({ type: type!, token_hash: tokenHash! });
     if (!error) {
-      target.pathname = next.startsWith("/") && !next.startsWith("//") ? next : "/overview";
-      return NextResponse.redirect(target);
+      // next may carry a query string (e.g. /oauth/consent?authorization_id=…), so resolve it as a URL.
+      const dest = new URL(next.startsWith("/") && !next.startsWith("//") ? next : "/overview", target.origin);
+      return NextResponse.redirect(dest);
     }
   }
   target.pathname = "/login";

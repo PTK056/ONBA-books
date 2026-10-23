@@ -1,7 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/auth/"];
+// /api/mcp and the OAuth metadata authenticate with a bearer token, not the session cookie.
+const PUBLIC_PATHS = ["/login", "/auth/", "/api/mcp", "/.well-known/"];
 
 /** Refreshes the Supabase session on every navigation and sends signed-out users to /login. */
 export async function proxy(request: NextRequest) {
@@ -30,7 +31,7 @@ export async function proxy(request: NextRequest) {
   if (!data?.claims && !PUBLIC_PATHS.some((p) => path.startsWith(p))) {
     const login = request.nextUrl.clone();
     login.pathname = "/login";
-    login.search = `?next=${encodeURIComponent(path)}`;
+    login.search = `?next=${encodeURIComponent(path + request.nextUrl.search)}`; // keep e.g. ?authorization_id=
     return NextResponse.redirect(login);
   }
   return response;
