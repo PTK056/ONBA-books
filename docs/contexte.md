@@ -28,7 +28,8 @@ gestionnaires (Bali d'abord, puis l'Australie et ailleurs).
 
 ## Risques notés
 - ONBA est aussi une société de gestion locative : un frein possible pour vendre aux gestionnaires concurrents.
-- Facturation : les codes d'activité (KBLI) de PT ONBA ne couvrent probablement pas le logiciel.
+- Facturation : ONBA Books ne sera **pas** porté par la PT indonésienne (décidé le 23/10/2026) ; structure qui vend
+  (et qui ouvre le compte Meta Business pour l'agent WhatsApp) encore à préciser.
 - Données personnelles : RGPD, UU PDP (Indonésie), Privacy Act (Australie).
 
 ## État au 20/10/2026
