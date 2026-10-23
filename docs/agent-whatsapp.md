@@ -45,6 +45,11 @@ WhatsApp → **Owl** (owlagent.me, SaaS d'un ami) → **serveur MCP ONBA Books**
 
 Pour brancher un assistant : adresse `https://onba-books.vercel.app/api/mcp`, connexion OAuth (automatique).
 
+**Testé avec Claude (claude.ai, 23/10/2026)** : connexion OAuth + consentement OK ; `get_todo`, `record_transaction`
+(« 350k essence Kadek hier »), `submit_receipt` (photo → lu → Review, villa déjà choisie) et `add_task` OK.
+À surveiller : pour « rappelle-moi… », Claude a d'abord pris Google Agenda ; les descriptions orientent
+désormais vers `add_task`. Pas encore testé : `record_stay`, `attach_evidence`, `complete_task`, `month_summary`.
+
 ## À demander à l'ami (Owl)
 1. Owl accepte-t-il un serveur MCP personnalisé ? Avec OAuth, ou seulement un en-tête fixe ?
 2. Comment une photo ou un PDF WhatsApp est-il transmis à un outil MCP (lien, base64, rien) ?
