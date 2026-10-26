@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { AuthInfo } from "@modelcontextprotocol/server";
+import { APP_URL } from "@/lib/app-url";
 
 /** Supabase client acting as the user the bearer token was issued to (RLS applies, as in the app). */
 export function clientFor(token: string): SupabaseClient {
@@ -61,7 +62,7 @@ export async function sessionFor(token: string, userId: string): Promise<Session
     role: Session["role"]; organization_id: string;
     organizations: { name: string; reporting_currency: string; timezone: string; evidence_threshold: number };
   } | null;
-  if (!row) throw new ToolError("This account has no organization yet. Finish setup at https://onba-books.vercel.app/setup.");
+  if (!row) throw new ToolError(`This account has no organization yet. Finish setup at ${APP_URL}/setup.`);
 
   const [villas, categories] = await Promise.all([
     db.from("villas").select("id, name, currency").eq("organization_id", row.organization_id).is("archived_at", null).order("name"),

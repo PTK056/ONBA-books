@@ -7,7 +7,7 @@ import {
   loadSession, rateFor, requireEditor, resolveCategory, resolveVilla, today, ToolError, type Session,
 } from "./session";
 
-const APP = "https://onba-books.vercel.app";
+import { APP_URL as APP } from "@/lib/app-url";
 const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD");
 const CURRENCY = z.string().regex(/^[A-Za-z]{3}$/, "three-letter code, e.g. IDR").transform((c) => c.toUpperCase());
 const UUID = z.string().uuid();

@@ -3,7 +3,9 @@ import { createHash } from "node:crypto";
 
 // ONBA Books' own OAuth client for chat channels, registered once on Supabase's OAuth server
 // (public client + PKCE). The user consents on /oauth/consent like any other assistant.
-export const APP_URL = process.env.APP_URL ?? "https://onba-books.vercel.app";
+import { APP_URL } from "@/lib/app-url";
+
+export { APP_URL };
 const ISSUER = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1`;
 export const REDIRECT_URI = `${APP_URL}/api/channels/link/callback`;
 const SCOPE = "openid email offline_access";
