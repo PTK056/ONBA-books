@@ -84,6 +84,9 @@ async function answer(link: Link, chatId: string, items: Incoming[]) {
     await db.from("chat_conversations").update({
       messages: turn.history, attachments, updated_at: new Date().toISOString(),
     }).eq("link_id", link.id);
+    // A real sentence (not a one-word answer) tells the brief which language to write in.
+    const sentence = items.map((i) => i.text?.trim() ?? "").filter((t) => t.split(/\s+/).length >= 4).at(-1);
+    if (sentence) await db.from("channel_links").update({ last_user_text: sentence.slice(0, 300) }).eq("id", link.id);
     await sendMessage(chatId, turn.reply);
   } finally {
     clearInterval(typing);

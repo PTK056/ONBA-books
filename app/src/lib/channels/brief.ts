@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { toolDefs } from "@/lib/mcp/tools";
 import type { Session } from "@/lib/mcp/session";
+import { APP_URL } from "@/lib/app-url";
 
 // Morning brief: what is left to do, from get_todo, trimmed to what needs the user soon.
 // Returns null when nothing does: then no message is sent.
@@ -30,7 +31,8 @@ export async function briefItems(s: Session) {
     receipts_to_review: todo.receipts_to_review,
     expenses_missing_receipt: todo.expenses_missing_receipt,
     month_to_close: Number(todo.today.slice(8, 10)) <= CLOSE_REMINDER_UNTIL_DAY ? todo.month_to_close : null,
-    review_link: todo.review,
+    review_link: todo.receipts_to_review ? todo.review : null,
+    missing_receipts_link: todo.expenses_missing_receipt.count ? `${APP_URL}/transactions?receipt=missing` : null,
   };
   const empty = !items.tasks_due.length && !items.receipts_to_review && !items.expenses_missing_receipt.count && !items.month_to_close;
   return empty ? null : items;
@@ -41,17 +43,20 @@ const client = new Anthropic();
 /** A short message for a phone, in the user's language (guessed from their recent messages). */
 export async function writeBrief(items: object, recentUserText: string[]): Promise<string> {
   const r = await client.messages.create({
-    model: process.env.AGENT_MODEL ?? "claude-opus-5-5",
+    // Rewording a short list: Haiku is enough, and ~40x cheaper than the agent's model.
+    model: process.env.BRIEF_MODEL ?? "claude-haiku-5-5",
     max_tokens: 2000,
     output_config: { effort: "low" },
     system:
       "You write the Splyce morning brief for someone who runs short-term-rental villas, sent in a chat on their phone. "
       + "From the JSON, write a short message: a one-line greeting, then only what needs them (overdue first), a few short bullets, "
-      + "amounts with thousand separators and currency, the review link if receipts wait. End with one short offer to help. "
-      + "No headings, no tables, **bold** at most once. Write in the language of the user's recent messages; English if there are none.",
+      + "amounts with thousand separators and currency. Links: review_link for receipts waiting for review, missing_receipts_link for "
+      + "expenses without a receipt (they can be attached by sending the photo in this chat); never mix them up. End with one short offer to help. "
+      + "No headings, no tables, **bold** at most once. Write in the language of the language sample; English if there is none. Mention only what the JSON contains.",
     messages: [{
       role: "user",
-      content: `Recent messages from the user:\n${recentUserText.map((t) => `- ${t}`).join("\n") || "(none)"}\n\nTo-do JSON:\n${JSON.stringify(items)}`,
+      content: `Language sample (old messages from the user; use them ONLY to pick the language, never as facts or to-dos):\n`
+        + `${recentUserText.map((t) => `- ${t}`).join("\n") || "(none)"}\n\nTo-do JSON (the only source of facts):\n${JSON.stringify(items)}`,
     }],
   });
   return r.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("\n").trim();

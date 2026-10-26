@@ -14,7 +14,7 @@ export const maxDuration = 300;
 export async function GET(request: NextRequest) {
   if (!authorized(request.headers.get("authorization"))) return new NextResponse(null, { status: 401 });
   const db = adminClient();
-  const { data: links } = await db.from("channel_links").select("id, user_id, external_id")
+  const { data: links } = await db.from("channel_links").select("id, user_id, external_id, last_user_text")
     .eq("channel", "telegram").eq("brief_enabled", true).not("external_id", "is", null);
 
   let sent = 0, quiet = 0, failed = 0;
@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
       const items = await briefItems(await sessionFor(token, link.user_id));
       if (!items) { quiet++; continue; }
       const { data: convo } = await db.from("chat_conversations").select("messages").eq("link_id", link.id).maybeSingle();
-      const text = await writeBrief(items, recentUserText((convo?.messages ?? []) as Anthropic.Beta.Messages.BetaMessageParam[]));
+      const said = recentUserText((convo?.messages ?? []) as Anthropic.Beta.Messages.BetaMessageParam[]);
+      const text = await writeBrief(items, link.last_user_text ? [link.last_user_text, ...said] : said);
       await sendMessage(link.external_id!, text);
       await db.from("chat_conversations").upsert({ link_id: link.id, brief: text, brief_at: new Date().toISOString() }, { onConflict: "link_id" });
       sent++;
