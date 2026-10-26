@@ -59,6 +59,12 @@ Ce qui marche de bout en bout :
 - **Assistant** (`docs/agent-whatsapp.md`) : serveur MCP `/api/mcp` (OAuth Supabase, testé avec Claude) et **agent Telegram
   @ONBAbooks_bot** : reçus (photo/PDF → Review), dépenses dictées, séjours, pense-bêtes, chiffres du mois, notes vocales
   (transcription OpenAI), brief du matin. WhatsApp = même cœur, adaptateur à écrire (compte Meta Business).
+- **Vraies données** (26/10/2026) : organisation « Onba Property Management » (compte e-mail de la villa), migrée du Control
+  Room Airtable et vérifiée au rupiah près ; le chat Telegram y est relié. Bac à sable pour les essais : organisation « Casa ONBA ».
+- **Team** (27/10/2026, `docs/module-staff.md`) : staff et freelances, mode de paie par personne (mensuel + base/extras, heure,
+  prestation), journal « qui a bossé quand », paie de la période du 26 au 25 préparée puis payée (→ dépense), rappel dans le brief.
+- **Brief du matin** sur Claude Haiku, dans la langue de Pierre ; ne relance que les justificatifs du mois et du précédent.
+- **Occupation** comptée à partir de la première nuit louée de chaque villa ; Overview s'ouvre sur le mois en cours.
 
 Vérifications : `npm test` (parser Airbnb), `npm run test:db` (SQL sur PGlite), `npm run check:queries`
 (requêtes de l'app rejouées contre le projet), `npx tsc --noEmit`, `npx eslint`, `npx next build`.
