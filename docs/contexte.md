@@ -54,6 +54,9 @@ Ce qui marche de bout en bout :
 - **Transactions** (journal, recherche, fiche avec Download / Share / WhatsApp / lien 7 jours) et
   **Documents** (dossiers année → mois, filtres par catégorie, ZIP).
 - **Relevé mensuel PDF** par villa.
+- **Assistant** (`docs/agent-whatsapp.md`) : serveur MCP `/api/mcp` (OAuth Supabase, testé avec Claude) et **agent Telegram
+  @ONBAbooks_bot** : reçus (photo/PDF → Review), dépenses dictées, séjours, pense-bêtes, chiffres du mois, notes vocales
+  (transcription OpenAI), brief du matin. WhatsApp = même cœur, adaptateur à écrire (compte Meta Business).
 
 Vérifications : `npm test` (parser Airbnb), `npm run test:db` (SQL sur PGlite), `npm run check:queries`
 (requêtes de l'app rejouées contre le projet), `npx tsc --noEmit`, `npx eslint`, `npx next build`.
@@ -68,5 +71,6 @@ fonction Supabase) ; `app/.env.local` (URL + clé publique Supabase).
    Supabase par défaut, lien à ouvrir dans le navigateur qui l'a demandé, pas de code dans l'e-mail).
    Passer Vercel en Pro avant le premier client payant.
 2. Rapprochement bancaire Danamon (Claude lit bien les relevés PDF).
+2 bis. Agent WhatsApp (adaptateur sur le cœur Telegram) quand le compte Meta Business est prêt.
 3. Couche gestionnaire : frais de gestion, relevés propriétaires à la marque, accès propriétaires.
 4. Entretiens prospects (questions dans `docs/cadrage.md` §6).
