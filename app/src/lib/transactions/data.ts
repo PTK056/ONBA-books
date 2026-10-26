@@ -131,15 +131,12 @@ export async function getTransaction(id: string): Promise<{ org: Member; tx: Tx;
   return { org, tx, files, closed: close.data?.status === "closed", categories: categories.data ?? [] };
 }
 
-/** View and download links for a transaction's files; download links carry a readable file name. */
+/** View links for a transaction's files; downloads go through /documents/file/<id>, which logs them. */
 export async function signFiles(tx: Tx): Promise<TxFileLinks[]> {
   const db = await createClient();
   return Promise.all(tx.files.map(async (f, i) => {
     const name = documentFileName(tx, f, tx.files.length > 1 ? i + 1 : undefined);
-    const [view, download] = await Promise.all([
-      db.storage.from("evidence").createSignedUrl(f.path, SIGNED_URL_TTL),
-      db.storage.from("evidence").createSignedUrl(f.path, SIGNED_URL_TTL, { download: name }),
-    ]);
-    return { ...f, name, viewUrl: view.data?.signedUrl ?? null, downloadUrl: download.data?.signedUrl ?? null };
+    const view = await db.storage.from("evidence").createSignedUrl(f.path, SIGNED_URL_TTL);
+    return { ...f, name, viewUrl: view.data?.signedUrl ?? null, downloadUrl: `/documents/file/${f.id}` };
   }));
 }

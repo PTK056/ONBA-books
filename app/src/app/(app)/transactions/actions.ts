@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentOrg } from "@/lib/org";
 import { documentFileName } from "@/lib/transactions/names";
 import { createClient } from "@/lib/supabase/server";
+import { logDownload } from "@/lib/downloads";
 
 export type TxResult = { ok: true; id: string } | { ok: false; error: string };
 
@@ -143,5 +144,6 @@ export async function createShareLink(evidenceId: string): Promise<{ ok: true; u
   const { data, error } = await db.storage.from("evidence")
     .createSignedUrl(ev.storage_path, SHARE_LINK_DAYS * 86_400, { download: name });
   if (error || !data) return { ok: false, error: "Could not create the link." };
+  await logDownload(db, org.id, "share_link", 1, { evidence_id: evidenceId, name, valid_days: SHARE_LINK_DAYS });
   return { ok: true, url: data.signedUrl, days: SHARE_LINK_DAYS };
 }

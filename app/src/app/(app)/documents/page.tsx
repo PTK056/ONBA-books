@@ -53,6 +53,9 @@ async function Content({ searchParams }: Pick<PageProps<"/documents">, "searchPa
         description="Every receipt and invoice behind your entries, filed by month."
         actions={
           <form action="/documents" className="flex items-center gap-2">
+            {org.role === "admin" && (
+              <Link href="/documents/activity" className="h-9 rounded-lg border border-zinc-300 px-3 text-sm font-medium leading-9 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800">Activity</Link>
+            )}
             {category && <input type="hidden" name="category" value={category} />}
             <input name="month" type="month" defaultValue={month} aria-label="Go to month" className="h-9 rounded-lg border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
             <button className="h-9 rounded-lg bg-zinc-900 px-3 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">Open</button>

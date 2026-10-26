@@ -3,6 +3,7 @@ import { type NextRequest } from "next/server";
 import { listTransactions } from "@/lib/transactions/data";
 import { documentFileName } from "@/lib/transactions/names";
 import { createClient } from "@/lib/supabase/server";
+import { logDownload } from "@/lib/downloads";
 
 const MAX_FILES = 400;
 
@@ -41,6 +42,7 @@ export async function GET(request: NextRequest) {
   entries["index.csv"] = new TextEncoder().encode(`﻿${csv}\r\n`);
 
   const zip = zipSync(entries, { level: 0 });
+  await logDownload(db, result.org.id, "zip", index.length - 1, { month: month ?? null, category: category ?? null, villa: villa ?? null });
   const org = result.org.name.replace(/[^\w-]+/g, "-");
   return new Response(new Uint8Array(zip), {
     headers: {
