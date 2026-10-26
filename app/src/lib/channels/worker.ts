@@ -7,12 +7,17 @@ import { adminClient } from "@/lib/supabase/admin";
 import { accessTokenFor, unlink, type Link } from "./links";
 import { APP_URL } from "./oauth";
 import { downloadFile, sendMessage, sendTyping } from "./telegram";
+import { transcribe } from "./transcribe";
 
 type ContentBlockParam = Anthropic.Beta.Messages.BetaContentBlockParam;
 type MessageParam = Anthropic.Beta.Messages.BetaMessageParam;
 
 /** One incoming chat message, as queued by the webhook. */
-export interface Incoming { text?: string; file?: { id: string; kind: "photo" | "document"; mime?: string; name?: string } }
+export interface Incoming {
+  text?: string;
+  file?: { id: string; kind: "photo" | "document"; mime?: string; name?: string };
+  voice?: { id: string; mime?: string };
+}
 type Attachments = Record<string, { path: string; mimeType: string; used?: boolean }>;
 
 const FRESH_AFTER_MS = 6 * 3600_000; // a new conversation after 6 quiet hours
@@ -61,6 +66,7 @@ async function answer(link: Link, chatId: string, items: Incoming[]) {
   const content: ContentBlockParam[] = [];
   for (const item of items) {
     if (item.file) content.push(...(await intake(session, item.file, attachments)));
+    if (item.voice) content.push(await listen(session, item.voice));
     if (item.text) content.push({ type: "text", text: item.text });
   }
   if (!content.length) return;
@@ -104,4 +110,15 @@ async function intake(s: Session, f: NonNullable<Incoming["file"]>, attachments:
       : [label, { type: "text", text: "(PDF too large to show; it can still be submitted.)" }];
   }
   return [label, { type: "image", source: { type: "base64", media_type: file.mimeType as "image/jpeg" | "image/png" | "image/webp" | "image/gif", data } }];
+}
+
+/** A voice note becomes its transcription; the model is told it is one, so it restates what it understood. */
+async function listen(s: Session, v: NonNullable<Incoming["voice"]>): Promise<ContentBlockParam> {
+  try {
+    const text = await transcribe(s, await downloadFile(v.id), v.mime);
+    return { type: "text", text: text ? `[Voice note, transcribed: "${text}"]` : "[Voice note: nothing could be heard.]" };
+  } catch (e) {
+    console.error("[chat] transcribe:", e);
+    return { type: "text", text: "[A voice note was sent but could not be transcribed. Ask the user to type it.]" };
+  }
 }

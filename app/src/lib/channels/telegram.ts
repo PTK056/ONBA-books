@@ -63,6 +63,6 @@ export interface TgMessage {
   caption?: string;
   photo?: { file_id: string; file_size?: number; width: number; height: number }[];
   document?: { file_id: string; mime_type?: string; file_name?: string; file_size?: number };
-  voice?: { file_id: string };
+  voice?: { file_id: string; duration?: number; mime_type?: string };
   media_group_id?: string;
 }

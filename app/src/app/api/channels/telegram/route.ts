@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { findLink, redeemCode, unlink } from "@/lib/channels/links";
 import { APP_URL } from "@/lib/channels/oauth";
 import { sendMessage, type TgMessage } from "@/lib/channels/telegram";
+import { transcriptionEnabled } from "@/lib/channels/transcribe";
 import { processChat, type Incoming } from "@/lib/channels/worker";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -11,7 +12,8 @@ import { adminClient } from "@/lib/supabase/admin";
 export const maxDuration = 300;
 
 const CONNECT = `${APP_URL}/connect/telegram`;
-const HELP = "Send me receipts (photo or PDF), expenses (\"350k petrol Kadek yesterday\"), booking screenshots or reminders, "
+const MAX_VOICE_SECONDS = 180;
+const HELP = "Send me receipts (photo or PDF), voice notes, expenses (\"350k petrol Kadek yesterday\"), booking screenshots or reminders, "
   + "and ask what's left to do.\n/new starts a fresh conversation · /stop disconnects this chat.";
 
 export async function POST(request: NextRequest) {
@@ -50,16 +52,19 @@ async function handle(msg: TgMessage) {
     await adminClient().from("chat_conversations").update({ messages: [], attachments: {} }).eq("link_id", link.id);
     return sendMessage(chatId, "Fresh start. What can I do?");
   }
-  if (msg.voice) return sendMessage(chatId, "I can't listen to voice notes yet. Type it, or send a photo.");
-
   const item: Incoming = { text: msg.text ?? msg.caption };
+  if (msg.voice) {
+    if (!transcriptionEnabled()) return sendMessage(chatId, "I can't listen to voice notes yet. Type it, or send a photo.");
+    if ((msg.voice.duration ?? 0) > MAX_VOICE_SECONDS) return sendMessage(chatId, "That voice note is too long. Keep it under 3 minutes.");
+    item.voice = { id: msg.voice.file_id, mime: msg.voice.mime_type };
+  }
   if (msg.photo?.length) {
     const largest = msg.photo.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a));
     item.file = { id: largest.file_id, kind: "photo", mime: "image/jpeg" };
   } else if (msg.document) {
     item.file = { id: msg.document.file_id, kind: "document", mime: msg.document.mime_type, name: msg.document.file_name };
   }
-  if (!item.text && !item.file) return sendMessage(chatId, "Send text, a photo or a PDF.");
+  if (!item.text && !item.file && !item.voice) return sendMessage(chatId, "Send text, a voice note, a photo or a PDF.");
 
   await adminClient().rpc("chat_enqueue", { p_link: link.id, p_item: item });
   await processChat(link, chatId);
