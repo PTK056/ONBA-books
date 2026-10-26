@@ -1,6 +1,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { computePay, type PayBreakdown, type PayMode, type StaffPay, type WorkLog } from "./pay";
+import { computePay, payPeriod, type PayBreakdown, type PayMode, type StaffPay, type WorkLog } from "./pay";
+
+export { payPeriod };
 
 // Staff, work and pay operations, shared by the app (server actions) and the assistant (tools).
 // Every call runs with the caller's client, so RLS decides what they may touch.
@@ -115,15 +117,10 @@ export async function deleteLog(db: SupabaseClient, orgId: string, id: string) {
   if (!data) throw new StaffError("Unknown entry.");
 }
 
-const monthRange = (month: string) => {
-  const [y, m] = month.split("-").map(Number);
-  return { from: `${month}-01`, to: new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10) };
-};
-
-export async function monthLogs(db: SupabaseClient, orgId: string, month: string): Promise<Log[]> {
-  const { from, to } = monthRange(month);
+/** Work between two dates (inclusive). A month's pay covers a period that starts in the previous month. */
+export async function logsBetween(db: SupabaseClient, orgId: string, from: string, to: string): Promise<Log[]> {
   const { data } = await db.from("work_logs").select("id, staff_id, villa_id, date, hours, jobs, extra_amount, task, note")
-    .eq("organization_id", orgId).gte("date", from).lt("date", to).order("date");
+    .eq("organization_id", orgId).gte("date", from).lte("date", to).order("date");
   return (data ?? []).map((l) => ({ ...l, hours: num(l.hours), extra_amount: num(l.extra_amount) }) as Log);
 }
 
@@ -133,7 +130,8 @@ export interface PayLine { staff: Staff; computed: PayBreakdown; run: PayRun | n
 export async function payroll(db: SupabaseClient, orgId: string, month: string): Promise<PayLine[]> {
   const [people, logs, runs] = await Promise.all([
     listStaff(db, orgId),
-    monthLogs(db, orgId, month),
+    // Wide enough for any payday (1–28): from the 2nd of the previous month to the 28th of this one.
+    logsBetween(db, orgId, payPeriod(month, 1).from, payPeriod(month, 28).to),
     db.from("pay_runs").select("id, staff_id, month, amount, currency, breakdown, status, transaction_id, paid_on")
       .eq("organization_id", orgId).eq("month", `${month}-01`),
   ]);
@@ -199,12 +197,14 @@ export async function markPaid(db: SupabaseClient, orgId: string, runId: string,
 export function describePay(b: PayBreakdown): string {
   const n = (x: number) => x.toLocaleString("en");
   const parts: string[] = [];
+  const short = (d: string) => `${+d.slice(8, 10)}/${+d.slice(5, 7)}`;
   if (b.mode === "monthly") {
     parts.push(`${n(b.fixed ?? 0)} fixed`);
-    if (b.base) parts.push(`${n(b.base.done)}/${n(b.base.this_month)} ${b.base.unit} this month${b.base.extra_units ? `, ${n(b.base.extra_units)} extra × ${n(b.base.extra_rate)}` : ""}`);
+    if (b.base) parts.push(`${n(b.base.done)}/${n(b.base.this_month)} ${b.base.unit} in the period${b.base.extra_units ? `, ${n(b.base.extra_units)} extra × ${n(b.base.extra_rate)}` : ""}`);
   }
   if (b.mode === "hourly") parts.push(`${n(b.hours ?? 0)} h × ${n(b.hourly_rate ?? 0)}`);
   if (b.mode === "per_job") parts.push(`${n(b.jobs ?? 0)} job${b.jobs === 1 ? "" : "s"} × ${n(b.job_rate ?? 0)}`);
   if (b.one_off_extras) parts.push(`+ ${n(b.one_off_extras)} extras`);
-  return parts.join(", ");
+  // Pay prepared before periods existed has none recorded.
+  return b.period ? `${parts.join(", ")} (work ${short(b.period.from)}–${short(b.period.to)})` : parts.join(", ");
 }

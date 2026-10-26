@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/shell/PageHeader";
 import { AddStaff, DeleteLog, EditStaff, LogForm, PayButton, PrepareButton } from "@/components/team/TeamForms";
 import { shortDate, todayIn } from "@/lib/format/date";
 import { getCurrentOrg } from "@/lib/org";
-import { describePay, monthLabel, monthLogs, payroll } from "@/lib/staff/ops";
+import { describePay, logsBetween, monthLabel, payPeriod, payroll } from "@/lib/staff/ops";
 import { createClient } from "@/lib/supabase/server";
 
 export default function TeamPage({ searchParams }: PageProps<"/team">) {
@@ -40,11 +40,16 @@ async function Content({ searchParams }: Pick<PageProps<"/team">, "searchParams"
   const today = todayIn(o?.timezone ?? "UTC");
   const sp = await searchParams;
   const month = typeof sp.month === "string" && /^\d{4}-\d{2}$/.test(sp.month) ? sp.month : today.slice(0, 7);
-  const [lines, logs] = await Promise.all([payroll(db, org.id, month), monthLogs(db, org.id, month)]);
+  const lines = await payroll(db, org.id, month);
   const staff = lines.map((l) => l.staff);
+  // The calendar shows the pay period of the most common payday (25 → 26 of last month to the 25th).
+  const paydays = staff.map((s) => s.payday);
+  const payday = paydays.sort((a, b) => paydays.filter((x) => x === b).length - paydays.filter((x) => x === a).length)[0] ?? 25;
+  const period = payPeriod(month, payday);
+  const logs = await logsBetween(db, org.id, period.from, period.to);
   const villas = org.villas.map((v) => ({ id: v.id, name: v.name }));
   const formProps = { villas, categories: cats ?? [], currency: org.reportingCurrency };
-  const days = new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7), 0)).getUTCDate();
+  const dates = Array.from({ length: period.days }, (_, i) => new Date(Date.parse(period.from) + i * 86_400_000).toISOString().slice(0, 10));
   const name = new Map(staff.map((s) => [s.id, s.name]));
   const toPrepare = lines.some((l) => l.staff.active && l.run?.status !== "paid");
   const total = lines.reduce((s, l) => s + (l.run?.amount ?? l.computed.total), 0);
@@ -68,7 +73,7 @@ async function Content({ searchParams }: Pick<PageProps<"/team">, "searchParams"
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="font-semibold">Pay for {monthLabel(month)}</h2>
-            <p className="text-sm text-zinc-500">Computed from the work logged. Prepare, pay, then mark paid: the expense is booked.</p>
+            <p className="text-sm text-zinc-500">Work from {shortDate(period.from)} to {shortDate(period.to)} (each person&apos;s period ends on their payday). Prepare, pay, then mark paid: the expense is booked.</p>
           </div>
           {toPrepare && staff.length > 0 && <PrepareButton month={month} label={lines.some((l) => l.run) ? "Update drafts" : "Prepare payroll"} />}
         </div>
@@ -113,24 +118,23 @@ async function Content({ searchParams }: Pick<PageProps<"/team">, "searchParams"
 
       {/* Who worked when */}
       <section className="card p-5">
-        <h2 className="mb-1 font-semibold">Who worked when</h2>
+        <h2 className="mb-1 font-semibold">Who worked when <span className="font-normal text-zinc-500">· {shortDate(period.from)} → {shortDate(period.to)}</span></h2>
         <p className="mb-4 text-sm text-zinc-500">Log each day of work here, or tell Sply (&ldquo;Delia did the cleaning today&rdquo;).</p>
-        <LogForm staff={staff.filter((s) => s.active)} villas={villas} today={today.startsWith(month) ? today : `${month}-01`} />
+        <LogForm staff={staff.filter((s) => s.active)} villas={villas} today={today >= period.from && today <= period.to ? today : period.to} />
         {staff.length > 0 && (
           <div className="mt-6 overflow-x-auto">
             <table className="text-xs">
               <thead>
                 <tr>
                   <th className="sticky left-0 bg-white pr-3 text-left font-medium dark:bg-zinc-950" />
-                  {Array.from({ length: days }, (_, i) => <th key={i} className="w-7 text-center font-normal text-zinc-400">{i + 1}</th>)}
+                  {dates.map((d) => <th key={d} className="w-7 text-center font-normal text-zinc-400">{+d.slice(8, 10)}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {staff.map((s) => (
                   <tr key={s.id}>
                     <td className="sticky left-0 bg-white py-1 pr-3 font-medium dark:bg-zinc-950">{s.name}</td>
-                    {Array.from({ length: days }, (_, i) => {
-                      const d = `${month}-${String(i + 1).padStart(2, "0")}`;
+                    {dates.map((d) => {
                       const ls = logs.filter((l) => l.staff_id === s.id && l.date === d);
                       const hours = ls.reduce((n, l) => n + (l.hours ?? 0), 0);
                       const jobs = ls.reduce((n, l) => n + (l.jobs ?? 0), 0);

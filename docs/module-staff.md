@@ -17,7 +17,8 @@ Nom, rôle (housekeeper, manager, jardinier, piscine…), **salarié ou freelanc
 | **À l'heure** | taux horaire | heures du mois × taux |
 | **À la prestation** | tarif par prestation | prestations du mois × tarif |
 
-Base du mois = base par semaine × jours du mois ÷ 7, arrondie. Sans base : fixe seul ; les extras se saisissent à part
+**Période de paie** : du lendemain du jour de paie précédent au jour de paie (payé le 25 → la paie de novembre couvre
+du 26 octobre au 25 novembre). Base de la période = base par semaine × jours de la période ÷ 7, arrondie. Sans base : fixe seul ; les extras se saisissent à part
 (« extra 150k pour Kadek ») et s'ajoutent.
 **Jour de paie** : par défaut le 25 (réglable par personne).
 
