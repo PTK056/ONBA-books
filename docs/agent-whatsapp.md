@@ -61,7 +61,9 @@ Notre propre agent, indépendant d'Owl ; WhatsApp sera un deuxième adaptateur (
 - Variables Vercel (copie locale `~/.config/onbabooks/vercel.env`) : ANTHROPIC_API_KEY, CHANNEL_TOKEN_KEY, TELEGRAM_WEBHOOK_SECRET,
   CHAT_OAUTH_CLIENT_ID, APP_URL, TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME, SUPABASE_SECRET_KEY (clé `vercel-agent`, réservée aux tables du chat).
 - **Testé (26/10/2026)** : liaison ; reçu transféré depuis WhatsApp → lu → Review ; dépense dictée ; pense-bête + `get_todo` ; séjour direct.
-  Pas encore : notes vocales (refusées pour l'instant), brief du matin.
+- **Notes vocales (26/10/2026)** : transcrites par OpenAI (`gpt-4o-transcribe`, variable `TRANSCRIBE_MODEL`, clé `OPENAI_API_KEY`),
+  3 min maximum ; l'agent reformule ce qu'il a compris avant d'écrire. Testé OK.
+- Pas encore : brief du matin.
 
 ## À demander à l'ami (Owl)
 1. Owl accepte-t-il un serveur MCP personnalisé ? Avec OAuth, ou seulement un en-tête fixe ?
