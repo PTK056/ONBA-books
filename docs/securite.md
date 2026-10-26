@@ -28,7 +28,14 @@ Bilan du 26/10/2026 (vérifié dans le code et en ligne ; pas un audit professio
    (FileVault) ou à ranger dans un gestionnaire de mots de passe.
 8. **Politique de confidentialité** : sous-traitants (Supabase Tokyo, Vercel, Anthropic, OpenAI, Telegram, Resend).
 
-## Journal des téléchargements
-Voir plus bas (« Fait »). Limite assumée : il trace ce qui passe par l'app (ZIP, liens de partage, bouton Download) ;
+## Fait
+- **Journal des téléchargements** (26/10/2026, testé) : ZIP, liens de partage et bouton Download notés (qui, quand, quoi)
+  dans `download_log` ; lecture admins seulement dans **Documents → Activity** ; aucune entrée modifiable ni effaçable.
+- **Pages protégées** (vérifié le 26/10/2026) : sans session, toutes les pages de l'app renvoient vers la connexion ;
+  un compte d'une autre organisation ne voit jamais les fiches d'une autre (code + RLS). Exceptions voulues : liens de
+  partage (7 jours) et adresses d'aperçu signées (1 heure).
+
+## Journal des téléchargements — limite
+Limite assumée : il trace ce qui passe par l'app (ZIP, liens de partage, bouton Download) ;
 un membre technique pourrait encore lire les fichiers directement par l'API Supabase avec sa session. Le bloquer
 demanderait de servir tous les fichiers par une route de l'app (à envisager si un client l'exige).
