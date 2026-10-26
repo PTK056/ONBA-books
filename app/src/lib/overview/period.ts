@@ -2,6 +2,7 @@ import "server-only";
 import { connection } from "next/server";
 import { getCurrentOrg } from "@/lib/org";
 import { createClient } from "@/lib/supabase/server";
+import { availableNights, openingDays } from "./availability";
 import type { CategoryLine, MonthOccupancy, MonthTotals } from "./data";
 
 const MAX_ROWS = 20000;
@@ -37,7 +38,6 @@ type Row = {
 };
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const daysInMonth = (y: number, m: number) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
 
 export async function loadPeriod(kind: "year" | "all", requestedYear?: string): Promise<
   { kind: "signed_out" } | { kind: "no_organization" } | { kind: "ready"; data: PeriodOverview }
@@ -79,7 +79,7 @@ export async function loadPeriod(kind: "year" | "all", requestedYear?: string): 
       .eq("organization_id", org.id).eq("status", "pending").is("read_at", null),
   ]);
   const rows = (txs.data ?? []) as unknown as Row[];
-  const villaCount = Math.max(1, org.villas.length);
+  const opened = await openingDays(db, org.id);
 
   // Buckets: the 12 months of the year, or one per year for all time.
   const keyOf = (date: string) => (year ? date.slice(0, 7) : date.slice(0, 4));
@@ -87,10 +87,11 @@ export async function loadPeriod(kind: "year" | "all", requestedYear?: string): 
     ? MONTHS.map((_, i) => `${year}-${String(i + 1).padStart(2, "0")}`)
     : [...years].reverse();
   const buckets = new Map<string, Bucket>(bucketKeys.map((k) => {
-    // Nights available: whole months up to the current one (the future can't be occupied yet).
+    // Nights available: months up to the current one (the future can't be occupied yet), counted
+    // from each villa's first booked night (before that it was not on the market).
     let available = 0;
     const months = year ? [k] : MONTHS.map((_, i) => `${k}-${String(i + 1).padStart(2, "0")}`);
-    for (const m of months) if (m <= thisMonth) available += daysInMonth(+m.slice(0, 4), +m.slice(5, 7) - 1) * villaCount;
+    for (const m of months) if (m <= thisMonth) for (const v of org.villas) available += availableNights(m, opened.get(v.id));
     return [k, {
       month: year ? `${k}-01` : `${k}-01-01`,
       label: year ? MONTHS[+k.slice(5, 7) - 1] : k,
@@ -161,7 +162,7 @@ export async function loadPeriod(kind: "year" | "all", requestedYear?: string): 
     data: {
       kind, year, years,
       org: { id: org.id, name: org.name, reportingCurrency: org.reportingCurrency, role: org.role },
-      villaCount,
+      villaCount: Math.max(1, org.villas.length),
       totals: { income, expenses, net: income - expenses, platformFees },
       occupancy: {
         booked, available,
