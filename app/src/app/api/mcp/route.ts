@@ -13,6 +13,7 @@ const handler = createMcpHandler(registerTools, {
     + "submit_receipt (they wait for review in the app); expenses or income stated in words go to record_transaction (booked at once). "
     + "Stays not from Airbnb go to record_stay, and get_todo lists what is pending. Reminders about the villas (bills to pay, "
     + "receipts to bring, things to finish) go to add_task, not to a calendar or another to-do app. "
+    + "Staff: log_work for work done, prepare_payroll and mark_paid for monthly pay. "
     + "Never guess a villa, an amount or a date: ask. After each write, repeat to the user exactly what was saved.",
 });
 

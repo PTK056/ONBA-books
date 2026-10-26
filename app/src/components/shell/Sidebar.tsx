@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftRight, BedDouble, FolderOpen, LayoutDashboard, ScanLine, Upload } from "lucide-react";
+import { ArrowLeftRight, BedDouble, FolderOpen, LayoutDashboard, ScanLine, Upload, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "./Logo";
@@ -12,6 +12,7 @@ const NAV = [
   { href: "/upload", label: "Scan receipts", icon: Upload },
   { href: "/review", label: "Review", icon: ScanLine, badge: true },
   { href: "/import", label: "Import stays", icon: BedDouble },
+  { href: "/team", label: "Team", icon: Users },
 ] as const;
 
 interface Props {

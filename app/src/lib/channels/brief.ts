@@ -16,6 +16,7 @@ interface Todo {
   receipts_to_review: number;
   expenses_missing_receipt: { count: number; latest: { date: string; amount: number; currency: string; description: string | null }[] };
   month_to_close: { month: string; villas: string[] } | null;
+  payroll_due: { month: string; overdue: boolean; people: { name: string; amount: number; currency: string; how: string; status: string }[]; total: number; link: string } | null;
   review: string;
 }
 
@@ -27,6 +28,7 @@ export async function briefItems(s: Session) {
   const soon = new Date(Date.parse(`${todo.today}T00:00:00Z`) + SOON_DAYS * 86_400_000).toISOString().slice(0, 10);
   const items = {
     today: todo.today,
+    payroll_due: todo.payroll_due,
     tasks_due: todo.tasks.filter((t) => t.due_date && t.due_date <= soon),
     receipts_to_review: todo.receipts_to_review,
     expenses_missing_receipt: todo.expenses_missing_receipt,
@@ -34,7 +36,7 @@ export async function briefItems(s: Session) {
     review_link: todo.receipts_to_review ? todo.review : null,
     missing_receipts_link: todo.expenses_missing_receipt.count ? `${APP_URL}/transactions?receipt=missing` : null,
   };
-  const empty = !items.tasks_due.length && !items.receipts_to_review && !items.expenses_missing_receipt.count && !items.month_to_close;
+  const empty = !items.payroll_due && !items.tasks_due.length && !items.receipts_to_review && !items.expenses_missing_receipt.count && !items.month_to_close;
   return empty ? null : items;
 }
 
@@ -49,7 +51,8 @@ export async function writeBrief(items: object, recentUserText: string[]): Promi
     output_config: { effort: "low" },
     system:
       "You write the Splyce morning brief for someone who runs short-term-rental villas, sent in a chat on their phone. "
-      + "From the JSON, write a short message: a one-line greeting, then only what needs them (overdue first), a few short bullets, "
+      + "From the JSON, write a short message: a one-line greeting, then only what needs them (staff pay due first, then overdue items), a few short bullets, "
+      + "for staff pay: who, how much, the total, and offer to prepare it or mark people as paid; "
       + "amounts with thousand separators and currency. Links: review_link for receipts waiting for review, missing_receipts_link for "
       + "expenses without a receipt (they can be attached by sending the photo in this chat); never mix them up. End with one short offer to help. "
       + "No headings, no tables, **bold** at most once. Write in the language of the language sample; English if there is none. Mention only what the JSON contains.",

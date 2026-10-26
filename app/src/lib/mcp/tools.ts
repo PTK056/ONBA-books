@@ -4,6 +4,10 @@ import type { AuthInfo, McpServer } from "@modelcontextprotocol/server";
 import { allocateByNights, nightsBetween } from "@/lib/stays/airbnb";
 import { storeEvidence } from "./files";
 import {
+  createStaff, describePay, listStaff, logWork, markPaid, monthLabel, payroll, preparePayroll, StaffError, updateStaff,
+  type Staff, type StaffInput,
+} from "@/lib/staff/ops";
+import {
   loadSession, rateFor, requireEditor, resolveCategory, resolveVilla, today, ToolError, type Session,
 } from "./session";
 
@@ -41,7 +45,7 @@ export async function runTool(t: ToolDef, s: Session, args: unknown): Promise<{ 
   try {
     return { ok: true, text: JSON.stringify(await t.handler(s, args as never), null, 1) };
   } catch (e) {
-    if (e instanceof ToolError) return { ok: false, text: e.message };
+    if (e instanceof ToolError || e instanceof StaffError) return { ok: false, text: e.message };
     console.error(`[tool ${t.name}]`, e);
     return { ok: false, text: "Something went wrong in Splyce. Try again in a moment." };
   }
@@ -435,7 +439,7 @@ function define(server: Registrar, channel: Channel) {
   server.registerTool("get_todo", {
     title: "What's left to do",
     description:
-      "Everything that needs the user: open tasks and payments (overdue first), receipts waiting for review, expenses of this month and last missing a receipt (older ones: find_transactions with missing_evidence), "
+      "Everything that needs the user: open tasks and payments (overdue first), staff pay due this month (from each person's payday), receipts waiting for review, expenses of this month and last missing a receipt (older ones: find_transactions with missing_evidence), "
       + "and last month if it is not closed. Use it for a morning brief or when the user asks what is pending. Summarize briefly; offer to help with each item.",
     inputSchema: z.object({}),
     annotations: { readOnlyHint: true },
@@ -468,10 +472,178 @@ function define(server: Registrar, channel: Channel) {
         count: missing.count ?? 0,
         latest: (missing.data ?? []).map((t) => ({ transaction_id: t.id, date: t.date, amount: Number(t.amount), currency: t.currency, description: t.description })),
       },
+      payroll_due: await payrollDue(s, day),
       month_to_close: s.villas.filter((v) => !closed.has(v.id)).length
         ? { month: lastMonth.slice(0, 7), villas: s.villas.filter((v) => !closed.has(v.id)).map((v) => v.name) }
         : null,
       review: `${APP}/review`,
     };
   }));
+
+  // ---------------------------------------------------------------- staff
+  const MONTH = z.string().regex(/^\d{4}-\d{2}$/, "YYYY-MM");
+  const staffSummary = (s: Session, p: Staff) => ({
+    staff_id: p.id, name: p.name, role: p.role, type: p.kind, active: p.active, villa: s.villas.find((v) => v.id === p.villa_id)?.name ?? null,
+    pay: p.pay_mode === "monthly" ? `${p.monthly_amount} ${p.currency}/month${p.base_unit ? `, base ${p.base_per_week} ${p.base_unit}/week, extra ${p.extra_rate ?? "pay ÷ base"}` : ""}`
+      : p.pay_mode === "hourly" ? `${p.hourly_rate} ${p.currency}/hour` : `${p.job_rate} ${p.currency}/job`,
+    payday: p.payday,
+  });
+
+  async function resolveStaff(s: Session, who: string): Promise<Staff> {
+    const people = await listStaff(s.db, s.org.id);
+    const w = who.trim().toLowerCase();
+    const hit = people.filter((p) => p.id === who || p.name.toLowerCase() === w);
+    if (hit.length === 1) return hit[0];
+    const partial = people.filter((p) => p.name.toLowerCase().includes(w) || w.includes(p.name.toLowerCase()));
+    if (partial.length === 1) return partial[0];
+    throw new ToolError(people.length ? `Who is "${who}"? Team: ${people.map((p) => p.name).join(", ")}. Add them with save_staff if new.` : "No one in the team yet. Add people with save_staff.");
+  }
+
+  server.registerTool("list_staff", {
+    title: "List the team",
+    description: "The people who work for the user (staff and freelancers) and how each is paid. Call before logging work or paying, to use the right names.",
+    inputSchema: z.object({}),
+    annotations: { readOnlyHint: true },
+  }, (async (s) => ({ team: (await listStaff(s.db, s.org.id)).map((p) => staffSummary(s, p)) })));
+
+  server.registerTool("save_staff", {
+    title: "Add or change a team member",
+    description:
+      "Adds a person (no staff_id) or changes one (staff_id from list_staff). Pay modes: monthly (monthly_amount; optional weekly base of "
+      + "visits or hours with an extra_rate for work beyond it), hourly (hourly_rate) or per_job (job_rate). Ask for anything unclear "
+      + "(how they are paid, the amount); repeat the settings back after saving.",
+    inputSchema: z.object({
+      staff_id: UUID.optional(),
+      name: z.string().min(1).max(80),
+      role: z.string().max(80).optional().describe("Housekeeper, manager, gardener, pool…"),
+      type: z.enum(["employee", "freelance"]).optional(),
+      villa: z.string().optional(),
+      pay_mode: z.enum(["monthly", "hourly", "per_job"]),
+      monthly_amount: z.number().min(0).optional(),
+      hourly_rate: z.number().positive().optional(),
+      job_rate: z.number().positive().optional(),
+      base_unit: z.enum(["visits", "hours"]).optional().describe("Monthly only: what the weekly base counts."),
+      base_per_week: z.number().positive().optional(),
+      extra_rate: z.number().min(0).optional().describe("Monthly only: pay per visit/hour beyond the base (default: monthly amount ÷ base of the month)."),
+      currency: CURRENCY.optional(),
+      payday: z.number().int().min(1).max(28).optional().describe("Day of the month they are paid (default 25)."),
+      active: z.boolean().optional(),
+      notes: z.string().max(500).optional(),
+    }),
+  }, (async (s, a: {
+    staff_id?: string; name: string; role?: string; type?: "employee" | "freelance"; villa?: string; pay_mode: Staff["pay_mode"];
+    monthly_amount?: number; hourly_rate?: number; job_rate?: number; base_unit?: "visits" | "hours"; base_per_week?: number;
+    extra_rate?: number; currency?: string; payday?: number; active?: boolean; notes?: string;
+  }) => {
+    requireEditor(s);
+    const villa = a.villa ? resolveVilla(s, a.villa) : s.villas.length === 1 ? s.villas[0] : null;
+    const input: StaffInput = {
+      name: a.name, role: a.role, kind: a.type, villa_id: villa?.id ?? null, pay_mode: a.pay_mode,
+      currency: a.currency ?? villa?.currency ?? s.org.reportingCurrency, monthly_amount: a.monthly_amount, hourly_rate: a.hourly_rate,
+      job_rate: a.job_rate, base_unit: a.base_unit, base_per_week: a.base_per_week, extra_rate: a.extra_rate, payday: a.payday,
+      active: a.active, notes: a.notes,
+    };
+    const saved = a.staff_id ? await updateStaff(s.db, s.org.id, a.staff_id, input) : await createStaff(s.db, s.org.id, input);
+    return { status: a.staff_id ? "updated" : "added", person: staffSummary(s, saved), link: `${APP}/team` };
+  }));
+
+  server.registerTool("log_work", {
+    title: "Log work done",
+    description:
+      "Records that someone worked: \"Delia did the cleaning today\", \"Kadek 3h garden yesterday\", \"extra 150k for Alit on Saturday\". "
+      + "Give hours for people paid by the hour (or with an hourly base), otherwise a number of visits/jobs (default 1). An agreed extra "
+      + "goes in extra_amount. Resolve relative dates from today. Repeat what was logged.",
+    inputSchema: z.object({
+      person: z.string().describe("Name as in list_staff."),
+      date: DATE.optional().describe("Defaults to today."),
+      hours: z.number().positive().max(24).optional(),
+      jobs: z.number().int().positive().optional(),
+      extra_amount: z.number().positive().optional(),
+      task: z.string().max(200).optional(),
+      villa: z.string().optional(),
+    }),
+  }, (async (s, a: { person: string; date?: string; hours?: number; jobs?: number; extra_amount?: number; task?: string; villa?: string }) => {
+    requireEditor(s);
+    const p = await resolveStaff(s, a.person);
+    const villa = a.villa ? resolveVilla(s, a.villa) : null;
+    const log = await logWork(s.db, s.org.id, { staff_id: p.id, date: a.date ?? today(s), villa_id: villa?.id, hours: a.hours, jobs: a.jobs, extra_amount: a.extra_amount, task: a.task });
+    return { status: "logged", person: p.name, date: log.date, hours: log.hours, jobs: log.jobs, extra_amount: log.extra_amount, task: log.task };
+  }));
+
+  server.registerTool("team_month", {
+    title: "Who worked, and pay so far",
+    description: "For a month (default: this one): each person's days worked, work done and the pay it comes to, with the status of their pay (not prepared, draft, paid).",
+    inputSchema: z.object({ month: MONTH.optional() }),
+    annotations: { readOnlyHint: true },
+  }, (async (s, a: { month?: string }) => {
+    const month = a.month ?? today(s).slice(0, 7);
+    const lines = await payroll(s.db, s.org.id, month);
+    return {
+      month: monthLabel(month),
+      people: lines.map((l) => ({
+        name: l.staff.name, days_worked: l.computed.days_worked, how: describePay(l.computed), amount: l.computed.total, currency: l.staff.currency,
+        pay_status: l.run?.status ?? "not prepared", paid_on: l.run?.paid_on ?? null,
+      })),
+      total: lines.reduce((n, l) => n + l.computed.total, 0),
+      link: `${APP}/team?month=${month}`,
+    };
+  }));
+
+  server.registerTool("prepare_payroll", {
+    title: "Prepare the month's pay",
+    description: "Computes each person's pay for the month (default: this one) from their settings and the work logged, and saves it as drafts. Paid ones are left alone. Show the list and the total, then offer to mark each as paid once transferred.",
+    inputSchema: z.object({ month: MONTH.optional() }),
+  }, (async (s, a: { month?: string }) => {
+    requireEditor(s);
+    const month = a.month ?? today(s).slice(0, 7);
+    const lines = await preparePayroll(s.db, s.org.id, month);
+    return {
+      month: monthLabel(month),
+      pay: lines.map((l) => ({ name: l.staff.name, amount: l.run?.amount ?? l.computed.total, currency: l.staff.currency, how: describePay(l.computed), status: l.run?.status ?? "draft" })),
+      total: lines.reduce((n, l) => n + (l.run?.amount ?? l.computed.total), 0),
+      link: `${APP}/team?month=${month}`,
+    };
+  }));
+
+  server.registerTool("mark_paid", {
+    title: "Mark someone's pay as paid",
+    description:
+      "Once the user has paid someone (\"paid Kadek\", or a transfer screenshot): books the month's prepared pay as an expense on the "
+      + "payment date and marks it paid. If the user sent the transfer proof, pass its attachment_id. Prepare the payroll first if needed.",
+    inputSchema: z.object({
+      person: z.string(),
+      month: MONTH.optional().describe("Month of the pay (default: this one)."),
+      paid_on: DATE.optional().describe("Payment date (default: today)."),
+      ...file,
+    }),
+  }, (async (s, a: { person: string; month?: string; paid_on?: string; file_url?: string; file_base64?: string; mime_type?: string; attachment_id?: string }) => {
+    requireEditor(s);
+    const p = await resolveStaff(s, a.person);
+    const month = a.month ?? today(s).slice(0, 7);
+    let lines = await payroll(s.db, s.org.id, month);
+    if (!lines.find((l) => l.staff.id === p.id)?.run) lines = await preparePayroll(s.db, s.org.id, month);
+    const run = lines.find((l) => l.staff.id === p.id)?.run;
+    if (!run) throw new ToolError(`No pay to book for ${p.name} in ${monthLabel(month)}.`);
+    const paid = await markPaid(s.db, s.org.id, run.id, a.paid_on ?? today(s));
+    let proof = "none";
+    if (a.file_url || a.file_base64 || a.attachment_id) { await storeEvidence(s, a, paid.transactionId); proof = "attached"; }
+    return {
+      status: "paid", person: p.name, month: monthLabel(month), amount: paid.run.amount, currency: paid.run.currency, paid_on: paid.run.paid_on,
+      how: describePay(paid.run.breakdown), proof, link: `${APP}/transactions/${paid.transactionId}`,
+    };
+  }));
+}
+
+/** Pay of this month that is due (someone's payday has come) and not yet paid. */
+async function payrollDue(s: Session, day: string) {
+  const month = day.slice(0, 7);
+  const lines = (await payroll(s.db, s.org.id, month)).filter((l) => l.staff.active && l.run?.status !== "paid" && Number(day.slice(8, 10)) >= l.staff.payday);
+  if (!lines.length) return null;
+  return {
+    month: monthLabel(month),
+    overdue: lines.some((l) => Number(day.slice(8, 10)) >= l.staff.payday + 2),
+    people: lines.map((l) => ({ name: l.staff.name, amount: l.run?.amount ?? l.computed.total, currency: l.staff.currency, how: describePay(l.computed), status: l.run ? "prepared" : "not prepared" })),
+    total: lines.reduce((n, l) => n + (l.run?.amount ?? l.computed.total), 0),
+    link: `${APP}/team?month=${month}`,
+  };
 }
