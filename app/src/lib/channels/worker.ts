@@ -58,18 +58,22 @@ async function answer(link: Link, chatId: string, items: Incoming[]) {
   }
 
   const db = adminClient();
-  const { data: convo } = await db.from("chat_conversations").select("messages, attachments, updated_at").eq("link_id", link.id).single();
+  const { data: convo } = await db.from("chat_conversations").select("messages, attachments, updated_at, brief, brief_at").eq("link_id", link.id).single();
   const stale = !convo || Date.parse(convo.updated_at) < Date.now() - FRESH_AFTER_MS || (convo.messages as unknown[]).length > MAX_MESSAGES;
   const history = (stale ? [] : convo.messages) as MessageParam[];
   const attachments = (stale ? {} : convo.attachments) as Attachments;
 
   const content: ContentBlockParam[] = [];
+  // A morning brief sent since the last turn: the user may be answering it.
+  if (convo?.brief && convo.brief_at && Date.parse(convo.brief_at) > Date.parse(convo.updated_at)) {
+    content.push({ type: "text", text: `[Morning brief you sent earlier today: "${convo.brief}"]` });
+  }
   for (const item of items) {
     if (item.file) content.push(...(await intake(session, item.file, attachments)));
     if (item.voice) content.push(await listen(session, item.voice));
     if (item.text) content.push({ type: "text", text: item.text });
   }
-  if (!content.length) return;
+  if (!content.some((b) => b.type !== "text" || !b.text.startsWith("[Morning brief"))) return;
 
   session.attachments = new Map(Object.entries(attachments).map(([k, v]) => [k, { path: v.path, mimeType: v.mimeType }]));
   session.usedAttachments = new Set(Object.entries(attachments).filter(([, v]) => v.used).map(([k]) => k));

@@ -63,7 +63,10 @@ Notre propre agent, indépendant d'Owl ; WhatsApp sera un deuxième adaptateur (
 - **Testé (26/10/2026)** : liaison ; reçu transféré depuis WhatsApp → lu → Review ; dépense dictée ; pense-bête + `get_todo` ; séjour direct.
 - **Notes vocales (26/10/2026)** : transcrites par OpenAI (`gpt-4o-transcribe`, variable `TRANSCRIBE_MODEL`, clé `OPENAI_API_KEY`),
   3 min maximum ; l'agent reformule ce qu'il a compris avant d'écrire. Testé OK.
-- Pas encore : brief du matin.
+- **Brief du matin (26/10/2026)** : Vercel Cron `30 23 * * *` UTC (≈ 7 h 30 à Bali) → `/api/cron/brief` (`CRON_SECRET`).
+  Paiements en retard ou à échéance sous 3 jours, reçus à valider, justificatifs manquants, mois précédent à clôturer (du 1er au 10).
+  Rien à dire → aucun message. Rédigé par Claude dans la langue des derniers messages ; gardé avec la conversation
+  (une réponse au brief a son contexte). `/brief off` / `/brief on`. Plan Hobby : la tâche part dans l'heure, pas à la minute.
 
 ## À demander à l'ami (Owl)
 1. Owl accepte-t-il un serveur MCP personnalisé ? Avec OAuth, ou seulement un en-tête fixe ?

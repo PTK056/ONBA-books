@@ -14,7 +14,8 @@ export const maxDuration = 300;
 const CONNECT = `${APP_URL}/connect/telegram`;
 const MAX_VOICE_SECONDS = 180;
 const HELP = "Send me receipts (photo or PDF), voice notes, expenses (\"350k petrol Kadek yesterday\"), booking screenshots or reminders, "
-  + "and ask what's left to do.\n/new starts a fresh conversation · /stop disconnects this chat.";
+  + "and ask what's left to do. Each morning I send what needs you, if anything.\n"
+  + "/new starts a fresh conversation · /brief off stops the morning brief · /stop disconnects this chat.";
 
 export async function POST(request: NextRequest) {
   if (!validSecret(request.headers.get("x-telegram-bot-api-secret-token"))) return new NextResponse(null, { status: 401 });
@@ -47,6 +48,11 @@ async function handle(msg: TgMessage) {
   if (text === "/stop") {
     await unlink("telegram", chatId);
     return sendMessage(chatId, "Disconnected. ONBA Books no longer has access from this chat.");
+  }
+  if (text === "/brief off" || text === "/brief on") {
+    const on = text.endsWith("on");
+    await adminClient().from("channel_links").update({ brief_enabled: on }).eq("id", link.id);
+    return sendMessage(chatId, on ? "Morning brief on: each morning, what's left to do (nothing if nothing is)." : "Morning brief off. /brief on to turn it back on.");
   }
   if (text === "/new") {
     await adminClient().from("chat_conversations").update({ messages: [], attachments: {} }).eq("link_id", link.id);
