@@ -435,7 +435,7 @@ function define(server: Registrar, channel: Channel) {
   server.registerTool("get_todo", {
     title: "What's left to do",
     description:
-      "Everything that needs the user: open tasks and payments (overdue first), receipts waiting for review, expenses missing a receipt, "
+      "Everything that needs the user: open tasks and payments (overdue first), receipts waiting for review, expenses of this month and last missing a receipt (older ones: find_transactions with missing_evidence), "
       + "and last month if it is not closed. Use it for a morning brief or when the user asks what is pending. Summarize briefly; offer to help with each item.",
     inputSchema: z.object({}),
     annotations: { readOnlyHint: true },
@@ -448,8 +448,9 @@ function define(server: Registrar, channel: Channel) {
         .is("done_at", null).order("due_date", { ascending: true, nullsFirst: false }).limit(30),
       s.db.from("receipt_items").select("id", { count: "exact", head: true }).eq("organization_id", s.org.id).eq("status", "pending").not("read_at", "is", null),
       s.db.from("receipt_items").select("id", { count: "exact", head: true }).eq("organization_id", s.org.id).eq("status", "pending").is("read_at", null),
+      // Only recent expenses: a receipt from this month or last can still be found; older gaps would be noise every day.
       s.db.from("expenses_missing_evidence").select("id, date, amount, currency, description", { count: "exact" })
-        .eq("organization_id", s.org.id).order("date", { ascending: false }).limit(10),
+        .eq("organization_id", s.org.id).gte("date", lastMonth).lte("date", day).order("date", { ascending: false }).limit(10),
       s.db.from("month_closes").select("villa_id, status").eq("organization_id", s.org.id).eq("month", lastMonth),
     ]);
     const names = new Map(s.villas.map((v) => [v.id, v.name]));
@@ -463,6 +464,7 @@ function define(server: Registrar, channel: Channel) {
       receipts_to_review: toReview.count ?? 0,
       receipts_being_read: unread.count ?? 0,
       expenses_missing_receipt: {
+        since: lastMonth,
         count: missing.count ?? 0,
         latest: (missing.data ?? []).map((t) => ({ transaction_id: t.id, date: t.date, amount: Number(t.amount), currency: t.currency, description: t.description })),
       },
