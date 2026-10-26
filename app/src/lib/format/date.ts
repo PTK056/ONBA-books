@@ -5,3 +5,8 @@
 export function shortDate(iso: string): string {
   return `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(2, 4)}`;
 }
+
+/** Today (YYYY-MM-DD) in a time zone, e.g. the organization's ("Asia/Makassar"). */
+export function todayIn(timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}

@@ -59,7 +59,8 @@ export async function loadPeriod(kind: "year" | "all", requestedYear?: string): 
   const lastYear = last?.[0]?.date.slice(0, 4) ?? today.slice(0, 4);
   const years: string[] = [];
   for (let y = +lastYear; y >= +firstYear; y--) years.push(String(y));
-  const year = kind === "year" ? (requestedYear && /^\d{4}$/.test(requestedYear) ? requestedYear : lastYear) : null;
+  // Default: this year, not the last year with entries (prepaid costs can reach into next year).
+  const year = kind === "year" ? (requestedYear && /^\d{4}$/.test(requestedYear) ? requestedYear : today.slice(0, 4)) : null;
 
   const from = year ? `${year}-01-01` : `${firstYear}-01-01`;
   const to = year ? `${+year + 1}-01-01` : `${+lastYear + 1}-01-01`;

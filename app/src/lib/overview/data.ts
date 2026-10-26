@@ -1,5 +1,6 @@
 import "server-only";
 import { connection } from "next/server";
+import { todayIn } from "@/lib/format/date";
 import { getCurrentOrg } from "@/lib/org";
 import { createClient } from "@/lib/supabase/server";
 
@@ -93,7 +94,6 @@ export type OverviewResult =
   | { kind: "no_organization" }
   | { kind: "ready"; data: Overview };
 
-const monthStart = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
 const addMonths = (d: Date, n: number) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, 1));
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -113,7 +113,7 @@ type Row = {
   evidence: { storage_path: string; extracted: { merchant?: string | null } | null }[];
 };
 
-/** Figures for one month (default: the latest month with validated entries) and the 12 months up to it. */
+/** Figures for one month (default: the current month in the organization's time zone) and the 12 months up to it. */
 export async function loadOverview(requested?: string): Promise<OverviewResult> {
   await connection();
   const org = await getCurrentOrg();
@@ -125,10 +125,9 @@ export async function loadOverview(requested?: string): Promise<OverviewResult> 
   if (requested && /^\d{4}-\d{2}$/.test(requested)) {
     month = new Date(`${requested}-01T00:00:00Z`);
   } else {
-    const { data: latest } = await db.from("transactions").select("date")
-      .eq("organization_id", org.id).eq("status", "validated")
-      .order("date", { ascending: false }).limit(1);
-    month = monthStart(latest?.[0] ? new Date(`${latest[0].date}T00:00:00Z`) : new Date());
+    // Not the latest month with entries: prepaid costs (a lease spread ahead) would open a future month.
+    const { data: o } = await db.from("organizations").select("timezone").eq("id", org.id).single();
+    month = new Date(`${todayIn(o?.timezone ?? "UTC").slice(0, 7)}-01T00:00:00Z`);
   }
   const from = iso(month);
   const to = iso(addMonths(month, 1));
