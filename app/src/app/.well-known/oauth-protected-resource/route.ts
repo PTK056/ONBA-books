@@ -1,6 +1,6 @@
 import { generateProtectedResourceMetadata, getPublicOrigin, metadataCorsOptionsRequestHandler } from "mcp-handler";
 
-// RFC 9728: tells MCP clients that /api/mcp is protected by Supabase Auth (ONBA Books' OAuth server).
+// RFC 9728: tells MCP clients that /api/mcp is protected by Supabase Auth (Splyce's OAuth server).
 // offline_access asks for a refresh token, so the assistant stays connected after the 1-hour access token.
 export function GET(req: Request) {
   const metadata = generateProtectedResourceMetadata({

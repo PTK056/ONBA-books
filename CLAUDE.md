@@ -1,4 +1,4 @@
-# ONBA Books
+# Splyce (ex-ONBA Books)
 
 Produit commercial dérivé du Casa ONBA Control Room. Lire `docs/contexte.md` avant tout.
 

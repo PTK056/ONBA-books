@@ -47,7 +47,7 @@ export class ToolError extends Error {}
 /** The user's first organization (as in the app), with its villas and categories. */
 export async function loadSession(auth: AuthInfo | undefined): Promise<Session> {
   const userId = auth?.extra?.userId;
-  if (!auth || typeof userId !== "string") throw new ToolError("Not signed in. Reconnect ONBA Books in your assistant.");
+  if (!auth || typeof userId !== "string") throw new ToolError("Not signed in. Reconnect Splyce in your assistant.");
   return sessionFor(auth.token, userId);
 }
 

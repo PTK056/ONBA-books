@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ONBA Books",
+  title: "Splyce",
   description: "Bookkeeping for short-term-rental villas",
 };
 

@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 
-// ONBA Books' own OAuth client for chat channels, registered once on Supabase's OAuth server
+// Splyce's own OAuth client for chat channels, registered once on Supabase's OAuth server
 // (public client + PKCE). The user consents on /oauth/consent like any other assistant.
 import { APP_URL } from "@/lib/app-url";
 

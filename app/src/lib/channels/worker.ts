@@ -48,12 +48,12 @@ async function answer(link: Link, chatId: string, items: Incoming[]) {
   const token = await accessTokenFor(link.id);
   if (!token) {
     await unlink("telegram", chatId);
-    await sendMessage(chatId, `Your ONBA Books connection has expired. Connect again: ${APP_URL}/connect/telegram`);
+    await sendMessage(chatId, `Your Splyce connection has expired. Connect again: ${APP_URL}/connect/telegram`);
     return;
   }
   let session: Session;
   try { session = await sessionFor(token, link.user_id); } catch (e) {
-    await sendMessage(chatId, e instanceof ToolError ? e.message : "Could not open ONBA Books. Try again in a minute.");
+    await sendMessage(chatId, e instanceof ToolError ? e.message : "Could not open Splyce. Try again in a minute.");
     return;
   }
 

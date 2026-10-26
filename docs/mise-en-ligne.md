@@ -2,7 +2,7 @@
 
 **Terminée le 26/10/2026.** Domaine **`splyce.me`** (GoDaddy, 3 ans) : app sur **https://app.splyce.me** (Vercel ;
 `onba-books.vercel.app` reste actif et autorisé pendant la transition). E-mails de connexion par **Resend** depuis
-`login@splyce.me` (domaine vérifié, région Tokyo ; DKIM, `send`/`rsend`, DMARC de GoDaddy gardé), avec le modèle ONBA Books
+`login@splyce.me` (domaine vérifié, région Tokyo ; DKIM, `send`/`rsend`, DMARC de GoDaddy gardé), avec le modèle Splyce
 (lien `token_hash` + code). Adresse de l'app dans la variable `APP_URL`. Client OAuth du chat : `785f5991-…` (deux domaines).
 Reste : passer Vercel en Pro avant le premier client payant ; à terme rediriger `onba-books.vercel.app` (après avoir
 déplacé le connecteur Claude sur `app.splyce.me/api/mcp`).
@@ -12,7 +12,7 @@ déplacé le connecteur Claude sur `app.splyce.me/api/mcp`).
 retours autorisés). Pierre s'y connecte depuis son téléphone. Clé Resend rangée dans
 `~/.config/onbabooks/resend_key`. **Reste** : le domaine, puis Resend + SMTP + modèle d'e-mail (points 1, 2 et 6).
 Le plan gratuit de Supabase **refuse de changer les modèles d'e-mail** sans SMTP personnalisé : l'e-mail
-ONBA Books (lien + code) attend donc le domaine. Les blocs sont commentés dans `config.toml`.
+Splyce (lien + code) attend donc le domaine. Les blocs sont commentés dans `config.toml`.
 Pour `config push` : relire le diff, ne pousser que ce qu'on veut changer (le CLI compare aussi stockage, MFA, etc.).
 
 But : l'app sur une vraie adresse (`app.onbabooks.com`, en attendant `onba-books.vercel.app`), utilisable sur téléphone, avec des e-mails
@@ -20,7 +20,7 @@ de connexion envoyés à n'importe qui (aujourd'hui l'envoi Supabase par défaut
 de l'équipe Supabase, quelques e-mails par heure).
 
 Déjà prêt dans le code (branche `core-schema`) :
-- E-mail de connexion ONBA Books (`app/supabase/templates/sign_in.html`) : un lien `token_hash` qui
+- E-mail de connexion Splyce (`app/supabase/templates/sign_in.html`) : un lien `token_hash` qui
   marche dans n'importe quel navigateur (l'ancien lien `?code=` exigeait le navigateur qui l'avait
   demandé, ce qui cassait souvent sur téléphone) **et** un code à 6 chiffres.
 - Écran de connexion en deux temps : e-mail, puis « ouvrez le lien ou tapez le code ».

@@ -17,8 +17,9 @@ gestionnaires (Bali d'abord, puis l'Australie et ailleurs).
 - Les éléments propres à Casa ONBA : IDR, banque Danamon, PT PMA, personnel (Kadek, Alit), avances de Pierre (`-OA`).
 
 ## Décisions prises
-- **Nom : ONBA Books.** Domaines libres le 07/10 : onbabooks.com, onba.io, onba.co (pas encore réservés).
-  Marque : aucun « ONBA » en Indonésie, en Australie ni dans l'UE (TMView, OMPI, PDKI) ; dépôt reporté.
+- **Nom : Splyce** (26/10/2026, domaine `splyce.me` acheté chez GoDaddy pour 3 ans ; le produit s'appelait ONBA Books
+  jusque-là, nom écarté car ONBA est aussi une société de gestion locative). **Recherche de marque « Splyce » à faire**
+  (TMView, PDKI, IP Australia) : « Splice » (sons pour musiciens) et l'ex-équipe e-sport « Splyce » existent.
 - **Cible : propriétaires ET gestionnaires.** Modèle de données : Organisation → Villas → Propriétaires
   (un propriétaire seul = une organisation à une villa ; le gestionnaire donne à chaque propriétaire un accès en lecture).
 - **Un seul code, configurable.** Le sur-mesure passe par des réglages et des modules activables, jamais par une copie du code. Pas de version à télécharger : un service hébergé en abonnement.
@@ -27,8 +28,8 @@ gestionnaires (Bali d'abord, puis l'Australie et ailleurs).
 - **Produit en libre-service** : le client utilise l'outil lui-même ; Pierre vend et maintient le système, il ne tient la compta de personne.
 
 ## Risques notés
-- ONBA est aussi une société de gestion locative : un frein possible pour vendre aux gestionnaires concurrents.
-- Facturation : ONBA Books ne sera **pas** porté par la PT indonésienne (décidé le 23/10/2026) ; structure qui vend
+- ~~ONBA est aussi une société de gestion locative~~ : levé par le passage au nom Splyce (26/10/2026).
+- Facturation : Splyce ne sera **pas** porté par la PT indonésienne (décidé le 23/10/2026) ; structure qui vend
   (et qui ouvre le compte Meta Business pour l'agent WhatsApp) encore à préciser.
 - Données personnelles : RGPD, UU PDP (Indonésie), Privacy Act (Australie).
 
@@ -67,8 +68,8 @@ Secrets hors dépôt : clé Anthropic dans `~/.config/onbabooks/anthropic_key` (
 fonction Supabase) ; `app/.env.local` (URL + clé publique Supabase).
 
 ## Prochaines étapes (ordre proposé)
+0. **Sécurité avant d'inviter d'autres utilisateurs** : `docs/securite.md` (quotas IA ou invitations, en-têtes + consentement OAuth durci, captcha).
 1. ~~Mise en ligne~~ faite (26/10, `splyce.me`). Passer Vercel en Pro avant le premier client payant.
-   Nom du produit à trancher : « Splyce » envisagé (domaine pris pour ça), l'interface dit encore « ONBA Books ».
 2. Rapprochement bancaire Danamon (Claude lit bien les relevés PDF).
 2 bis. Agent WhatsApp (adaptateur sur le cœur Telegram) quand le compte Meta Business est prêt.
 3. Couche gestionnaire : frais de gestion, relevés propriétaires à la marque, accès propriétaires.

@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* ONBA Books design tokens: zinc neutrals, emerald brand, Geist type. */
+/* Splyce design tokens: zinc neutrals, emerald brand, Geist type. */
 :root {
   --background: #f7f7f8;
   --foreground: #18181b;

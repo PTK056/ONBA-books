@@ -1,4 +1,4 @@
-# ONBA Books — web app
+# Splyce — web app
 
 Next.js 16 (App Router, Cache Components) on Supabase. The database, its tests and the
 receipt engine live in [`supabase/`](supabase/README.md).

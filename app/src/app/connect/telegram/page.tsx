@@ -3,7 +3,7 @@ import { Logo } from "@/components/shell/Logo";
 
 const BOT = process.env.TELEGRAM_BOT_USERNAME ?? "";
 
-/** Links the signed-in user's Telegram to ONBA Books: consent here, then /start CODE from their own Telegram. */
+/** Links the signed-in user's Telegram to Splyce: consent here, then /start CODE from their own Telegram. */
 export default function ConnectTelegramPage({ searchParams }: PageProps<"/connect/telegram">) {
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-4 py-12">
@@ -44,7 +44,7 @@ async function Step({ searchParams }: Pick<PageProps<"/connect/telegram">, "sear
     <div className="flex flex-col gap-4">
       <h1 className="text-lg font-semibold">Connect Telegram</h1>
       <p className="text-sm text-zinc-500">
-        Send receipts, expenses, stays and reminders to ONBA Books from a Telegram chat. The assistant works with your own access.
+        Send receipts, expenses, stays and reminders to Splyce from a Telegram chat. The assistant works with your own access.
       </p>
       {typeof error === "string" && ERRORS[error] && <p role="alert" className="text-sm text-red-600">{ERRORS[error]}</p>}
       <a href="/api/channels/link/start?channel=telegram" className="flex h-10 items-center justify-center rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white shadow-sm hover:bg-emerald-700">

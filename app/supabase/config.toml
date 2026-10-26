@@ -245,17 +245,17 @@ port = 465
 user = "resend"
 pass = "env(RESEND_API_KEY)"
 admin_email = "login@splyce.me"
-sender_name = "ONBA Books"
+sender_name = "Splyce"
 
 # Sign-in e-mail: a token_hash link (works in any browser, unlike the PKCE ?code= link, which needs
 # the browser that asked for it) plus the 6-digit code for the sign-in page. New users get the
 # confirmation template, existing ones the magic link: same content for both.
 [auth.email.template.magic_link]
-subject = "Your ONBA Books sign-in link"
+subject = "Your Splyce sign-in link"
 content_path = "./supabase/templates/sign_in.html"
 
 [auth.email.template.confirmation]
-subject = "Your ONBA Books sign-in link"
+subject = "Your Splyce sign-in link"
 content_path = "./supabase/templates/sign_in.html"
 
 # Uncomment to customize email template
@@ -378,7 +378,7 @@ enabled = false
 # domain = "example.clerk.accounts.dev"
 
 # OAuth server configuration
-# ONBA Books is the authorization server for its MCP server (/api/mcp): an assistant (WhatsApp agent,
+# Splyce is the authorization server for its MCP server (/api/mcp): an assistant (WhatsApp agent,
 # Claude...) signs the user in here and gets a token that acts as that user, so RLS applies as in the app.
 [auth.oauth_server]
 # Enable OAuth server functionality

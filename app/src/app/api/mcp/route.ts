@@ -7,9 +7,9 @@ import { registerTools } from "@/lib/mcp/tools";
 export const maxDuration = 60; // reading a receipt with Claude takes a few seconds
 
 const handler = createMcpHandler(registerTools, {
-  serverInfo: { name: "ONBA Books", version: "1.0.0" },
+  serverInfo: { name: "Splyce", version: "1.0.0" },
   instructions:
-    "ONBA Books keeps the books of short-term-rental villas. Call get_context first. Receipts sent as photos or PDFs go to "
+    "Splyce keeps the books of short-term-rental villas. Call get_context first. Receipts sent as photos or PDFs go to "
     + "submit_receipt (they wait for review in the app); expenses or income stated in words go to record_transaction (booked at once). "
     + "Stays not from Airbnb go to record_stay, and get_todo lists what is pending. Reminders about the villas (bills to pay, "
     + "receipts to bring, things to finish) go to add_task, not to a calendar or another to-do app. "

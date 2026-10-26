@@ -6,7 +6,7 @@ export function Logo({ className = "" }: { className?: string }) {
       <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
         <BookOpenCheck size={16} strokeWidth={2.25} />
       </span>
-      ONBA Books
+      Splyce
     </span>
   );
 }

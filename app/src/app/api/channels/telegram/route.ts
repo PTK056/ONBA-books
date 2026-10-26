@@ -36,18 +36,18 @@ async function handle(msg: TgMessage) {
     if (code) {
       const linked = await redeemCode("telegram", code, chatId, msg.from?.username ?? msg.from?.first_name ?? null);
       return sendMessage(chatId, linked
-        ? `Connected to ONBA Books${linked.email ? ` as ${linked.email}` : ""}. ✅\n\n${HELP}`
+        ? `Connected to Splyce${linked.email ? ` as ${linked.email}` : ""}. ✅\n\n${HELP}`
         : `That link has expired or was already used. Get a new one: ${CONNECT}`);
     }
   }
 
   const link = await findLink("telegram", chatId);
-  if (!link) return sendMessage(chatId, `Hi! To use ONBA Books here, connect your account first: ${CONNECT}`);
+  if (!link) return sendMessage(chatId, `Hi! To use Splyce here, connect your account first: ${CONNECT}`);
 
   if (text === "/start" || text === "/help") return sendMessage(chatId, HELP);
   if (text === "/stop") {
     await unlink("telegram", chatId);
-    return sendMessage(chatId, "Disconnected. ONBA Books no longer has access from this chat.");
+    return sendMessage(chatId, "Disconnected. Splyce no longer has access from this chat.");
   }
   if (text === "/brief off" || text === "/brief on") {
     const on = text.endsWith("on");

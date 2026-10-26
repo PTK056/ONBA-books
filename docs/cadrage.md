@@ -5,7 +5,7 @@ sont en anglais (ce sont des éléments du produit) ; le reste est en français.
 
 ## 1. Ce qu'on vend, en une phrase
 
-> ONBA Books turns receipts, bookings and bank statements into clean monthly books
+> Splyce turns receipts, bookings and bank statements into clean monthly books
 > and owner statements for short-term-rental villas — without an accountant chasing you.
 
 Deux promesses, une par cible :
@@ -21,7 +21,7 @@ Légende : **Cœur** = pour tous, toujours actif · **Réglage** = même code, p
 
 ### 2.1 Ce qui existe dans le Control Room
 
-| Onglet actuel | Classement | Ce que ça devient dans ONBA Books |
+| Onglet actuel | Classement | Ce que ça devient dans Splyce |
 |---|---|---|
 | Overview | Cœur | Tableau de bord par villa et consolidé par organisation. |
 | Months | Cœur | Clôture mensuelle : statut (ouvert / à valider / clôturé), verrouillage après clôture. |
@@ -96,7 +96,7 @@ Points de conception :
 
 Le Control Room tourne comme artifact claude.ai qui passe par **le connecteur Airtable de Pierre**. Il ne peut pas être remis tel quel à un client : il faudrait que chaque client ait Claude, son propre connecteur, et un artifact à lui. Et le moteur de tickets tourne sur le Mac de Pierre.
 
-Principe fixé : **ONBA Books est un produit en libre-service.** Le client l'utilise lui-même ; Pierre vend et maintient le système, il ne tient la compta de personne. Le pilote doit donc déjà être une vraie application, avec ses comptes utilisateurs, et le moteur de tickets doit tourner dans le cloud dès le départ.
+Principe fixé : **Splyce est un produit en libre-service.** Le client l'utilise lui-même ; Pierre vend et maintient le système, il ne tient la compta de personne. Le pilote doit donc déjà être une vraie application, avec ses comptes utilisateurs, et le moteur de tickets doit tourner dans le cloud dès le départ.
 
 Deux options :
 
@@ -158,7 +158,7 @@ Règle : faire parler de ce qu'ils font **aujourd'hui**, pas de ce qu'ils achèt
 1. ~~Pilote : Airtable (B) ou directement Supabase (C) ?~~ → **C, Supabase direct** (08/10/2026).
 2. Premier segment visé : propriétaires seuls ou gestionnaires ? **Pas de prospect à ce jour (08/10/2026) → on ne tranche pas dans l'abstrait** :
    - On construit le cœur commun, avec une base pensée d'emblée pour plusieurs villas et des rôles. Le surcoût pour les gestionnaires (rôle propriétaire, frais de gestion, relevé à la marque) est estimé à un quart à un tiers de la v1 et s'ajoute ensuite sans reprise du schéma.
-   - Casa ONBA est le premier utilisateur réel d'ONBA Books, sur une organisation séparée et sans lien avec la base Airtable. C'est la démo des entretiens.
+   - Casa ONBA est le premier utilisateur réel d'Splyce, sur une organisation séparée et sans lien avec la base Airtable. C'est la démo des entretiens.
    - En parallèle : 5–10 entretiens, mélangeant propriétaires et gestionnaires. Pistes : groupes de propriétaires et d'hôtes à Bali, entourage de Pierre (voisins, notaire, comptable, agent immobilier), petits gestionnaires de 3 à 15 villas.
    - Hypothèses à tester : les propriétaires qui passent par un gestionnaire voudraient-ils l'outil pour le *contrôler* ? Les gestionnaires voient-ils ONBA comme un concurrent ?
    - Critère de choix après les entretiens : **qui a déjà payé** (outil, comptable, temps salarié) pour résoudre ce problème ?

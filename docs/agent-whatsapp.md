@@ -1,10 +1,10 @@
 # Agent WhatsApp (serveur MCP)
 
 Décidé le 23/10/2026. But : envoyer depuis WhatsApp des tickets, des dépenses, des séjours et des pense-bêtes,
-qui entrent directement dans ONBA Books ; l'agent relance aussi sur ce qui reste à faire.
+qui entrent directement dans Splyce ; l'agent relance aussi sur ce qui reste à faire.
 
 ## Architecture
-WhatsApp → **Owl** (owlagent.me, SaaS d'un ami) → **serveur MCP ONBA Books** → Supabase.
+WhatsApp → **Owl** (owlagent.me, SaaS d'un ami) → **serveur MCP Splyce** → Supabase.
 
 - Serveur MCP = route de l'app : `https://onba-books.vercel.app/api/mcp` (Streamable HTTP, Vercel `hnd1`).
   Générique : marche aussi avec Claude ou ChatGPT. Côté produit : un **module** activable par organisation.

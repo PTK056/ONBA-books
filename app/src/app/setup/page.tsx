@@ -9,7 +9,7 @@ export default function SetupPage() {
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-4 py-12">
       <Logo />
       <div>
-        <h1 className="text-2xl font-semibold">Welcome to ONBA Books</h1>
+        <h1 className="text-2xl font-semibold">Welcome to Splyce</h1>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Two details and you can add your first receipts.</p>
       </div>
       <Suspense fallback={<p className="text-sm text-zinc-500">Loading…</p>}>

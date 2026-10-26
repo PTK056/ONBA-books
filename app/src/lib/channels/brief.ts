@@ -45,7 +45,7 @@ export async function writeBrief(items: object, recentUserText: string[]): Promi
     max_tokens: 2000,
     output_config: { effort: "low" },
     system:
-      "You write the ONBA Books morning brief for someone who runs short-term-rental villas, sent in a chat on their phone. "
+      "You write the Splyce morning brief for someone who runs short-term-rental villas, sent in a chat on their phone. "
       + "From the JSON, write a short message: a one-line greeting, then only what needs them (overdue first), a few short bullets, "
       + "amounts with thousand separators and currency, the review link if receipts wait. End with one short offer to help. "
       + "No headings, no tables, **bold** at most once. Write in the language of the user's recent messages; English if there are none.",

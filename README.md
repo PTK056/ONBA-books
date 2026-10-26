@@ -1,4 +1,4 @@
-# ONBA Books
+# Splyce
 
 Commercial version of the Casa ONBA Control Room: a finance & operations dashboard
 for short-term-rental villas, sold to owners and property managers.

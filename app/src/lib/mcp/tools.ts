@@ -43,7 +43,7 @@ export async function runTool(t: ToolDef, s: Session, args: unknown): Promise<{ 
   } catch (e) {
     if (e instanceof ToolError) return { ok: false, text: e.message };
     console.error(`[tool ${t.name}]`, e);
-    return { ok: false, text: "Something went wrong in ONBA Books. Try again in a moment." };
+    return { ok: false, text: "Something went wrong in Splyce. Try again in a moment." };
   }
 }
 
@@ -66,7 +66,7 @@ export function registerTools(server: McpServer) {
       async (args: unknown, ctx: { http?: { authInfo?: AuthInfo } }): Promise<Result> => {
         let s: Session;
         try { s = await loadSession(ctx.http?.authInfo); } catch (e) {
-          return { content: [{ type: "text", text: e instanceof ToolError ? e.message : "Could not open ONBA Books." }], isError: true };
+          return { content: [{ type: "text", text: e instanceof ToolError ? e.message : "Could not open Splyce." }], isError: true };
         }
         const r = await runTool(t, s, args);
         return { content: [{ type: "text", text: r.text }], ...(r.ok ? {} : { isError: true }) };
@@ -97,7 +97,7 @@ function define(server: Registrar, channel: Channel) {
   server.registerTool("submit_receipt", {
     title: "Submit a receipt",
     description:
-      "Use when the user sends a photo or PDF of a receipt, invoice or transfer slip for an expense. ONBA Books reads it "
+      "Use when the user sends a photo or PDF of a receipt, invoice or transfer slip for an expense. Splyce reads it "
       + "(merchant, date, total, category, villa) and puts it in the review queue: it is NOT booked until the user validates it in the app. "
       + "Tell the user what was read, point out uncertain fields and possible duplicates, and give the review link. "
       + "One call per file. Do not also call record_transaction for the same expense.",
@@ -342,7 +342,7 @@ function define(server: Registrar, channel: Channel) {
     description:
       "Use for any reminder about the villas or their books: a bill or payment to make (kind payment, e.g. \"remind me to pay PLN 850k on the 25th\"), "
       + "a receipt or proof to bring in (kind evidence), or anything else to finish (kind todo). Prefer this over a calendar or a to-do app: "
-      + "ONBA Books tasks come back in get_todo and in the morning brief until done. If the user also wants a calendar alert, add it after this.",
+      + "Splyce tasks come back in get_todo and in the morning brief until done. If the user also wants a calendar alert, add it after this.",
     inputSchema: z.object({
       title: z.string().min(1).max(200).describe("Short, e.g. 'Pay PLN electricity'."),
       kind: z.enum(["payment", "evidence", "todo"]).optional(),
