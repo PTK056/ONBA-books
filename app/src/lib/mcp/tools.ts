@@ -377,6 +377,61 @@ function define(server: Registrar, channel: Channel) {
     return { status: "done", task: data };
   }));
 
+  server.registerTool("update_task", {
+    title: "Change a task",
+    description:
+      "Changes an open task: title, due date, amount, villa or notes (find its task_id with get_todo), e.g. \"move the PLN bill to the 30th\". "
+      + "Only the fields given change. Repeat the task as it now stands.",
+    inputSchema: z.object({
+      task_id: UUID,
+      title: z.string().min(1).max(200).optional(),
+      due_date: DATE.nullable().optional().describe("New due date, or null to remove it."),
+      amount: z.number().positive().nullable().optional().describe("New amount, or null to remove it."),
+      currency: CURRENCY.optional(),
+      villa: z.string().nullable().optional().describe("Villa name, or null for none."),
+      notes: z.string().max(1000).nullable().optional(),
+    }),
+  }, (async (s, a: { task_id: string; title?: string; due_date?: string | null; amount?: number | null; currency?: string; villa?: string | null; notes?: string | null }) => {
+    requireEditor(s);
+    const { data: task } = await s.db.from("tasks").select("amount, currency, villa_id")
+      .eq("id", a.task_id).eq("organization_id", s.org.id).is("done_at", null).maybeSingle();
+    if (!task) throw new ToolError("No open task with that id.");
+    const villa = a.villa === undefined ? undefined : a.villa === null ? null : resolveVilla(s, a.villa);
+    const change: Record<string, unknown> = {};
+    if (a.title !== undefined) change.title = a.title.trim();
+    if (a.due_date !== undefined) change.due_date = a.due_date;
+    if (a.notes !== undefined) change.notes = a.notes?.trim() || null;
+    if (villa !== undefined) change.villa_id = villa?.id ?? null;
+    if (a.amount === null) { change.amount = null; change.currency = null; }
+    else if (a.amount !== undefined || a.currency !== undefined) {
+      // Amount and currency go together: keep the current one, else the villa's, else the reporting currency.
+      change.amount = a.amount ?? task.amount;
+      change.currency = a.currency ?? task.currency ?? villa?.currency ?? s.org.reportingCurrency;
+      if (change.amount === null) throw new ToolError("Give the amount too.");
+    }
+    if (!Object.keys(change).length) throw new ToolError("Nothing to change.");
+    const { data, error } = await s.db.from("tasks").update(change).eq("id", a.task_id)
+      .select("title, kind, due_date, amount, currency, notes").maybeSingle();
+    if (error || !data) throw new ToolError("Could not update the task. Try again.");
+    return { status: "updated", task: data };
+  }));
+
+  server.registerTool("delete_task", {
+    title: "Delete a task",
+    description:
+      "Deletes a reminder the user no longer wants (find its task_id with get_todo), e.g. one created by mistake or no longer relevant. "
+      + "If it was done rather than cancelled, use complete_task instead. Confirm with the user before calling.",
+    inputSchema: z.object({ task_id: UUID }),
+    annotations: { destructiveHint: true },
+  }, (async (s, a: { task_id: string }) => {
+    requireEditor(s);
+    const { data, error } = await s.db.from("tasks").delete()
+      .eq("id", a.task_id).eq("organization_id", s.org.id).select("title, due_date, amount, currency").maybeSingle();
+    if (error) throw new ToolError("Could not delete the task. Try again.");
+    if (!data) throw new ToolError("No task with that id.");
+    return { status: "deleted", task: data };
+  }));
+
   server.registerTool("get_todo", {
     title: "What's left to do",
     description:
