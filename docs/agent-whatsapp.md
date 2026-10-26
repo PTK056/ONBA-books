@@ -50,6 +50,18 @@ Pour brancher un assistant : adresse `https://onba-books.vercel.app/api/mcp`, co
 À surveiller : pour « rappelle-moi… », Claude a d'abord pris Google Agenda ; les descriptions orientent
 désormais vers `add_task`. Pas encore testé : `record_stay`, `attach_evidence`, `complete_task`, `month_summary`.
 
+## Agent Telegram (26/10/2026) — en ligne, @ONBAbooks_bot
+Notre propre agent, indépendant d'Owl ; WhatsApp sera un deuxième adaptateur (API WhatsApp Business), le cœur ne change pas.
+- Cœur : `app/src/lib/agent/run.ts` (Claude Opus 5.5, effort `medium`, repli `fallbacks: "default"`), mêmes outils que MCP
+  (`toolDefs("chat")` : fichiers par `attachment_id`). Historique append-only ; nouvelle conversation après 6 h ou 60 messages, ou `/new`.
+- Liaison : `/connect/telegram` → OAuth (client `af54b67d-…`, public + PKCE) → code à usage unique → `/start CODE` depuis
+  son propre Telegram. Jetons chiffrés (AES-GCM, `CHANNEL_TOKEN_KEY`) dans `channel_links` ; l'agent agit avec le jeton de l'utilisateur.
+- Webhook : `app/src/app/api/channels/telegram/route.ts` (secret d'en-tête), réponse 200 immédiate, travail après (`after`).
+  File par conversation (`chat_enqueue/claim/take/release`) : un album + légende = un seul tour, dans l'ordre.
+- Variables Vercel (copie locale `~/.config/onbabooks/vercel.env`) : ANTHROPIC_API_KEY, CHANNEL_TOKEN_KEY, TELEGRAM_WEBHOOK_SECRET,
+  CHAT_OAUTH_CLIENT_ID, APP_URL, TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME, SUPABASE_SECRET_KEY (clé `vercel-agent`, réservée aux tables du chat).
+- **Testé** : liaison + photo de reçu transférée depuis WhatsApp → lue → Review. Pas encore : notes vocales (refusées), brief du matin.
+
 ## À demander à l'ami (Owl)
 1. Owl accepte-t-il un serveur MCP personnalisé ? Avec OAuth, ou seulement un en-tête fixe ?
 2. Comment une photo ou un PDF WhatsApp est-il transmis à un outil MCP (lien, base64, rien) ?
