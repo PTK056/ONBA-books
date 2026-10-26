@@ -40,7 +40,7 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Everything except static assets and the dev-only preview.
-    "/((?!_next/static|_next/image|favicon.ico|dev/|dev-fixtures/|.*\\.(?:svg|png|jpg|jpeg|webp)$).*)",
+    // Everything except static assets (icons included) and the dev-only preview.
+    "/((?!_next/static|_next/image|favicon.ico|apple-icon|dev/|dev-fixtures/|.*\\.(?:svg|png|jpg|jpeg|webp)$).*)",
   ],
 };
