@@ -38,7 +38,8 @@ Cadrage fait (`docs/cadrage.md`). Décisions depuis : **Supabase direct** (pas d
 segment à trancher après 5–10 entretiens (base déjà prévue pour les gestionnaires).
 
 Code dans `app/` (Next.js 16 + Supabase), dépôt privé GitHub `PTK056/ONBA-books` ; `main` = `core-schema`.
-**En ligne** sur https://onba-books.vercel.app (Vercel Hobby, déploiement à chaque push sur `main`).
+**En ligne** sur https://app.splyce.me (domaine `splyce.me`, Vercel Hobby, déploiement à chaque push sur `main` ;
+`onba-books.vercel.app` reste actif). Connexion par e-mail ouverte à tous (Resend).
 Serveur Vercel à Tokyo (`hnd1`, `app/vercel.json`), à côté de la base Supabase (`ap-northeast-1`) :
 ne pas changer l'un sans l'autre.
 Projet Supabase `wnmukybwihyrxzcbfbdz` lié (CLI connectée sur le Mac de Pierre) ; migrations et
@@ -66,10 +67,8 @@ Secrets hors dépôt : clé Anthropic dans `~/.config/onbabooks/anthropic_key` (
 fonction Supabase) ; `app/.env.local` (URL + clé publique Supabase).
 
 ## Prochaines étapes (ordre proposé)
-1. **Finir la mise en ligne** (`docs/mise-en-ligne.md`) : acheter `onbabooks.com`, le vérifier dans Resend,
-   activer le SMTP et l'e-mail de connexion ONBA Books. D'ici là, seul Pierre peut se connecter (envoi
-   Supabase par défaut, lien à ouvrir dans le navigateur qui l'a demandé, pas de code dans l'e-mail).
-   Passer Vercel en Pro avant le premier client payant.
+1. ~~Mise en ligne~~ faite (26/10, `splyce.me`). Passer Vercel en Pro avant le premier client payant.
+   Nom du produit à trancher : « Splyce » envisagé (domaine pris pour ça), l'interface dit encore « ONBA Books ».
 2. Rapprochement bancaire Danamon (Claude lit bien les relevés PDF).
 2 bis. Agent WhatsApp (adaptateur sur le cœur Telegram) quand le compte Meta Business est prêt.
 3. Couche gestionnaire : frais de gestion, relevés propriétaires à la marque, accès propriétaires.

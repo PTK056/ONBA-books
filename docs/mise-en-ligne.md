@@ -1,5 +1,12 @@
 # Mise en ligne (étape 1)
 
+**Terminée le 26/10/2026.** Domaine **`splyce.me`** (GoDaddy, 3 ans) : app sur **https://app.splyce.me** (Vercel ;
+`onba-books.vercel.app` reste actif et autorisé pendant la transition). E-mails de connexion par **Resend** depuis
+`login@splyce.me` (domaine vérifié, région Tokyo ; DKIM, `send`/`rsend`, DMARC de GoDaddy gardé), avec le modèle ONBA Books
+(lien `token_hash` + code). Adresse de l'app dans la variable `APP_URL`. Client OAuth du chat : `785f5991-…` (deux domaines).
+Reste : passer Vercel en Pro avant le premier client payant ; à terme rediriger `onba-books.vercel.app` (après avoir
+déplacé le connecteur Claude sur `app.splyce.me/api/mcp`).
+
 **État au 20/10/2026** : l'app est en ligne sur https://onba-books.vercel.app (Vercel Hobby, dépôt privé
 `PTK056/ONBA-books`, déploiement à chaque push sur `main`). Supabase connaît cette adresse (site et
 retours autorisés). Pierre s'y connecte depuis son téléphone. Clé Resend rangée dans
