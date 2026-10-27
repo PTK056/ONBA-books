@@ -13,10 +13,7 @@ Bilan du 26/10/2026 (vérifié dans le code et en ligne ; pas un audit professio
 ## À faire — avant d'inviter d'autres utilisateurs
 1. ~~Protéger la facture IA~~ : fait (27/10/2026), voir « Fait ».
 2. ~~En-têtes de sécurité et page de consentement OAuth durcie~~ : fait (27/10/2026), voir « Fait ».
-3. **Captcha Turnstile** : code prêt mais éteint. À activer dans cet ordre (sinon plus personne ne peut se connecter) :
-   a. Cloudflare → Turnstile → ajouter le site `app.splyce.me` (mode *Managed*) : clé de site + clé secrète.
-   b. Vercel : `NEXT_PUBLIC_TURNSTILE_SITE_KEY` = clé de site, puis redéployer.
-   c. Supabase → Authentication → Attack Protection → Captcha : Turnstile + clé secrète.
+3. ~~Captcha Turnstile~~ : fait (27/10/2026), voir « Fait ».
 
 ## À faire — ensuite
 4. **MFA** (application d'authentification) pour les admins ; TOTP déjà activé côté Supabase, écran à faire.
@@ -28,6 +25,10 @@ Bilan du 26/10/2026 (vérifié dans le code et en ligne ; pas un audit professio
 8. **Politique de confidentialité** : sous-traitants (Supabase Tokyo, Vercel, Anthropic, OpenAI, Telegram, Resend).
 
 ## Fait
+- **Captcha Turnstile** (27/10/2026) : widget Cloudflare « Splyce » (mode Managed, `app.splyce.me` + `localhost`),
+  clé de site dans Vercel (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`), clé secrète dans Supabase (Attack Protection). Vérifié :
+  une demande de code sans jeton est refusée (`captcha_failed`), une vraie connexion passe. Invisible pour la plupart des gens.
+  Pour le désactiver : d'abord Supabase, ensuite seulement retirer la variable Vercel.
 - **Quotas IA par organisation** (27/10/2026, tests `supabase/tests/ai_quotas.sql`) : par mois civil, 100 reçus lus,
   300 messages à l'agent, 60 minutes de vocal par défaut. Au-delà, les reçus restent en attente (« Read now » plus tard,
   ou saisie à la main), l'agent répond que l'enveloppe du mois est épuisée. Un plafond différent par organisation va dans

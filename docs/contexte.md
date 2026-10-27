@@ -74,8 +74,8 @@ Secrets hors dépôt : clé Anthropic dans `~/.config/onbabooks/anthropic_key` (
 fonction Supabase) ; `app/.env.local` (URL + clé publique Supabase).
 
 ## Prochaines étapes (ordre proposé)
-0. **Sécurité avant d'inviter d'autres utilisateurs** : quotas IA, en-têtes et consentement OAuth faits (27/10) ;
-   reste à activer le captcha Turnstile (clés Cloudflare, 3 étapes dans `docs/securite.md`).
+0. ~~Sécurité avant d'inviter d'autres utilisateurs~~ : faite (27/10) — quotas IA, en-têtes, consentement OAuth, captcha
+   (`docs/securite.md`). Reste « ensuite » : MFA admins, liens de partage révocables, anciennes clés Supabase.
 1. ~~Mise en ligne~~ faite (26/10, `splyce.me`). Passer Vercel en Pro avant le premier client payant.
 2. Rapprochement bancaire Danamon (Claude lit bien les relevés PDF).
 2 bis. Agent WhatsApp (adaptateur sur le cœur Telegram) quand le compte Meta Business est prêt.
