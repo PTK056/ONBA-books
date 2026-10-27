@@ -68,7 +68,8 @@ select pg_temp.expect(
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
 insert into ids select 'orgB', public.create_organization('Org B', 'AUD');
 
-select pg_temp.expect((select count(*) from villas) = 0,       'admin B sees no villa of org A');
+select pg_temp.expect((select count(*) from villas where organization_id <> (select v from ids where k = 'orgB')) = 0,
+  'admin B sees no villa of org A');
 select pg_temp.expect((select count(*) from transactions) = 0, 'admin B sees no transaction of org A');
 select pg_temp.expect((select count(*) from organizations) = 1, 'admin B sees only their organization');
 select pg_temp.expect((select count(*) from categories) = 17,  'admin B sees only their own categories');

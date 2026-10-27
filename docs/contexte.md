@@ -84,4 +84,9 @@ fonction Supabase) ; `app/.env.local` (URL + clé publique Supabase).
    Avant d'ouvrir aux clients : société, CGU + DPA, politique de confidentialité (`docs/securite.md`).
 2 bis. Agent WhatsApp (adaptateur sur le cœur Telegram) quand le compte Meta Business est prêt.
 3. Couche gestionnaire : frais de gestion, relevés propriétaires à la marque, accès propriétaires.
+   Fait (27/10/2026) : la **Société** (une « villa » de type `company` par organisation, invisible des propriétaires) pour
+   ce qui n'est à aucune villa, et la page **Settings** (frais bancaires et intérêts → Société ou partagés entre villas).
+   Scénario de référence (société de gestion, 3 villas, 3 propriétaires) : à faire ensuite, la répartition d'une écriture
+   entre villas, puis frais de gestion par villa, relevé propriétaire (net dû − versé) et versements aux propriétaires
+   reconnus comme règlements. Tout ce qui varie d'un contrat à l'autre = réglage.
 4. Entretiens prospects (questions dans `docs/cadrage.md` §6).

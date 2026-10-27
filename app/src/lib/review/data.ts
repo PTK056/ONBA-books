@@ -35,7 +35,7 @@ export async function loadReviewQueue(orgId?: string): Promise<ReviewQueueData> 
       .order("read_at", { ascending: true }),
     db.from("categories").select("id, name").eq("organization_id", org)
       .eq("kind", "expense").is("archived_at", null).order("name"),
-    db.from("villas").select("id, name, currency").eq("organization_id", org)
+    db.from("villas").select("id, name, currency, kind").eq("organization_id", org)
       .is("archived_at", null).order("name"),
     db.from("transactions").select("currency, fx_rate").eq("organization_id", org)
       .order("date", { ascending: false }).limit(200),
@@ -67,7 +67,8 @@ export async function loadReviewQueue(orgId?: string): Promise<ReviewQueueData> 
       organizationName: m.organizations.name,
       reportingCurrency: m.organizations.reporting_currency,
       categories: categories.data ?? [],
-      villas: villas.data ?? [],
+      villas: (villas.data ?? []).filter((v) => v.kind === "villa").map((v) => ({ id: v.id, name: v.name, currency: v.currency })),
+      company: (villas.data ?? []).filter((v) => v.kind === "company").map((v) => ({ id: v.id, name: v.name, currency: v.currency }))[0] ?? null,
       lastRates,
     },
   };

@@ -6,9 +6,10 @@ import { money } from "@/components/overview/format";
 import { shortDate } from "@/lib/format/date";
 import { AttachReceipt, DeleteEntry, ShareDownload } from "@/components/transactions/FileActions";
 import { TxForm } from "@/components/transactions/TxForm";
+import { places } from "@/lib/org";
 import { getTransaction, needsReceipt } from "@/lib/transactions/data";
 
-const SOURCES: Record<string, string> = { manual: "Added by hand", receipt: "From a receipt", stay: "Imported stay", adjustment: "Adjustment", module: "Module" };
+const SOURCES: Record<string, string> = { manual: "Added by hand", receipt: "From a receipt", stay: "Imported stay", adjustment: "Adjustment", module: "From a bank statement" };
 
 export default function TransactionPage({ params, searchParams }: PageProps<"/transactions/[id]">) {
   return (
@@ -29,7 +30,7 @@ async function Content({ params, searchParams }: Pick<PageProps<"/transactions/[
   const { org, tx, files, closed, categories } = data;
   const cur = org.reportingCurrency;
   const editor = org.role !== "owner_viewer";
-  const editable = editor && !closed && (tx.source === "manual" || tx.source === "receipt");
+  const editable = editor && !closed && (tx.source === "manual" || tx.source === "receipt" || tx.source === "module");
 
   return (
     <>
@@ -98,13 +99,13 @@ async function Content({ params, searchParams }: Pick<PageProps<"/transactions/[
           </div>
           {edit === "1" ? (
             <TxForm
-              mode="edit" id={tx.id} organizationId={org.id} reportingCurrency={cur} villas={org.villas} categories={categories}
+              mode="edit" id={tx.id} organizationId={org.id} reportingCurrency={cur} villas={places(org)} categories={categories}
               initial={{ direction: tx.direction, date: tx.date, amount: tx.amount, currency: tx.currency, fxRate: tx.fxRate, categoryId: tx.category?.id ?? null, villaId: tx.villa.id, description: tx.description ?? "" }}
             />
           ) : (
             <p className="text-sm text-zinc-500">Correct the date, amount, category or villa if needed.</p>
           )}
-          {tx.source === "manual" && <div className="mt-4 border-t border-zinc-100 pt-4 dark:border-zinc-800"><DeleteEntry id={tx.id} /></div>}
+          {(tx.source === "manual" || tx.source === "module") && <div className="mt-4 border-t border-zinc-100 pt-4 dark:border-zinc-800"><DeleteEntry id={tx.id} /></div>}
         </section>
       )}
     </>

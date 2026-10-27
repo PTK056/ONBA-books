@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { matchLines, type BankLineIn, type BookEntry, type StayNet } from "./match.ts";
+import { equalShares, matchLines, type BankLineIn, type BookEntry, type StayNet } from "./match.ts";
 
 const line = (id: string, date: string, amount: number, direction: "in" | "out" = "out", currency = "IDR"): BankLineIn =>
   ({ id, date, amount, direction, currency });
@@ -69,4 +69,10 @@ test("a long stay paid in two instalments links both lines", () => {
   const out = matchLines([line("L1", "2026-08-05", 25_378_973, "in"), line("L2", "2026-08-15", 2_048_659, "in"), line("L3", "2026-08-20", 1_246_384, "in")], [],
     [stay("S1", "2026-08-03", "2026-08-17", 27_427_632), stay("S2", "2026-08-19", "2026-08-20", 1_246_384)], "IDR");
   assert.deepEqual(out.map((m) => m.lineId + (m.kind === "stays" ? m.stayIds.join() : "")).sort(), ["L1S1", "L2S1", "L3S2"]);
+});
+
+test("shares add up to the cent", () => {
+  assert.deepEqual(equalShares(26100, 3), [8700, 8700, 8700]);
+  assert.deepEqual(equalShares(13935.96, 3), [4645.32, 4645.32, 4645.32]);
+  assert.deepEqual(equalShares(10, 3), [3.34, 3.33, 3.33]);
 });

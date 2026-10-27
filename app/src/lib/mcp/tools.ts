@@ -93,6 +93,7 @@ function define(server: Registrar, channel: Channel) {
     today: today(s),
     reporting_currency: s.org.reportingCurrency,
     villas: s.villas.map((v) => ({ name: v.name, currency: v.currency })),
+    company: s.company && { name: s.company.name, use_for: "what belongs to no villa: bank fees and interest, accountant, office, licences, company taxes" },
     expense_categories: s.categories.filter((c) => c.kind === "expense").map((c) => c.name),
     income_categories: s.categories.filter((c) => c.kind === "income").map((c) => c.name),
     evidence_required_from: `${s.org.evidenceThreshold} ${s.org.reportingCurrency} (expenses at or above this need a receipt)`,

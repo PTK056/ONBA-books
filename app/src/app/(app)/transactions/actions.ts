@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getCurrentOrg } from "@/lib/org";
+import { getCurrentOrg, places } from "@/lib/org";
 import { documentFileName } from "@/lib/transactions/names";
 import { createClient } from "@/lib/supabase/server";
 import { logDownload } from "@/lib/downloads";
@@ -54,7 +54,7 @@ const friendly = (message: string) =>
 export async function createTransaction(input: TxInput, file: { path: string; mimeType: string } | null): Promise<TxResult> {
   const org = await editor();
   if (!org) return { ok: false, error: "Only admins and staff can add entries." };
-  const problem = invalid(input, new Set(org.villas.map((v) => v.id)));
+  const problem = invalid(input, new Set(places(org).map((v) => v.id)));
   if (problem) return { ok: false, error: problem };
   const fx = await rateFor(org.id, org.reportingCurrency, input.currency, input.fxRate);
   if (!fx) return { ok: false, error: `Enter the ${input.currency} → ${org.reportingCurrency} rate.` };
@@ -96,7 +96,7 @@ export async function attachReceipt(transactionId: string, file: { path: string;
 export async function updateTransaction(id: string, input: TxInput): Promise<TxResult> {
   const org = await editor();
   if (!org || !UUID.test(id)) return { ok: false, error: "Only admins and staff can edit entries." };
-  const problem = invalid(input, new Set(org.villas.map((v) => v.id)));
+  const problem = invalid(input, new Set(places(org).map((v) => v.id)));
   if (problem) return { ok: false, error: problem };
   const fx = await rateFor(org.id, org.reportingCurrency, input.currency, input.fxRate);
   if (!fx) return { ok: false, error: `Enter the ${input.currency} → ${org.reportingCurrency} rate.` };
@@ -105,7 +105,7 @@ export async function updateTransaction(id: string, input: TxInput): Promise<TxR
   const { data, error } = await db.from("transactions").update({
     villa_id: input.villaId, date: input.date, direction: input.direction, category_id: input.categoryId,
     description: input.description.trim() || null, currency: input.currency, amount: input.amount, fx_rate: fx,
-  }).eq("id", id).in("source", ["manual", "receipt"]).select("id");
+  }).eq("id", id).in("source", ["manual", "receipt", "module"]).select("id");
   if (error) return { ok: false, error: friendly(error.message) };
   if (!data?.length) return { ok: false, error: "This entry can't be edited here." };
   revalidatePath(`/transactions/${id}`);
@@ -119,7 +119,7 @@ export async function deleteTransaction(id: string): Promise<TxResult> {
   if (!org || !UUID.test(id)) return { ok: false, error: "Only admins and staff can delete entries." };
   const db = await createClient();
   // Entries from a receipt stay linked to their reviewed receipt; they are corrected, not deleted.
-  const { data, error } = await db.from("transactions").delete().eq("id", id).eq("source", "manual").select("id");
+  const { data, error } = await db.from("transactions").delete().eq("id", id).in("source", ["manual", "module"]).select("id");
   if (error) return { ok: false, error: friendly(error.message) };
   if (!data?.length) return { ok: false, error: "Only entries added by hand can be deleted; correct the others instead." };
   revalidatePath("/transactions");

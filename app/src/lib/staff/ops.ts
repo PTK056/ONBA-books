@@ -177,7 +177,7 @@ export async function markPaid(db: SupabaseClient, orgId: string, runId: string,
   const staff = toStaff(s!);
   let villaId = staff.villa_id;
   if (!villaId) {
-    const { data: v } = await db.from("villas").select("id").eq("organization_id", orgId).is("archived_at", null).limit(2);
+    const { data: v } = await db.from("villas").select("id").eq("organization_id", orgId).eq("kind", "villa").is("archived_at", null).limit(2);
     if (v?.length !== 1) throw new StaffError(`Set ${staff.name}'s villa first, so the pay is booked in the right place.`);
     villaId = v[0].id;
   }

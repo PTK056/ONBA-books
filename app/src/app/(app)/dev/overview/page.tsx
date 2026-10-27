@@ -64,6 +64,7 @@ const DATA: Overview = {
   ],
   toReview: 3,
   toRead: 0,
+  company: { id: "co", name: "Company", income: 0, expenses: 26100, net: -26100, closed: null },
 };
 
 export default function DevOverview() {

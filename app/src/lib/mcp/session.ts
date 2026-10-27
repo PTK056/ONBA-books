@@ -36,6 +36,8 @@ export interface Session {
   org: { id: string; name: string; reportingCurrency: string; timezone: string; evidenceThreshold: number };
   role: "admin" | "staff" | "owner_viewer";
   villas: Villa[];
+  /** What belongs to no villa (bank fees, accountant…) is booked on the company. */
+  company: Villa | null;
   categories: Category[];
   /** Chat agent only: files the user sent, already stored in the evidence bucket. */
   attachments?: Map<string, { path: string; mimeType: string }>;
@@ -72,7 +74,7 @@ export async function sessionFor(token: string, userId: string): Promise<Session
   if (!row) throw new ToolError(`This account has no organization yet. Finish setup at ${APP_URL}/setup.`);
 
   const [villas, categories] = await Promise.all([
-    db.from("villas").select("id, name, currency").eq("organization_id", row.organization_id).is("archived_at", null).order("name"),
+    db.from("villas").select("id, name, currency, kind").eq("organization_id", row.organization_id).is("archived_at", null).order("name"),
     db.from("categories").select("id, name, kind").eq("organization_id", row.organization_id).is("archived_at", null).order("name"),
   ]);
   return {
@@ -82,7 +84,8 @@ export async function sessionFor(token: string, userId: string): Promise<Session
       timezone: row.organizations.timezone, evidenceThreshold: Number(row.organizations.evidence_threshold),
     },
     role: row.role,
-    villas: (villas.data ?? []) as Villa[],
+    villas: (villas.data ?? []).filter((v) => v.kind === "villa").map((v) => ({ id: v.id, name: v.name, currency: v.currency })),
+    company: (villas.data ?? []).filter((v) => v.kind === "company").map((v) => ({ id: v.id, name: v.name, currency: v.currency }))[0] ?? null,
     categories: (categories.data ?? []) as Category[],
   };
 }
@@ -98,9 +101,13 @@ export function today(s: Session): string {
 
 const norm = (x: string) => x.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
-/** Villa by id or by name (case and accents ignored, partial match if unique); the only villa if none given. */
+/**
+ * Villa by id or by name (case and accents ignored, partial match if unique); the only villa if none given.
+ * "Company" (or the company's own name) gives the company, for what belongs to no villa.
+ */
 export function resolveVilla(s: Session, wanted?: string | null): Villa {
-  const names = s.villas.map((v) => v.name).join(", ");
+  const names = s.villas.map((v) => v.name).join(", ") + (s.company ? `, or "${s.company.name}" for what belongs to no villa` : "");
+  if (s.company && wanted && (wanted === s.company.id || ["company", norm(s.company.name)].includes(norm(wanted)))) return s.company;
   if (!s.villas.length) throw new ToolError("This organization has no villa yet.");
   if (!wanted) {
     if (s.villas.length === 1) return s.villas[0];

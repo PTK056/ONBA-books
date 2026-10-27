@@ -4,7 +4,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
 import { autoMatch, CHARGE, ingestStatement, INTEREST, WITHHELD_TAX } from "@/lib/bank/ops";
 import { readStatementPdf, StatementError } from "@/lib/bank/statement-pdf";
-import { getCurrentOrg } from "@/lib/org";
+import { equalShares } from "@/lib/bank/match";
+import { getCurrentOrg, places } from "@/lib/org";
+import { bankSettings, type Bearer } from "@/lib/settings";
 import { createClient } from "@/lib/supabase/server";
 
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
@@ -64,7 +66,7 @@ export async function addStatement(file: { path: string; name: string; mimeType:
 export async function createFromLine(lineId: string, input: { villaId: string; categoryId: string | null; description: string; fxRate: number | null }): Promise<Result> {
   const org = await admin();
   if (!org || !UUID.test(lineId)) return { ok: false, error: "Not allowed." };
-  if (!org.villas.some((v) => v.id === input.villaId)) return { ok: false, error: "Choose a villa." };
+  if (!places(org).some((v) => v.id === input.villaId)) return { ok: false, error: "Choose a villa." };
   const db = await createClient();
   const { data: line } = await db.from("bank_lines").select("id, date, direction, amount, currency, status")
     .eq("id", lineId).eq("organization_id", org.id).single();
@@ -88,16 +90,18 @@ export async function createFromLine(lineId: string, input: { villaId: string; c
  * One expense for the statement's bank fees, and one income for its interest net of the tax the bank withheld
  * (in Indonesia a 20% final tax: not a bank fee, and not a deductible expense).
  */
-export async function bookCharges(statementId: string, villaId: string): Promise<Result> {
+export async function bookCharges(statementId: string): Promise<Result> {
   const org = await admin();
   if (!org || !UUID.test(statementId)) return { ok: false, error: "Not allowed." };
-  if (!org.villas.some((v) => v.id === villaId)) return { ok: false, error: "Choose a villa." };
   const db = await createClient();
-  const [{ data: lines }, { data: cats }] = await Promise.all([
+  const [{ data: lines }, { data: cats }, settings] = await Promise.all([
     db.from("bank_lines").select("id, date, direction, amount, currency, description")
       .eq("statement_id", statementId).eq("organization_id", org.id).eq("status", "unmatched"),
     db.from("categories").select("id, name, kind").eq("organization_id", org.id).is("archived_at", null),
+    bankSettings(db, org.id),
   ]);
+  // Where each kind goes, as set in Settings: the company, or every villa in equal shares.
+  const targets = (to: Bearer) => (to === "company" && org.company ? [org.company] : org.villas);
   const charges = (lines ?? []).filter((l) => CHARGE.test(l.description));
   if (!charges.length) return { ok: false, error: "No bank charges left on this statement." };
   if (charges.some((l) => l.currency !== org.reportingCurrency)) {
@@ -112,32 +116,36 @@ export async function bookCharges(statementId: string, villaId: string): Promise
   const tax = charges.filter((l) => l.direction === "out" && WITHHELD_TAX.test(l.description));
   const fees = charges.filter((l) => !interest.includes(l) && !tax.includes(l) && l.direction === "out");
 
-  const book = async (group: typeof charges, entry: { direction: "in" | "out"; amount: number; category_id: string | null; description: string }) => {
+  // One entry per place; split in equal shares when it goes to several villas. The lines link to the first share.
+  const book = async (group: typeof charges, to: Bearer, entry: { direction: "in" | "out"; amount: number; category_id: string | null; description: string }) => {
     if (!group.length || !(entry.amount > 0)) return null;
-    const { data: tx, error } = await db.from("transactions").insert({
-      organization_id: org.id, villa_id: villaId, date: group.map((l) => l.date).sort().at(-1), currency: org.reportingCurrency,
-      fx_rate: 1, status: "validated", source: "module", ...entry,
-    }).select("id").single();
-    if (error || !tx) return error?.message.includes("closed") ? "That month is closed for this villa." : "Could not save. Try again.";
-    await db.from("bank_lines").update({ status: "matched", transaction_id: tx.id, matched_by: "created" }).in("id", group.map((l) => l.id));
+    const where = targets(to);
+    const shares = equalShares(entry.amount, where.length);
+    const { data: txs, error } = await db.from("transactions").insert(where.map((v, i) => ({
+      organization_id: org.id, villa_id: v.id, date: group.map((l) => l.date).sort().at(-1), currency: org.reportingCurrency,
+      fx_rate: 1, status: "validated", source: "module", ...entry, amount: shares[i],
+      description: where.length > 1 ? `${entry.description} (share ${i + 1}/${where.length})` : entry.description,
+    }))).select("id");
+    if (error || !txs?.length) return error?.message.includes("closed") ? "That month is closed." : "Could not save. Try again.";
+    await db.from("bank_lines").update({ status: "matched", transaction_id: txs[0].id, matched_by: "created" }).in("id", group.map((l) => l.id));
     return null;
   };
 
   const problems = [
-    await book(fees, {
+    await book(fees, settings.feesTo, {
       direction: "out", amount: total(fees), category_id: category("expense", /bank/i),
       description: `Bank fees, ${month} (${fees.length} line${fees.length === 1 ? "" : "s"})`,
     }),
   ];
   const gross = total(interest), withheld = total(tax);
   if (interest.length) {
-    problems.push(await book([...interest, ...tax], {
+    problems.push(await book([...interest, ...tax], settings.interestTo, {
       direction: "in", amount: Math.round((gross - withheld) * 100) / 100, category_id: category("income", /interest|other income/i),
       description: withheld ? `Bank interest, ${month}: ${fmt(gross)} less ${fmt(withheld)} tax withheld` : `Bank interest, ${month}`,
     }));
   } else if (tax.length) {
     // Tax without interest on this statement: book it on its own, as a tax.
-    problems.push(await book(tax, {
+    problems.push(await book(tax, settings.interestTo, {
       direction: "out", amount: withheld, category_id: category("expense", /tax/i), description: `Tax withheld by the bank, ${month}`,
     }));
   }

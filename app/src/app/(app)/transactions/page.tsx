@@ -6,9 +6,10 @@ import { money } from "@/components/overview/format";
 import { shortDate } from "@/lib/format/date";
 import { NewMenu } from "@/components/shell/NewMenu";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { places } from "@/lib/org";
 import { listTransactions, needsReceipt, type TxFilters } from "@/lib/transactions/data";
 
-const SOURCES: Record<string, string> = { manual: "Added by hand", receipt: "From a receipt", stay: "Imported stay", adjustment: "Adjustment" };
+const SOURCES: Record<string, string> = { manual: "Added by hand", receipt: "From a receipt", stay: "Imported stay", adjustment: "Adjustment", module: "From a bank statement" };
 
 export default function TransactionsPage({ searchParams }: PageProps<"/transactions">) {
   return (
@@ -38,6 +39,8 @@ async function Content({ searchParams }: Pick<PageProps<"/transactions">, "searc
   const expenses = rows.filter((r) => r.direction === "out").reduce((s, r) => s + r.amountReporting, 0);
   const missing = rows.filter((r) => needsReceipt(r) && !r.files.length).length;
   const filtered = Object.values(filters).some(Boolean);
+  // Which villa (or the company) only matters once entries are spread over more than one place.
+  const showVilla = org.villas.length > 1 || (!!org.company && (filters.villa === org.company.id || rows.some((r) => r.villa.id === org.company!.id)));
 
   return (
     <>
@@ -67,10 +70,10 @@ async function Content({ searchParams }: Pick<PageProps<"/transactions">, "searc
           <button className="h-9 rounded-lg bg-zinc-900 px-3 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">Apply</button>
           {filtered && <Link href="/transactions" className="flex h-9 items-center rounded-lg px-2 text-sm text-zinc-500 hover:text-zinc-900">Clear</Link>}
         </div>
-        {org.villas.length > 1 && (
+        {showVilla && (
           <select name="villa" defaultValue={filters.villa ?? ""} aria-label="Villa" className={input}>
             <option value="">All villas</option>
-            {org.villas.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+            {places(org).map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
         )}
       </form>
@@ -94,7 +97,7 @@ async function Content({ searchParams }: Pick<PageProps<"/transactions">, "searc
                   <th className="px-5 py-2.5 font-normal">Date</th>
                   <th className="px-3 py-2.5 font-normal">Description</th>
                   <th className="hidden px-3 py-2.5 font-normal md:table-cell">Category</th>
-                  {org.villas.length > 1 && <th className="hidden px-3 py-2.5 font-normal lg:table-cell">Villa</th>}
+                  {showVilla && <th className="hidden px-3 py-2.5 font-normal lg:table-cell">Villa</th>}
                   <th className="px-3 py-2.5 text-right font-normal">Amount</th>
                   <th className="px-5 py-2.5 text-right font-normal">Receipt</th>
                 </tr>
@@ -110,7 +113,7 @@ async function Content({ searchParams }: Pick<PageProps<"/transactions">, "searc
                       </Link>
                     </td>
                     <td className="hidden px-3 py-3 text-zinc-600 md:table-cell dark:text-zinc-400">{t.category?.name ?? "—"}</td>
-                    {org.villas.length > 1 && <td className="hidden px-3 py-3 text-zinc-600 lg:table-cell dark:text-zinc-400">{t.villa.name}</td>}
+                    {showVilla && <td className="hidden px-3 py-3 text-zinc-600 lg:table-cell dark:text-zinc-400">{t.villa.name}</td>}
                     <td className={`whitespace-nowrap px-3 py-3 text-right tabular-nums ${t.direction === "in" ? "text-emerald-700 dark:text-emerald-400" : ""}`}>
                       {t.direction === "in" ? "+" : "−"}{money(t.amountReporting, cur)}
                       {t.currency !== cur && <span className="block text-xs text-zinc-500">{money(t.amount, t.currency)} {t.currency}</span>}

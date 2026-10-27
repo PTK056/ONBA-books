@@ -38,6 +38,8 @@ export interface ReviewOptions {
   reportingCurrency: string;
   categories: { id: string; name: string }[];
   villas: { id: string; name: string; currency: string }[];
+  /** For what belongs to no villa (an accountant's invoice…): offered last, never chosen by default. */
+  company: { id: string; name: string; currency: string } | null;
   /** Last rate used per currency, to prefill conversions. */
   lastRates: Record<string, number>;
 }

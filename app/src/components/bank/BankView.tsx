@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle, Check, Copy, FileText, Link2, Undo2, UserRound } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { addStatement, bookCharges, createFromLine, linkLine, markPersonal, resetLine, type Result } from "@/app/(app)/bank/actions";
@@ -22,6 +23,8 @@ interface Props {
   categories: (Option & { kind: "income" | "expense" })[];
   statements: BankStatementRow[];
   lines: BankLineRow[];
+  /** Where bank fees and interest go, in words (from Settings). */
+  chargesTo: string;
 }
 
 function useAction() {
@@ -53,7 +56,7 @@ export function BankView(props: Props) {
 
       {statements.length > 0 && (
         <section className="card divide-y divide-zinc-100 dark:divide-zinc-800">
-          {statements.map((s) => <StatementRow key={s.id} s={s} villas={props.villas} />)}
+          {statements.map((s) => <StatementRow key={s.id} s={s} chargesTo={props.chargesTo} />)}
         </section>
       )}
 
@@ -113,8 +116,7 @@ function AddStatement({ organizationId }: { organizationId: string }) {
   );
 }
 
-function StatementRow({ s, villas }: { s: BankStatementRow; villas: Option[] }) {
-  const [villaId, setVillaId] = useState(villas.length === 1 ? villas[0].id : "");
+function StatementRow({ s, chargesTo }: { s: BankStatementRow; chargesTo: string }) {
   const { error, pending, go } = useAction();
   return (
     <div className="flex flex-col gap-2 p-4 text-sm sm:flex-row sm:items-center">
@@ -134,16 +136,11 @@ function StatementRow({ s, villas }: { s: BankStatementRow; villas: Option[] }) 
         {error && <p className="mt-1 text-red-600">{error}</p>}
       </div>
       {s.charges > 0 && (
-        <div className="flex gap-2">
-          {villas.length > 1 && (
-            <select className={field} value={villaId} onChange={(e) => setVillaId(e.target.value)} aria-label="Villa">
-              <option value="">Villa…</option>
-              {villas.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-            </select>
-          )}
-          <button className={secondary} disabled={pending || !villaId} onClick={() => go(() => bookCharges(s.id, villaId))}>
+        <div className="flex flex-col items-end gap-1">
+          <button className={secondary} disabled={pending} onClick={() => go(() => bookCharges(s.id))}>
             Book {s.charges} bank charge{s.charges === 1 ? "" : "s"}
           </button>
+          <Link href="/settings" className="text-xs text-zinc-500 hover:underline">Fees and interest → {chargesTo}</Link>
         </div>
       )}
     </div>
@@ -206,7 +203,7 @@ function TodoLine({ line, villas, categories, reportingCurrency }: { line: BankL
       {open && (
         <form action={submit} className="flex flex-wrap items-end gap-2 pl-20 max-sm:pl-0">
           {villas.length > 1 && (
-            <select name="villa" required className={field} aria-label="Villa" defaultValue="">
+            <select name="villa" required className={field} aria-label="Villa" defaultValue={villas.length === 2 ? villas[0].id : ""}>
               <option value="" disabled>Villa…</option>
               {villas.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>

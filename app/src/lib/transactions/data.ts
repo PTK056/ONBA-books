@@ -1,6 +1,6 @@
 import "server-only";
 import { connection } from "next/server";
-import { getCurrentOrg, type CurrentOrg } from "@/lib/org";
+import { getCurrentOrg, places, type CurrentOrg } from "@/lib/org";
 import { createClient } from "@/lib/supabase/server";
 import { documentFileName } from "./names";
 
@@ -98,7 +98,7 @@ export async function listTransactions(f: TxFilters): Promise<
     query,
     db.from("categories").select("id, name, kind").eq("organization_id", org.id).is("archived_at", null).order("name"),
   ]);
-  const villaNames = new Map(org.villas.map((v) => [v.id, v.name]));
+  const villaNames = new Map(places(org).map((v) => [v.id, v.name]));
   let rows = ((data ?? []) as unknown as Row[]).map((r) => toTx(r, villaNames));
 
   if (f.receipt === "missing") rows = rows.filter((t) => needsReceipt(t) && !t.files.length);
@@ -121,7 +121,7 @@ export async function getTransaction(id: string): Promise<{ org: Member; tx: Tx;
   const db = await createClient();
   const { data } = await db.from("transactions").select(SELECT).eq("id", id).eq("organization_id", org.id).maybeSingle();
   if (!data) return null;
-  const tx = toTx(data as unknown as Row, new Map(org.villas.map((v) => [v.id, v.name])));
+  const tx = toTx(data as unknown as Row, new Map(places(org).map((v) => [v.id, v.name])));
 
   const [files, close, categories] = await Promise.all([
     signFiles(tx),

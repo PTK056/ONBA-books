@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { TxForm } from "@/components/transactions/TxForm";
-import { getCurrentOrg } from "@/lib/org";
+import { getCurrentOrg, places } from "@/lib/org";
 import { createClient } from "@/lib/supabase/server";
 
 export default function NewTransactionPage({ searchParams }: PageProps<"/transactions/new">) {
@@ -29,7 +29,7 @@ async function Form({ searchParams }: Pick<PageProps<"/transactions/new">, "sear
     <div className="card p-6">
       <TxForm
         mode="create" organizationId={org.id} reportingCurrency={org.reportingCurrency}
-        villas={org.villas} categories={categories ?? []}
+        villas={places(org)} categories={categories ?? []}
         initial={{ direction: type === "income" ? "in" : "out" }}
       />
     </div>

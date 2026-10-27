@@ -162,7 +162,7 @@ function EntryForm({
   const defaultVilla = p.villa_id ?? (options.villas.length === 1 ? options.villas[0].id : "");
 
   const [date, setDate] = useState(p.date ?? "");
-  const [currency, setCurrency] = useState(p.currency ?? options.villas.find((v) => v.id === defaultVilla)?.currency ?? "");
+  const [currency, setCurrency] = useState(p.currency ?? [...options.villas, ...(options.company ? [options.company] : [])].find((v) => v.id === defaultVilla)?.currency ?? "");
   const [amountText, setAmountText] = useState(p.total != null ? formatAmount(p.total, p.currency ?? "") : "");
   const [categoryId, setCategoryId] = useState(p.category_id ?? "");
   const [villaId, setVillaId] = useState(defaultVilla);
@@ -295,6 +295,7 @@ function EntryForm({
             <select value={villaId} onChange={(e) => setVillaId(e.target.value)} className={input(!villaId)}>
               {!villaId && <option value="">Choose a villa…</option>}
               {options.villas.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+              {options.company && <option value={options.company.id}>{options.company.name} (no villa)</option>}
             </select>
           </Field>
 

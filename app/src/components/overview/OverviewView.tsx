@@ -81,12 +81,12 @@ export function OverviewView({ data: o }: { data: Overview }) {
             title="Latest entries"
             action={<Link href={`/transactions?month=${o.month.slice(0, 7)}`} className="inline-flex items-center gap-0.5 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">All {monthName} entries <ChevronRight size={14} /></Link>}
           >
-            <EntriesTable entries={o.entries.slice(0, LATEST_ENTRIES)} currency={cur} showVilla={o.villas.length > 1} />
+            <EntriesTable entries={o.entries.slice(0, LATEST_ENTRIES)} currency={cur} showVilla={o.villas.length > 1 || !!companyUsed(o)} />
           </Panel>
         </>
       )}
 
-      {o.villas.length > 1 && <VillaTable villas={o.villas} currency={cur} />}
+      {(o.villas.length > 1 || companyUsed(o)) && <VillaTable villas={o.villas} company={companyUsed(o) ? o.company : null} currency={cur} />}
     </div>
   );
 }
@@ -100,7 +100,9 @@ function TodoBar({ o, monthName }: { o: Overview; monthName: string }) {
   const missing = o.missingEvidence.length;
   const pct = o.evidence.expenses ? Math.round((o.evidence.withReceipt / o.evidence.expenses) * 100) : null;
   const monthOver = o.monthEnded;
-  const openVillas = o.villas.filter((v) => !v.closed);
+  // The company closes with the villas: its entries (bank fees…) belong to the month too.
+  const closable = [...o.villas, ...(o.company ? [o.company] : [])];
+  const openVillas = closable.filter((v) => !v.closed);
   const items = [
     o.toReview > 0 && <TodoLink key="r" href="/review">{o.toReview} receipt{o.toReview === 1 ? "" : "s"} to review</TodoLink>,
     o.toRead > 0 && <TodoLink key="w" href="/review">{o.toRead} waiting to be read</TodoLink>,
@@ -124,12 +126,12 @@ function TodoBar({ o, monthName }: { o: Overview; monthName: string }) {
         </span>
         {items}
         <span className="ml-auto text-xs text-zinc-500">
-          {allClosed ? `🔒 ${monthName} closed` : `${monthName} open${o.villas.length > 1 ? ` for ${openVillas.length} of ${o.villas.length} villas` : ""}`}
+          {allClosed ? `🔒 ${monthName} closed` : `${monthName} open${closable.length > 1 ? ` for ${openVillas.length} of ${closable.length}` : ""}`}
         </span>
       </div>
       {monthOver && o.org.role === "admin" && (
         <div className="flex flex-col gap-2 border-t border-zinc-100 pt-3 dark:border-zinc-800">
-          {o.villas.map((v) => (
+          {closable.map((v) => (
             <MonthClose
               key={v.id} villaId={v.id} villaName={v.name} month={o.month} monthName={monthName}
               closed={Boolean(v.closed)} canEdit warnings={warnings}
@@ -342,7 +344,12 @@ export function Panel({ title, children, action }: { title: string; children: Re
   );
 }
 
-export function VillaTable({ villas, currency }: { villas: Overview["villas"]; currency: string }) {
+/** The company's line is worth showing once it has entries this month. */
+const companyUsed = (o: Overview) => o.company && (o.company.income || o.company.expenses) ? o.company : null;
+
+export function VillaTable({ villas, company, currency }: { villas: Overview["villas"]; company?: Overview["company"]; currency: string }) {
+  const total = [...villas, ...(company ? [company] : [])].reduce(
+    (t, v) => ({ income: t.income + v.income, expenses: t.expenses + v.expenses, net: t.net + v.net }), { income: 0, expenses: 0, net: 0 });
   return (
     <Panel title="By villa">
       <table className="w-full text-sm tabular-nums">
@@ -360,6 +367,23 @@ export function VillaTable({ villas, currency }: { villas: Overview["villas"]; c
               <td className="text-right font-medium">{money(v.net, currency)}</td>
             </tr>
           ))}
+          {company && (
+            <tr className="border-t border-zinc-100 text-zinc-600 dark:border-zinc-900 dark:text-zinc-400">
+              <td className="py-1.5">{company.name} <span className="text-xs text-zinc-400">no villa</span></td>
+              <td className="text-right">—</td><td className="text-right">—</td>
+              <td className="text-right">{money(company.income, currency)}</td>
+              <td className="text-right">{money(company.expenses, currency)}</td>
+              <td className="text-right font-medium">{money(company.net, currency)}</td>
+            </tr>
+          )}
+          {(villas.length > 1 || company) && (
+            <tr className="border-t border-zinc-200 font-medium dark:border-zinc-800">
+              <td className="py-1.5">Total</td><td /><td />
+              <td className="text-right">{money(total.income, currency)}</td>
+              <td className="text-right">{money(total.expenses, currency)}</td>
+              <td className="text-right">{money(total.net, currency)}</td>
+            </tr>
+          )}
         </tbody>
       </table>
     </Panel>

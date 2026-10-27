@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftRight, BedDouble, FolderOpen, Landmark, LayoutDashboard, ScanLine, Upload, Users } from "lucide-react";
+import { ArrowLeftRight, BedDouble, FolderOpen, Landmark, LayoutDashboard, ScanLine, Settings, Upload, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "./Logo";
@@ -14,13 +14,14 @@ const NAV = [
   { href: "/import", label: "Import stays", icon: BedDouble },
   { href: "/team", label: "Team", icon: Users },
   { href: "/bank", label: "Bank", icon: Landmark, adminOnly: true },
+  { href: "/settings", label: "Settings", icon: Settings, adminOnly: true },
 ] as const;
 
 interface Props {
   org: React.ReactNode;
   reviewBadge: React.ReactNode;
   user: React.ReactNode;
-  /** Shows the admin-only pages (Bank). */
+  /** Shows the admin-only pages (Bank, Settings). */
   admin?: boolean;
 }
 

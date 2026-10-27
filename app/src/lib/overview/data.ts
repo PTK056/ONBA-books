@@ -2,7 +2,7 @@ import "server-only";
 import { connection } from "next/server";
 import { todayIn } from "@/lib/format/date";
 import { availableNights, openingDays } from "./availability";
-import { getCurrentOrg } from "@/lib/org";
+import { getCurrentOrg, places } from "@/lib/org";
 import { createClient } from "@/lib/supabase/server";
 
 export const TREND_MONTHS = 12;
@@ -85,6 +85,8 @@ export interface Overview {
   stays: MonthStay[];
   evidence: { expenses: number; withReceipt: number };
   villas: VillaMonth[];
+  /** What belongs to no villa this month (bank fees, accountant…); null when the company has nothing and no close to show. */
+  company: Pick<VillaMonth, "id" | "name" | "income" | "expenses" | "net" | "closed"> | null;
   missingEvidence: { id: string; date: string; description: string | null; amount: number; currency: string }[];
   toReview: number;
   toRead: number;
@@ -153,7 +155,7 @@ export async function loadOverview(requested?: string): Promise<OverviewResult> 
       .eq("organization_id", org.id).lt("check_in", to).gt("check_out", windowFrom).limit(MAX_ENTRIES),
   ]);
   const rows = (txs.data ?? []) as unknown as Row[];
-  const villaName = new Map(org.villas.map((v) => [v.id, v.name]));
+  const villaName = new Map(places(org).map((v) => [v.id, v.name]));
 
   // Trend: every month of the window, empty ones included.
   const byMonth = new Map<string, MonthTotals>();
@@ -310,6 +312,16 @@ export async function loadOverview(requested?: string): Promise<OverviewResult> 
           booked: occ.booked, available: occ.available, occupancy: occ.occupancy, adr: occ.adr,
         };
       }),
+      company: (() => {
+        if (!org.company) return null;
+        const rs = monthRows.filter((r) => r.villa_id === org.company!.id);
+        const income = rs.filter((r) => r.direction === "in").reduce((s, r) => s + Number(r.amount_reporting), 0);
+        const exp = rs.filter((r) => r.direction === "out").reduce((s, r) => s + Number(r.amount_reporting), 0);
+        return {
+          id: org.company.id, name: org.company.name, income, expenses: exp, net: income - exp,
+          closed: closedBy.has(org.company.id) ? { at: closedBy.get(org.company.id)! } : null,
+        };
+      })(),
       missingEvidence: (missing.data ?? []).map((m) => ({ ...m, amount: Number(m.amount) })),
       toReview: toReview.count ?? 0,
       toRead: toRead.count ?? 0,

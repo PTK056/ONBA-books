@@ -123,7 +123,7 @@ async function loadContext(db: SupabaseClient, orgId: string) {
   const [{ data: cats }, { data: villas }, history] = await Promise.all([
     db.from("categories").select("id, name").eq("organization_id", orgId)
       .eq("kind", "expense").is("archived_at", null),
-    db.from("villas").select("id, name, currency").eq("organization_id", orgId).is("archived_at", null),
+    db.from("villas").select("id, name, currency").eq("organization_id", orgId).eq("kind", "villa").is("archived_at", null),
     loadHistory(db, orgId),
   ]);
   const currencies = (villas ?? []).map((v) => v.currency);
