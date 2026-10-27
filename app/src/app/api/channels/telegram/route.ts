@@ -62,7 +62,7 @@ async function handle(msg: TgMessage) {
   if (msg.voice) {
     if (!transcriptionEnabled()) return sendMessage(chatId, "I can't listen to voice notes yet. Type it, or send a photo.");
     if ((msg.voice.duration ?? 0) > MAX_VOICE_SECONDS) return sendMessage(chatId, "That voice note is too long. Keep it under 3 minutes.");
-    item.voice = { id: msg.voice.file_id, mime: msg.voice.mime_type };
+    item.voice = { id: msg.voice.file_id, mime: msg.voice.mime_type, seconds: msg.voice.duration };
   }
   if (msg.photo?.length) {
     const largest = msg.photo.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a));

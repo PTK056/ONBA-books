@@ -44,6 +44,13 @@ export interface Session {
 
 export class ToolError extends Error {}
 
+/** Spends units of the organization's monthly AI quota (see migration ai_quotas); returns how many were granted. */
+export async function takeQuota(s: Session, kind: "receipt" | "agent_message" | "voice_minute", wanted = 1): Promise<number> {
+  const { data, error } = await s.db.rpc("ai_take", { org: s.org.id, k: kind, wanted });
+  if (error) throw new Error(`ai_take: ${error.message}`);
+  return data as number;
+}
+
 /** The user's first organization (as in the app), with its villas and categories. */
 export async function loadSession(auth: AuthInfo | undefined): Promise<Session> {
   const userId = auth?.extra?.userId;

@@ -120,12 +120,17 @@ function define(server: Registrar, channel: Channel) {
       .insert({ organization_id: s.org.id, batch_id: batch.id, evidence_id: ev.evidenceId }).select("id").single();
     if (!item) throw new ToolError("Could not queue the receipt. Try again.");
 
+    let quotaReached = false;
     for (let i = 0; i < 3; i++) {
-      const { data } = await s.db.functions.invoke<{ remaining: number }>("read-receipts", { body: { batch_id: batch.id } });
-      if (!data || data.remaining === 0) break;
+      const { data } = await s.db.functions.invoke<{ remaining: number; quota_reached?: boolean }>("read-receipts", { body: { batch_id: batch.id } });
+      quotaReached = !!data?.quota_reached;
+      if (!data || data.remaining === 0 || quotaReached) break;
     }
     const { data: read } = await s.db.from("receipt_items").select("proposed, read_at").eq("id", item.id).single();
     const p = (read?.proposed ?? null) as null | Record<string, unknown>;
+    if (quotaReached && !read?.read_at) {
+      return { status: "queued", message: "Saved, but this month's receipt reading allowance is used up: fill it in from the review queue, or it is read after the 1st.", review: `${APP}/review` };
+    }
     if (!read?.read_at || !p) {
       return { status: "queued", message: "Saved. The reading is still running; it will be in the review queue shortly.", review: `${APP}/review` };
     }

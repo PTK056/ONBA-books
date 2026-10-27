@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { readBatches, type ReadSummary } from "@/lib/receipts/read";
+import { QUOTA_MESSAGE, readBatches, type ReadSummary } from "@/lib/receipts/read";
 import { uploadEvidenceFile } from "@/lib/receipts/upload";
 
 type Status = "waiting" | "uploading" | "uploaded" | "failed";
@@ -93,7 +93,12 @@ export function Uploader({ organizationId, villas }: Props) {
             The files are uploaded but the reading engine did not answer. Use “Read now” on the Review page.
           </p>
         )}
-        {(summary.failed > 0 || summary.remaining > 0) && (
+        {summary.quotaReached && (
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            {QUOTA_MESSAGE} The rest are saved and wait in the Review page.
+          </p>
+        )}
+        {(summary.failed > 0 || (summary.remaining > 0 && !summary.quotaReached)) && (
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             {summary.failed > 0 && `${summary.failed} could not be read and will show as such in the review. `}
             {summary.remaining > 0 && `${summary.remaining} are still waiting; use “Read now” on the Review page.`}

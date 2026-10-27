@@ -52,10 +52,19 @@ Deno.serve(async (req) => {
     .limit(MAX_ITEMS);
   if (itemsErr) return json({ error: itemsErr.message }, 500);
 
+  // Many-to-one embed: PostgREST returns an object; without generated types it is typed as an array.
+  let unread = (items ?? []) as unknown as Item[];
+
+  // Each receipt read spends one unit of the organization's monthly quota; the rest stay unread.
+  const { data: granted, error: quotaErr } = unread.length
+    ? await db.rpc("ai_take", { org: batch.organization_id, k: "receipt", wanted: unread.length })
+    : { data: 0, error: null };
+  if (quotaErr) return json({ error: quotaErr.message }, 500);
+  const quotaReached = (granted as number) < unread.length;
+  unread = unread.slice(0, granted as number);
+
   await db.from("receipt_batches").update({ status: "processing" }).eq("id", batch_id);
 
-  // Many-to-one embed: PostgREST returns an object; without generated types it is typed as an array.
-  const unread = (items ?? []) as unknown as Item[];
   const results = await mapLimit(unread, CONCURRENCY, (item) => readItem(db, item, ctx, batch.villa_id));
 
   const { count: remaining } = await db
@@ -70,6 +79,7 @@ Deno.serve(async (req) => {
     read: results.filter((r) => r === "ok").length,
     failed: results.filter((r) => r !== "ok").length,
     remaining: remaining ?? 0,
+    quota_reached: quotaReached,
   });
 });
 

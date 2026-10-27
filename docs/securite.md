@@ -11,13 +11,12 @@ Bilan du 26/10/2026 (vérifié dans le code et en ligne ; pas un audit professio
 - **Next.js** à jour des avis de sécurité (16.4.2, 23/10/2026).
 
 ## À faire — avant d'inviter d'autres utilisateurs
-1. **Protéger la facture IA** : inscription sur invitation, ou quotas par organisation (reçus lus, messages agent, minutes
-   de vocal). Aujourd'hui n'importe quel compte consomme les clés Anthropic/OpenAI de Pierre, sans limite.
-2. **En-têtes de sécurité** (CSP `frame-ancestors 'none'`, `X-Content-Type-Options`, `Referrer-Policy`) et **page de
-   consentement OAuth durcie** : afficher l'adresse de destination (redirect URI) et avertir si le client n'est pas connu
-   (Claude, bot Telegram). Risque : une fausse appli « Splyce » inscrite par DCR + clic sur « Allow access ».
-3. **Captcha** (Cloudflare Turnstile) sur la connexion : le quota d'e-mails (60/h) est commun à tout le projet, un robot
-   peut bloquer la connexion de tous.
+1. ~~Protéger la facture IA~~ : fait (27/10/2026), voir « Fait ».
+2. ~~En-têtes de sécurité et page de consentement OAuth durcie~~ : fait (27/10/2026), voir « Fait ».
+3. **Captcha Turnstile** : code prêt mais éteint. À activer dans cet ordre (sinon plus personne ne peut se connecter) :
+   a. Cloudflare → Turnstile → ajouter le site `app.splyce.me` (mode *Managed*) : clé de site + clé secrète.
+   b. Vercel : `NEXT_PUBLIC_TURNSTILE_SITE_KEY` = clé de site, puis redéployer.
+   c. Supabase → Authentication → Attack Protection → Captcha : Turnstile + clé secrète.
 
 ## À faire — ensuite
 4. **MFA** (application d'authentification) pour les admins ; TOTP déjà activé côté Supabase, écran à faire.
@@ -29,6 +28,16 @@ Bilan du 26/10/2026 (vérifié dans le code et en ligne ; pas un audit professio
 8. **Politique de confidentialité** : sous-traitants (Supabase Tokyo, Vercel, Anthropic, OpenAI, Telegram, Resend).
 
 ## Fait
+- **Quotas IA par organisation** (27/10/2026, tests `supabase/tests/ai_quotas.sql`) : par mois civil, 100 reçus lus,
+  300 messages à l'agent, 60 minutes de vocal par défaut. Au-delà, les reçus restent en attente (« Read now » plus tard,
+  ou saisie à la main), l'agent répond que l'enveloppe du mois est épuisée. Un plafond différent par organisation va dans
+  `private.ai_limits` (éditeur SQL Supabase uniquement ; un admin ne peut pas relever le sien) ; consommation dans
+  `private.ai_usage`. Un compte crée au plus 3 organisations (chacune a son quota). Le brief du matin (Haiku) n'est pas compté.
+- **En-têtes** (27/10/2026) : `frame-ancestors 'none'` + `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`,
+  `Permissions-Policy` (`next.config.ts`).
+- **Consentement OAuth** (27/10/2026) : la page affiche l'adresse qui reçoit l'accès ; avertissement si ce n'est ni
+  Splyce ni Claude (`claude.ai`, `claude.com`), ou si c'est une appli locale ; refus si l'adresse n'est pas en https.
+  Le nom de l'appli n'est jamais pris pour preuve (n'importe qui peut s'appeler « Claude » par DCR).
 - **Journal des téléchargements** (26/10/2026, testé) : ZIP, liens de partage et bouton Download notés (qui, quand, quoi)
   dans `download_log` ; lecture admins seulement dans **Documents → Activity** ; aucune entrée modifiable ni effaçable.
 - **Pages protégées** (vérifié le 26/10/2026) : sans session, toutes les pages de l'app renvoient vers la connexion ;

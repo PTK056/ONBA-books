@@ -2,19 +2,20 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { readBatches } from "@/lib/receipts/read";
+import { QUOTA_MESSAGE, readBatches } from "@/lib/receipts/read";
 import type { UnreadSummary } from "@/lib/review/types";
 
 /** Asks the engine to read receipts that were uploaded but never read. */
 export function ReadPending({ unread }: { unread: UnreadSummary }) {
   const router = useRouter();
-  const [state, setState] = useState<"idle" | "reading" | "failed">("idle");
+  const [state, setState] = useState<"idle" | "reading" | "failed" | "quota">("idle");
   if (!unread.count) return null;
 
   const run = async () => {
     setState("reading");
     const result = await readBatches(unread.batchIds);
-    if (result.read + result.failed === 0) setState("failed");
+    if (result.quotaReached) setState("quota");
+    else if (result.read + result.failed === 0) setState("failed");
     else setState("idle");
     router.refresh();
   };
@@ -24,6 +25,7 @@ export function ReadPending({ unread }: { unread: UnreadSummary }) {
       <span>
         {unread.count} uploaded receipt{unread.count === 1 ? " is" : "s are"} waiting to be read.
         {state === "failed" && " The engine did not respond; try again in a minute."}
+        {state === "quota" && ` ${QUOTA_MESSAGE}`}
       </span>
       <button
         onClick={run} disabled={state === "reading"}

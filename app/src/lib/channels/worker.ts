@@ -2,7 +2,7 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import { respond } from "@/lib/agent/run";
 import { readFileInput } from "@/lib/mcp/files";
-import { sessionFor, ToolError, type Session } from "@/lib/mcp/session";
+import { sessionFor, takeQuota, ToolError, type Session } from "@/lib/mcp/session";
 import { adminClient } from "@/lib/supabase/admin";
 import { accessTokenFor, unlink, type Link } from "./links";
 import { APP_URL } from "./oauth";
@@ -16,7 +16,7 @@ type MessageParam = Anthropic.Beta.Messages.BetaMessageParam;
 export interface Incoming {
   text?: string;
   file?: { id: string; kind: "photo" | "document"; mime?: string; name?: string };
-  voice?: { id: string; mime?: string };
+  voice?: { id: string; mime?: string; seconds?: number };
 }
 type Attachments = Record<string, { path: string; mimeType: string; used?: boolean }>;
 
@@ -54,6 +54,13 @@ async function answer(link: Link, chatId: string, items: Incoming[]) {
   let session: Session;
   try { session = await sessionFor(token, link.user_id); } catch (e) {
     await sendMessage(chatId, e instanceof ToolError ? e.message : "Could not open Splyce. Try again in a minute.");
+    return;
+  }
+
+  // Checked before any file or voice note is processed, so nothing else is spent once it is used up.
+  if (!(await takeQuota(session, "agent_message"))) {
+    await sendMessage(chatId, `This month's assistant allowance for ${session.org.name} is used up; it renews on the 1st. `
+      + `Receipts can still be added in the app: ${APP_URL}/upload`);
     return;
   }
 
@@ -121,7 +128,11 @@ async function intake(s: Session, f: NonNullable<Incoming["file"]>, attachments:
 
 /** A voice note becomes its transcription; the model is told it is one, so it restates what it understood. */
 async function listen(s: Session, v: NonNullable<Incoming["voice"]>): Promise<ContentBlockParam> {
+  const minutes = Math.max(1, Math.ceil((v.seconds ?? 60) / 60));
   try {
+    if ((await takeQuota(s, "voice_minute", minutes)) < minutes) {
+      return { type: "text", text: "[A voice note was sent, but this month's voice allowance is used up. Ask the user to type it; it renews on the 1st.]" };
+    }
     const text = await transcribe(s, await downloadFile(v.id), v.mime);
     return { type: "text", text: text ? `[Voice note, transcribed: "${text}"]` : "[Voice note: nothing could be heard.]" };
   } catch (e) {

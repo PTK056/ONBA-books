@@ -11,17 +11,23 @@ export async function sendMagicLink(_prev: LoginState, formData: FormData): Prom
   const next = String(formData.get("next") ?? "/overview");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "Enter a valid e-mail address." };
 
+  const captchaToken = String(formData.get("cf-turnstile-response") ?? "") || undefined;
+  if (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !captchaToken) {
+    return { error: "Wait for the security check under the e-mail field, then try again." };
+  }
   const origin = (await headers()).get("origin") ?? "";
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
+      captchaToken,
       shouldCreateUser: true, // self-serve: the first link creates the account, which then goes to /setup
       emailRedirectTo: `${origin}/auth/confirm?next=${encodeURIComponent(safeNext(next))}`,
     },
   });
   if (error) {
     console.error("[login] signInWithOtp:", error.status, error.code, error.message);
+    if (error.code === "captcha_failed") return { error: "The security check failed. Try again." };
     if (error.status === 429) return { error: "Too many sign-in e-mails were sent. Wait a few minutes and try again." };
     return { error: "We couldn't send the link. Check the address and try again." };
   }

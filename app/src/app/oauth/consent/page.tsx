@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { Logo } from "@/components/shell/Logo";
+import { APP_URL } from "@/lib/app-url";
+import { classifyRedirect } from "@/lib/oauth/destination";
 import { getCurrentOrg } from "@/lib/org";
 import { createClient } from "@/lib/supabase/server";
 import { ConsentForm } from "./ConsentForm";
@@ -33,6 +35,8 @@ async function Consent({ searchParams }: Pick<PageProps<"/oauth/consent">, "sear
   if (!("authorization_id" in data)) redirect(data.redirect_url); // already allowed earlier
 
   const client = data.client.name || "An assistant";
+  const dest = classifyRedirect(data.redirect_uri, APP_URL);
+  if (dest.kind === "invalid") return <Problem text="This app's return address is not safe, so Splyce won't connect it." />;
   return (
     <div className="flex flex-col gap-5">
       <div>
@@ -46,6 +50,17 @@ async function Consent({ searchParams }: Pick<PageProps<"/oauth/consent">, "sear
         <li>• Send receipts to your review queue</li>
         <li>• Add expenses, income, stays and tasks</li>
       </ul>
+      <p className="text-sm text-zinc-600 dark:text-zinc-300">
+        Access goes to <strong className="font-mono text-xs">{dest.host}</strong>
+        {dest.kind === "local" && " (an app on this computer)"}.
+      </p>
+      {dest.kind !== "known" && (
+        <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+          {dest.kind === "local"
+            ? `Only allow this if you just started the connection yourself, from an app on this computer.`
+            : `Splyce doesn't know this app. Any app can call itself “${client}”: only allow it if you set it up yourself and trust ${dest.host}.`}
+        </p>
+      )}
       <p className="text-xs text-zinc-500">
         It acts with your own access: it can do nothing you can&apos;t. Receipts still wait for your review.
       </p>
