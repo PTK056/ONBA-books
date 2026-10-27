@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CHARGE, shift } from "./ops";
+import { LINK_DAYS, monthlyTemplate, type PastEntry, type Template } from "./recurring";
 
 export interface BankStatementRow {
   id: string; account: string; periodStart: string | null; periodEnd: string | null;
@@ -13,9 +14,11 @@ export interface BankLineRow {
   /** What the line is linked to, in words. */
   linkedTo: string | null;
   suggestions: Suggestion[];
+  /** A monthly payment whose month is missing: book it like the neighbouring month's entry. */
+  template: Template | null;
 }
 
-const SUGGEST_DAYS = 31;
+const AROUND_DAYS = 45; // wide enough to see last month's and next month's entries
 
 export async function bankPage(db: SupabaseClient, orgId: string) {
   const [{ data: accounts }, { data: statements }, { data: lines }] = await Promise.all([
@@ -38,36 +41,42 @@ export async function bankPage(db: SupabaseClient, orgId: string) {
   };
   const rows = (lines ?? []) as unknown as Row[];
 
-  // Entries the user could link an unmatched line to: same amount, within a month, not linked yet.
+  // Entries around the unmatched lines: to link one (close and not linked yet), or to copy last month's.
   const open = rows.filter((r) => r.status === "unmatched");
-  const candidates: { id: string; date: string; direction: string; amount: number; amount_reporting: number; currency: string; description: string | null; category: { name: string } | null }[] = [];
+  const around: (PastEntry & { linked: boolean })[] = [];
   if (open.length) {
     const dates = open.map((r) => r.date).sort();
     const [{ data: txs }, { data: taken }] = await Promise.all([
-      db.from("transactions").select("id, date, direction, amount, amount_reporting, currency, description, category:categories (name)")
+      db.from("transactions").select("id, date, direction, amount, amount_reporting, villa_id, category_id, description, category:categories (name)")
         .eq("organization_id", orgId).eq("status", "validated").is("stay_id", null)
-        .gte("date", shift(dates[0], -SUGGEST_DAYS)).lte("date", shift(dates.at(-1)!, SUGGEST_DAYS)),
+        .gte("date", shift(dates[0], -AROUND_DAYS)).lte("date", shift(dates.at(-1)!, AROUND_DAYS)),
       db.from("bank_lines").select("transaction_id").eq("organization_id", orgId).not("transaction_id", "is", null),
     ]);
     const used = new Set((taken ?? []).map((t) => t.transaction_id));
-    candidates.push(...((txs ?? []) as unknown as typeof candidates).filter((t) => !used.has(t.id)));
+    type Tx = { id: string; date: string; direction: "in" | "out"; amount: number; amount_reporting: number; villa_id: string; category_id: string | null; description: string | null; category: { name: string } | null };
+    around.push(...((txs ?? []) as unknown as Tx[]).map((t) => ({
+      id: t.id, date: t.date, direction: t.direction, amount: Number(t.amount), amountReporting: Number(t.amount_reporting),
+      villaId: t.villa_id, categoryId: t.category_id, category: t.category?.name ?? null, description: t.description, linked: used.has(t.id),
+    })));
   }
-  const near = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) <= SUGGEST_DAYS * 86_400_000;
+  const near = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) <= LINK_DAYS * 86_400_000;
 
   const out: BankLineRow[] = rows.map((r) => {
     const stays = r.stays.map((x) => x.stay);
     const linkedTo = r.transaction
       ? [r.transaction.category?.name, r.transaction.description].filter(Boolean).join(" · ") || "An entry"
       : stays.length ? `Airbnb ${stays.map((x) => x.external_ref ?? x.check_in).join(", ")}` : null;
-    const suggestions = r.status !== "unmatched" ? [] : candidates
-      .filter((t) => t.direction === r.direction && near(t.date, r.date)
-        && (Number(t.amount) === Number(r.amount) || Math.abs(Number(t.amount_reporting) - Number(r.amount)) < 1))
+    const line = { date: r.date, direction: r.direction, amount: Number(r.amount) };
+    const suggestions = r.status !== "unmatched" ? [] : around
+      .filter((t) => !t.linked && t.direction === r.direction && near(t.date, r.date)
+        && (t.amount === line.amount || Math.abs(t.amountReporting - line.amount) < 1))
       .slice(0, 3)
-      .map((t) => ({ id: t.id, date: t.date, description: t.description ?? "", category: t.category?.name ?? null }));
+      .map((t) => ({ id: t.id, date: t.date, description: t.description ?? "", category: t.category }));
+    const template = r.status === "unmatched" ? monthlyTemplate(line, around) : null;
     return {
       id: r.id, statementId: r.statement_id, account: accountName.get(r.account_id) ?? "", date: r.date, direction: r.direction,
       amount: Number(r.amount), currency: r.currency, description: r.description, counterparty: r.counterparty,
-      status: r.status, matchedBy: r.matched_by, linkedTo, suggestions,
+      status: r.status, matchedBy: r.matched_by, linkedTo, suggestions, template,
     };
   });
 

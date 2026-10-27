@@ -43,7 +43,7 @@ Rules:
 - balance: the running balance printed on that line, else null.
 - account_last4: the last 4 characters of the statement's own account number. Never return a full account number anywhere.
 - opening_balance / closing_balance: as printed for the period, else null.
-- notes: anything a person should know (unreadable rows, pages missing, a summary that does not add up); else null.`;
+- notes: only a problem the person must act on (unreadable rows, missing pages, totals that do not add up), in one short plain sentence; else null. Do not describe what you removed or how you read it.`;
 
 const LINE = {
   type: "object",

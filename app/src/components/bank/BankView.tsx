@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Check, FileText, Link2, Undo2, UserRound } from "lucide-react";
+import { AlertTriangle, Check, Copy, FileText, Link2, Undo2, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { addStatement, bookCharges, createFromLine, linkLine, markPersonal, resetLine, type Result } from "@/app/(app)/bank/actions";
@@ -127,7 +127,10 @@ function StatementRow({ s, villas }: { s: BankStatementRow; villas: Option[] }) 
           {s.balanced === false && <><AlertTriangle size={14} className="text-amber-600" /> Balances don&apos;t add up, check against the PDF · </>}
           {s.linesAdded} lines{s.linesSkipped ? `, ${s.linesSkipped} already known` : ""}
         </p>
-        {s.notes && <p className="mt-1 text-xs text-zinc-500">{s.notes}</p>}
+        {/* The reading's notes matter when the balances don't add up; otherwise they stay folded. */}
+        {s.notes && (s.balanced === false
+          ? <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">{s.notes}</p>
+          : <details className="mt-1 text-xs text-zinc-500"><summary className="cursor-pointer">Reading notes</summary><p className="mt-1">{s.notes}</p></details>)}
         {error && <p className="mt-1 text-red-600">{error}</p>}
       </div>
       {s.charges > 0 && (
@@ -146,6 +149,8 @@ function StatementRow({ s, villas }: { s: BankStatementRow; villas: Option[] }) 
     </div>
   );
 }
+
+const monthName = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en", { month: "long", timeZone: "UTC" });
 
 function Amount({ line }: { line: BankLineRow }) {
   return (
@@ -185,6 +190,14 @@ function TodoLine({ line, villas, categories, reportingCurrency }: { line: BankL
             <Link2 size={13} /> {shortDate(s.date)} {s.category ?? ""} {s.description && `· ${s.description}`}
           </button>
         ))}
+        {line.template && (
+          <button className={small} disabled={pending} title={`Same villa, category and description as the entry of ${shortDate(line.template.fromDate)}`}
+            onClick={() => go(() => createFromLine(line.id, {
+              villaId: line.template!.villaId, categoryId: line.template!.categoryId, description: line.template!.description, fxRate: null,
+            }))}>
+            <Copy size={13} /> Like {monthName(line.template.fromDate)}: {[line.template.category, line.template.description].filter(Boolean).join(" · ")}
+          </button>
+        )}
         <button className={small} disabled={pending} onClick={() => setOpen((o) => !o)}>Add to the books</button>
         <button className={small} disabled={pending} onClick={() => go(() => markPersonal(line.id))}>
           <UserRound size={13} /> Personal
