@@ -2,7 +2,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
-import { autoMatch, CHARGE, ingestStatement } from "@/lib/bank/ops";
+import { autoMatch, CHARGE, ingestStatement, INTEREST, WITHHELD_TAX } from "@/lib/bank/ops";
 import { readStatementPdf, StatementError } from "@/lib/bank/statement-pdf";
 import { getCurrentOrg } from "@/lib/org";
 import { createClient } from "@/lib/supabase/server";
@@ -84,7 +84,10 @@ export async function createFromLine(lineId: string, input: { villaId: string; c
   return done();
 }
 
-/** One expense for the statement's fees and tax, one income for its interest. */
+/**
+ * One expense for the statement's bank fees, and one income for its interest net of the tax the bank withheld
+ * (in Indonesia a 20% final tax: not a bank fee, and not a deductible expense).
+ */
 export async function bookCharges(statementId: string, villaId: string): Promise<Result> {
   const org = await admin();
   if (!org || !UUID.test(statementId)) return { ok: false, error: "Not allowed." };
@@ -97,24 +100,49 @@ export async function bookCharges(statementId: string, villaId: string): Promise
   ]);
   const charges = (lines ?? []).filter((l) => CHARGE.test(l.description));
   if (!charges.length) return { ok: false, error: "No bank charges left on this statement." };
-  const currency = charges[0].currency;
-  if (currency !== org.reportingCurrency) return { ok: false, error: "Book these one by one: they are not in your reporting currency." };
+  if (charges.some((l) => l.currency !== org.reportingCurrency)) {
+    return { ok: false, error: "Book these one by one: they are not in your reporting currency." };
+  }
   const category = (kind: "income" | "expense", re: RegExp) => (cats ?? []).find((c) => c.kind === kind && re.test(c.name))?.id ?? null;
   const month = charges.map((l) => l.date).sort().at(-1)!.slice(0, 7);
+  const total = (xs: typeof charges) => Math.round(xs.reduce((s, l) => s + Number(l.amount), 0) * 100) / 100;
+  const fmt = (n: number) => n.toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  for (const direction of ["out", "in"] as const) {
-    const group = charges.filter((l) => l.direction === direction);
-    if (!group.length) continue;
-    const total = Math.round(group.reduce((s, l) => s + Number(l.amount), 0) * 100) / 100;
+  const interest = charges.filter((l) => l.direction === "in" && INTEREST.test(l.description));
+  const tax = charges.filter((l) => l.direction === "out" && WITHHELD_TAX.test(l.description));
+  const fees = charges.filter((l) => !interest.includes(l) && !tax.includes(l) && l.direction === "out");
+
+  const book = async (group: typeof charges, entry: { direction: "in" | "out"; amount: number; category_id: string | null; description: string }) => {
+    if (!group.length || !(entry.amount > 0)) return null;
     const { data: tx, error } = await db.from("transactions").insert({
-      organization_id: org.id, villa_id: villaId, date: group.map((l) => l.date).sort().at(-1), direction,
-      category_id: direction === "out" ? category("expense", /bank/i) : category("income", /interest|other income/i),
-      description: direction === "out" ? `Bank fees and tax, ${month} (${group.length} lines)` : `Bank interest, ${month}`,
-      currency, amount: total, fx_rate: 1, status: "validated", source: "module",
+      organization_id: org.id, villa_id: villaId, date: group.map((l) => l.date).sort().at(-1), currency: org.reportingCurrency,
+      fx_rate: 1, status: "validated", source: "module", ...entry,
     }).select("id").single();
-    if (error || !tx) return { ok: false, error: error?.message.includes("closed") ? "That month is closed for this villa." : "Could not save. Try again." };
+    if (error || !tx) return error?.message.includes("closed") ? "That month is closed for this villa." : "Could not save. Try again.";
     await db.from("bank_lines").update({ status: "matched", transaction_id: tx.id, matched_by: "created" }).in("id", group.map((l) => l.id));
+    return null;
+  };
+
+  const problems = [
+    await book(fees, {
+      direction: "out", amount: total(fees), category_id: category("expense", /bank/i),
+      description: `Bank fees, ${month} (${fees.length} line${fees.length === 1 ? "" : "s"})`,
+    }),
+  ];
+  const gross = total(interest), withheld = total(tax);
+  if (interest.length) {
+    problems.push(await book([...interest, ...tax], {
+      direction: "in", amount: Math.round((gross - withheld) * 100) / 100, category_id: category("income", /interest|other income/i),
+      description: withheld ? `Bank interest, ${month}: ${fmt(gross)} less ${fmt(withheld)} tax withheld` : `Bank interest, ${month}`,
+    }));
+  } else if (tax.length) {
+    // Tax without interest on this statement: book it on its own, as a tax.
+    problems.push(await book(tax, {
+      direction: "out", amount: withheld, category_id: category("expense", /tax/i), description: `Tax withheld by the bank, ${month}`,
+    }));
   }
+  const problem = problems.find(Boolean);
+  if (problem) return { ok: false, error: problem };
   revalidatePath("/transactions");
   revalidatePath("/overview");
   return done();

@@ -8,6 +8,9 @@ import type { Statement } from "./statement-pdf";
 
 /** Bank charges and interest, booked together rather than line by line. */
 export const CHARGE = /\b(FEE|FEES|BIAYA|ADM|ADMIN|CHARGE|TAX|PAJAK|INTEREST|BUNGA)\b/i;
+export const INTEREST = /\b(INTEREST|BUNGA)\b/i;
+/** Tax the bank withholds on interest (Indonesia: 20% final tax). */
+export const WITHHELD_TAX = /\b(TAX|PAJAK)\b/i;
 
 export interface Ingested { statementId: string; accountId: string; added: number; skipped: number }
 
