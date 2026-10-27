@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftRight, BedDouble, FolderOpen, LayoutDashboard, ScanLine, Upload, Users } from "lucide-react";
+import { ArrowLeftRight, BedDouble, FolderOpen, Landmark, LayoutDashboard, ScanLine, Upload, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "./Logo";
@@ -13,12 +13,15 @@ const NAV = [
   { href: "/review", label: "Review", icon: ScanLine, badge: true },
   { href: "/import", label: "Import stays", icon: BedDouble },
   { href: "/team", label: "Team", icon: Users },
+  { href: "/bank", label: "Bank", icon: Landmark, adminOnly: true },
 ] as const;
 
 interface Props {
   org: React.ReactNode;
   reviewBadge: React.ReactNode;
   user: React.ReactNode;
+  /** Shows the admin-only pages (Bank). */
+  admin?: boolean;
 }
 
 /** Fixed sidebar on large screens; a compact top bar with tabs below that. */
@@ -27,8 +30,9 @@ export function Sidebar(props: Props) {
 }
 
 /** The same sidebar with no current page highlighted, shown while the path is resolved. */
-export function SidebarView({ org, reviewBadge, user, path }: Props & { path: string | null }) {
+export function SidebarView({ org, reviewBadge, user, path, admin }: Props & { path: string | null }) {
   const active = (href: string) => path !== null && (path === href || path.startsWith(`${href}/`));
+  const nav = NAV.filter((item) => admin || !("adminOnly" in item));
 
   return (
     <>
@@ -37,7 +41,7 @@ export function SidebarView({ org, reviewBadge, user, path }: Props & { path: st
         <div className="mt-6 px-2 text-xs font-medium uppercase tracking-wide text-zinc-400">Organization</div>
         <div className="mt-1 truncate px-2 text-sm font-medium">{org}</div>
         <nav className="mt-6 flex flex-col gap-0.5">
-          {NAV.map(({ href, label, icon: Icon, ...rest }) => (
+          {nav.map(({ href, label, icon: Icon, ...rest }) => (
             <Link
               key={href} href={href} aria-current={active(href) ? "page" : undefined}
               className="group flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 aria-[current=page]:bg-zinc-100 aria-[current=page]:font-medium aria-[current=page]:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100 dark:aria-[current=page]:bg-zinc-900 dark:aria-[current=page]:text-zinc-100"
@@ -54,7 +58,7 @@ export function SidebarView({ org, reviewBadge, user, path }: Props & { path: st
       <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-zinc-200 bg-white/90 px-4 backdrop-blur lg:hidden dark:border-zinc-800 dark:bg-zinc-950/90">
         <Link href="/overview"><Logo className="text-sm" /></Link>
         <nav className="ml-auto flex gap-1 overflow-x-auto">
-          {NAV.map(({ href, label, icon: Icon, ...rest }) => (
+          {nav.map(({ href, label, icon: Icon, ...rest }) => (
             <Link
               key={href} href={href} aria-label={label} aria-current={active(href) ? "page" : undefined}
               className="relative flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm text-zinc-500 aria-[current=page]:bg-zinc-100 aria-[current=page]:text-zinc-900 dark:aria-[current=page]:bg-zinc-900 dark:aria-[current=page]:text-zinc-100"

@@ -1,0 +1,3 @@
+# Real bank statements and other private files, kept out of git.
+/private/
+.DS_Store

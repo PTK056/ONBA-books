@@ -4,7 +4,15 @@ import { signOut } from "@/app/auth/signout/actions";
 import { getCurrentOrg } from "@/lib/org";
 import { createClient } from "@/lib/supabase/server";
 
+import { Sidebar } from "./Sidebar";
+
 // Session-dependent pieces of the sidebar, each streamed behind its own Suspense boundary.
+
+/** The sidebar, with the admin-only pages when the user is an admin. */
+export async function SidebarForRole(props: Omit<React.ComponentProps<typeof Sidebar>, "admin">) {
+  const org = await getCurrentOrg();
+  return <Sidebar {...props} admin={org.kind === "member" && org.role === "admin"} />;
+}
 
 export async function OrgName() {
   const org = await getCurrentOrg();

@@ -1,12 +1,12 @@
 import { Suspense } from "react";
-import { OrgName, ReviewBadge, UserMenu } from "@/components/shell/ShellParts";
-import { Sidebar, SidebarView } from "@/components/shell/Sidebar";
+import { OrgName, ReviewBadge, SidebarForRole, UserMenu } from "@/components/shell/ShellParts";
+import { SidebarView } from "@/components/shell/Sidebar";
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="flex min-h-dvh flex-col">
       <Suspense fallback={<SidebarView org="…" reviewBadge={null} user={null} path={null} />}>
-        <Sidebar
+        <SidebarForRole
           org={<Suspense fallback="…"><OrgName /></Suspense>}
           reviewBadge={<Suspense><ReviewBadge /></Suspense>}
           user={<Suspense><UserMenu /></Suspense>}

@@ -77,7 +77,11 @@ fonction Supabase) ; `app/.env.local` (URL + clé publique Supabase).
 0. ~~Sécurité avant d'inviter d'autres utilisateurs~~ : faite (27/10) — quotas IA, en-têtes, consentement OAuth, captcha
    (`docs/securite.md`). Reste « ensuite » : MFA admins, liens de partage révocables, anciennes clés Supabase.
 1. ~~Mise en ligne~~ faite (26/10, `splyce.me`). Passer Vercel en Pro avant le premier client payant.
-2. Rapprochement bancaire Danamon (Claude lit bien les relevés PDF).
+2. **Rapprochement bancaire** : version courte en test (27/10/2026), page **Bank** (admins seuls). Relevé Danamon PDF lu par
+   Claude (solde vérifié au centime), rapprochement auto des cas évidents (écritures, séjours Airbnb y compris paiement en
+   2 fois, sans date de versement après la migration Airtable), frais bancaires en un clic, « perso ». Sur août 2026 réel :
+   12/24 lignes auto, 11 frais/intérêts en un clic, 2 à regarder. Reste : Wise CSV, virements multiples, espèces.
+   Avant d'ouvrir aux clients : société, CGU + DPA, politique de confidentialité (`docs/securite.md`).
 2 bis. Agent WhatsApp (adaptateur sur le cœur Telegram) quand le compte Meta Business est prêt.
 3. Couche gestionnaire : frais de gestion, relevés propriétaires à la marque, accès propriétaires.
 4. Entretiens prospects (questions dans `docs/cadrage.md` §6).

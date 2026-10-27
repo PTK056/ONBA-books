@@ -25,6 +25,10 @@ Bilan du 26/10/2026 (vérifié dans le code et en ligne ; pas un audit professio
 8. **Politique de confidentialité** : sous-traitants (Supabase Tokyo, Vercel, Anthropic, OpenAI, Telegram, Resend).
 
 ## Fait
+- **Relevés bancaires** (27/10/2026) : tables `bank_*` et bucket `bank` réservés aux admins (ni staff, ni propriétaires,
+  jamais dans les ZIP ni les liens de partage) ; numéros de compte masqués (4 derniers chiffres) dans les lignes lues.
+  **Condition avant d'ouvrir le module à des clients** : société qui vend Splyce, CGU avec plafond de responsabilité + DPA,
+  politique de confidentialité.
 - **Captcha Turnstile** (27/10/2026) : widget Cloudflare « Splyce » (mode Managed, `app.splyce.me` + `localhost`),
   clé de site dans Vercel (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`), clé secrète dans Supabase (Attack Protection). Vérifié :
   une demande de code sans jeton est refusée (`captcha_failed`), une vraie connexion passe. Invisible pour la plupart des gens.
