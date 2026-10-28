@@ -60,14 +60,14 @@ export async function ingestStatement(
 
 /** Links every unmatched line of the organization that has an obvious counterpart in the books. Returns how many. */
 export async function autoMatch(db: SupabaseClient, orgId: string, reportingCurrency: string): Promise<number> {
-  const { data: lines } = await db.from("bank_lines").select("id, date, direction, amount, currency")
+  const { data: lines } = await db.from("bank_lines").select("id, date, direction, amount, currency, description, counterparty")
     .eq("organization_id", orgId).eq("status", "unmatched").order("date");
   if (!lines?.length) return 0;
   const from = shift(lines[0].date, -40);
   const to = shift(lines[lines.length - 1].date, 10);
 
   const [{ data: txs }, { data: taken }, { data: stays }, { data: paidStays }] = await Promise.all([
-    db.from("transactions").select("id, date, direction, amount, currency, amount_reporting")
+    db.from("transactions").select("id, date, direction, amount, currency, amount_reporting, description")
       .eq("organization_id", orgId).eq("status", "validated").is("stay_id", null).gte("date", from).lte("date", to),
     db.from("bank_lines").select("transaction_id").eq("organization_id", orgId).not("transaction_id", "is", null),
     db.from("stays").select("id, check_in, check_out, payout_date, transactions (direction, amount_reporting, status)")
@@ -78,6 +78,7 @@ export async function autoMatch(db: SupabaseClient, orgId: string, reportingCurr
   const used = new Set((taken ?? []).map((t) => t.transaction_id as string));
   const entries: BookEntry[] = (txs ?? []).filter((t) => !used.has(t.id)).map((t) => ({
     id: t.id, date: t.date, direction: t.direction, amount: Number(t.amount), currency: t.currency, amountReporting: Number(t.amount_reporting),
+    description: t.description,
   }));
   const paid = new Set((paidStays ?? []).map((x) => x.stay_id as string));
   type StayRow = { id: string; check_in: string; check_out: string; payout_date: string | null; transactions: { direction: string; amount_reporting: number; status: string }[] };
@@ -88,7 +89,7 @@ export async function autoMatch(db: SupabaseClient, orgId: string, reportingCurr
   }));
 
   const matches = matchLines(
-    lines.map((l) => ({ ...l, amount: Number(l.amount) })), entries, nets, reportingCurrency,
+    lines.map((l) => ({ ...l, amount: Number(l.amount), text: [l.counterparty, l.description].filter(Boolean).join(" · ") })), entries, nets, reportingCurrency,
   );
   for (const m of matches) {
     if (m.kind === "transaction") {

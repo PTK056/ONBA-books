@@ -8,6 +8,8 @@ export interface BankLineIn {
   direction: "in" | "out";
   amount: number;
   currency: string;
+  /** Payee and description, to tell apart lines with the same amount. */
+  text?: string;
 }
 
 export interface BookEntry {
@@ -17,6 +19,7 @@ export interface BookEntry {
   amount: number;          // in its own currency
   currency: string;
   amountReporting: number; // in the organization's reporting currency
+  description?: string | null;
 }
 
 /** A stay's net (income minus platform fees) in the reporting currency; payoutDate when the platform export gave it. */
@@ -42,16 +45,20 @@ const MAX_INSTALMENTS = 3;
 export function matchLines(lines: BankLineIn[], entries: BookEntry[], stays: StayNet[], reportingCurrency: string): Match[] {
   type Pair = { line: BankLineIn; key: string; match: Match; gap: number };
   const pairs: Pair[] = [];
+  const named = namesOf(lines);
 
   for (const line of lines) {
     for (const e of entries) {
       if (e.direction !== line.direction) continue;
+      const fit = nameFit(e.description, line, named);
+      if (fit === "other") continue;
       const same = e.currency === line.currency ? e.amount === line.amount
         : line.currency === reportingCurrency && Math.abs(e.amountReporting - line.amount) < 0.5;
       if (!same) continue;
       const gap = days(e.date, line.date); // > 0: entry dated before the bank line
       if (gap > BEFORE_DAYS || gap < -AFTER_DAYS) continue;
-      pairs.push({ line, key: `t:${e.id}`, gap: Math.abs(gap), match: { lineId: line.id, kind: "transaction", transactionId: e.id } });
+      // Naming this line's payee beats any date gap.
+      pairs.push({ line, key: `t:${e.id}`, gap: Math.abs(gap) - (fit === "this" ? 100 : 0), match: { lineId: line.id, kind: "transaction", transactionId: e.id } });
     }
     if (line.direction === "in" && line.currency === reportingCurrency) {
       // Stays the export gave a payout date: one transfer pays all the stays of that date.
@@ -129,3 +136,41 @@ export function days(a: string, b: string): number {
   return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
 }
 
+
+// Names break ties: an entry that mentions the payee of one line ("… white stones, sulami") belongs to that line,
+// not to another line with the same amount. Only distinctive words count: Balinese birth-order names
+// (Wayan, Made, Nyoman, Ketut…) and banking words are shared by too many to tell anyone apart.
+const COMMON = new Set([
+  "wise", "fee", "fees", "transfer", "transfert", "card", "carte", "received", "top", "money", "sent", "via", "payment", "bank",
+  "the", "and", "for", "from", "pt", "cv", "tbk", "toko", "badung", "kab", "denpasar", "bali",
+  "i", "ni", "wayan", "made", "nyoman", "ketut", "putu", "kadek", "komang", "gede", "gusti", "ayu", "desak", "luh", "ngurah", "anak", "agung",
+]);
+
+/** The distinctive words of a name or a text, lowercased and without accents. */
+export function nameTokens(text: string | null | undefined): string[] {
+  return [...new Set((text ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .split(/[^a-z]+/).filter((w) => w.length >= 3 && !COMMON.has(w)))];
+}
+
+/** Whether a text mentions one of these distinctive words. */
+export function mentions(text: string | null | undefined, tokens: string[]): boolean {
+  if (!tokens.length) return false;
+  const words = new Set(nameTokens(text));
+  return tokens.some((t) => words.has(t));
+}
+
+/** Each line's distinctive names, and all of them together. */
+export function namesOf(lines: { id: string; text?: string }[]) {
+  const byLine = new Map(lines.map((l) => [l.id, nameTokens(l.text)]));
+  return { byLine, all: new Set([...byLine.values()].flat()) };
+}
+
+/**
+ * "this": the entry names this line's payee. "other": it names the payee of another line, not this one's,
+ * so it is not this line's. "none": it names no one on the statement.
+ */
+export function nameFit(description: string | null | undefined, line: { id: string }, named: ReturnType<typeof namesOf>): "this" | "other" | "none" {
+  const words = nameTokens(description);
+  if (mentions(description, named.byLine.get(line.id) ?? [])) return "this";
+  return words.some((w) => named.all.has(w)) ? "other" : "none";
+}

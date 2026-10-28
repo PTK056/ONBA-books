@@ -70,6 +70,14 @@ export async function addStatement(file: { path: string; name: string; mimeType:
   }
 }
 
+/** Runs the automatic matching again on every line still to do (after entries were added, or the rules improved). */
+export async function matchAgain(): Promise<Result> {
+  const org = await admin();
+  if (!org) return { ok: false, error: "Not allowed." };
+  const matched = await autoMatch(await createClient(), org.id, org.reportingCurrency);
+  return done(matched ? `${matched} more line${matched === 1 ? "" : "s"} matched.` : "Nothing new to match.");
+}
+
 /** Books a line that is at the bank but not in the books. */
 export async function createFromLine(lineId: string, input: { villaId: string; categoryId: string | null; description: string; fxRate: number | null }): Promise<Result> {
   const org = await admin();

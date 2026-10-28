@@ -4,7 +4,7 @@ import { AlertTriangle, BedDouble, Check, Copy, FileText, Link2, Undo2, UserRoun
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
-import { addStatement, bookCharges, createFromLine, linkLine, linkStay, markPersonal, resetLine, type Result } from "@/app/(app)/bank/actions";
+import { addStatement, bookCharges, createFromLine, linkLine, linkStay, markPersonal, matchAgain, resetLine, type Result } from "@/app/(app)/bank/actions";
 import { money } from "@/components/overview/format";
 import type { BankLineRow, BankStatementRow } from "@/lib/bank/data";
 import { shortDate } from "@/lib/format/date";
@@ -62,9 +62,12 @@ export function BankView(props: Props) {
 
       {lines.length > 0 && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">
-            At the bank, not in your books <span className="text-zinc-400">· {todo.length}</span>
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">
+              At the bank, not in your books <span className="text-zinc-400">· {todo.length}</span>
+            </h2>
+            {todo.length > 0 && <MatchAgain />}
+          </div>
           {todo.length === 0
             ? <p className="card p-4 text-sm text-zinc-500">Nothing left: every line is in your books or marked personal.</p>
             : <div className="card divide-y divide-zinc-100 dark:divide-zinc-800">{todo.map((l) => <TodoLine key={l.id} line={l} {...props} />)}</div>}
@@ -74,6 +77,18 @@ export function BankView(props: Props) {
       {matched.length > 0 && <Done title="In your books" lines={matched} />}
       {personal.length > 0 && <Done title="Personal, not in the books" lines={personal} />}
     </div>
+  );
+}
+
+function MatchAgain() {
+  const { error, message, pending, go } = useAction();
+  return (
+    <span className="flex items-center gap-2 text-sm">
+      {(message || error) && <span className={error ? "text-red-600" : "text-zinc-500"}>{error ?? message}</span>}
+      <button className={secondary} disabled={pending} onClick={() => go(matchAgain)} title="Look again for entries that match these lines">
+        {pending ? "Matching…" : "Match again"}
+      </button>
+    </span>
   );
 }
 

@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { matchLines, type BankLineIn, type BookEntry, type StayNet } from "./match.ts";
+import { matchLines, mentions, nameTokens, type BankLineIn, type BookEntry, type StayNet } from "./match.ts";
 
 const line = (id: string, date: string, amount: number, direction: "in" | "out" = "out", currency = "IDR"): BankLineIn =>
   ({ id, date, amount, direction, currency });
@@ -85,4 +85,23 @@ test("two combinations that add up: left for a person", () => {
     [line("L1", "2026-03-01", 500, "in"), line("L2", "2026-03-02", 500, "in"), line("L3", "2026-03-03", 500, "in")],
     [], [stay("S1", "2026-03-10", "2026-03-12", 1000)], "IDR");
   assert.deepEqual(out, []);
+});
+
+test("only distinctive names count", () => {
+  assert.deepEqual(nameTokens("Wise fee · I MADE JIWA"), ["jiwa"]);
+  assert.deepEqual(nameTokens("NYOMAN WISTRI MAWATI"), ["wistri", "mawati"]);
+  assert.ok(mentions("Frais Wise – transfert #2446401555 (white stones, sulami)", nameTokens("Wise fee · sulami")));
+  assert.ok(!mentions("Frais Wise – transfert (white stones, sulami)", nameTokens("Wise fee · I MADE JIWA")));
+  assert.ok(!mentions("Salary I Made Ristawan", nameTokens("I MADE JIWA")));
+});
+
+// Real case (October 2026): three Wise fees of 6,458 the same days; the books' entry names "sulami".
+test("an entry naming the payee goes to that line, not to another line of the same amount", () => {
+  const lines = [
+    { ...line("F1", "2026-10-22", 6458), text: "Wise fee · sulami" },
+    { ...line("F2", "2026-10-22", 6458), text: "Wise fee · NYOMAN WISTRI MAWATI" },
+    { ...line("F3", "2026-10-24", 6458), text: "Wise fee · I MADE JIWA" },
+  ];
+  const fee = { ...entry("T1", "2026-10-22", 6458), description: "Frais Wise – transfert #2446401555 (white stones, sulami)" };
+  assert.deepEqual(matchLines(lines, [fee], [], "IDR"), [{ lineId: "F1", kind: "transaction", transactionId: "T1" }]);
 });

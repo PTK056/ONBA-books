@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { nameFit, namesOf } from "./match";
 import { CHARGE, shift } from "./ops";
 import { LINK_DAYS, monthlyTemplate, type PastEntry, type Template } from "./recurring";
 
@@ -78,17 +79,22 @@ export async function bankPage(db: SupabaseClient, orgId: string) {
 
   const near = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) <= LINK_DAYS * 86_400_000;
 
+  const named = namesOf(open.map((r) => ({ id: r.id, text: [r.counterparty, r.description].filter(Boolean).join(" · ") })));
   const out: BankLineRow[] = rows.map((r) => {
     const stays = r.stays.map((x) => x.stay);
     const linkedTo = r.transaction
       ? [r.transaction.category?.name, r.transaction.description].filter(Boolean).join(" · ") || "An entry"
       : stays.length ? `Airbnb ${stays.map((x) => x.external_ref ?? x.check_in).join(", ")}` : null;
     const line = { date: r.date, direction: r.direction, amount: Number(r.amount) };
-    const suggestions = r.status !== "unmatched" ? [] : around
+    // Same amount within two weeks; an entry naming this line's payee first, one naming another payee left out.
+    const close = r.status !== "unmatched" ? [] : around
       .filter((t) => !t.linked && t.direction === r.direction && near(t.date, r.date)
         && (t.amount === line.amount || Math.abs(t.amountReporting - line.amount) < 1))
+      .map((t) => ({ t, fit: nameFit(t.description, { id: r.id }, named) }))
+      .filter((x) => x.fit !== "other");
+    const suggestions = (close.some((x) => x.fit === "this") ? close.filter((x) => x.fit === "this") : close)
       .slice(0, 3)
-      .map((t) => ({ id: t.id, date: t.date, description: t.description ?? "", category: t.category }));
+      .map(({ t }) => ({ id: t.id, date: t.date, description: t.description ?? "", category: t.category }));
     const template = r.status === "unmatched" ? monthlyTemplate(line, around) : null;
     const payable = r.status === "unmatched" && r.direction === "in" ? staysFor(r.date) : [];
     return {
