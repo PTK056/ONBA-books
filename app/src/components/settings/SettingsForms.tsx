@@ -35,15 +35,19 @@ function CompanyName({ name }: { name: string }) {
   return (
     <section className="card flex flex-col gap-3 p-5">
       <div>
-        <h2 className="font-semibold">The company</h2>
+        <h2 className="font-semibold">Your company</h2>
         <p className="text-sm text-zinc-500">
-          Next to your villas, the company holds what belongs to no villa: bank fees, the accountant, the office, licences.
-          Owners never see it.
+          Some costs belong to your company, not to a villa: bank fees, your accountant, your office, licences.
+          Book them on the company so each villa&apos;s result stays accurate. Owners never see it.
         </p>
       </div>
-      <form className="flex flex-wrap gap-2" action={() => save(() => renameCompany(value))}>
-        <input className={`${field} min-w-64 flex-1`} value={value} onChange={(e) => setValue(e.target.value)} aria-label="Company name" maxLength={80} />
-        <button className={primary} disabled={pending || value.trim() === name}>Save</button>
+      <form className="flex flex-col gap-1" action={() => save(() => renameCompany(value))}>
+        <label htmlFor="company-name" className="text-sm font-medium">Its name, as it appears next to your villas</label>
+        <div className="flex flex-wrap gap-2">
+          <input id="company-name" className={`${field} min-w-64 flex-1`} value={value} onChange={(e) => setValue(e.target.value)}
+            placeholder="PT Onba Property Management" maxLength={80} />
+          <button className={primary} disabled={pending || value.trim() === name}>Save</button>
+        </div>
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
       {saved && !error && <p className="text-sm text-emerald-700 dark:text-emerald-400">Saved.</p>}
