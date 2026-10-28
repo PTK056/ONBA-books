@@ -1,6 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { connection } from "next/server";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 
 export type CurrentOrg =
@@ -54,16 +55,33 @@ export async function getCurrentOrg(): Promise<CurrentOrg> {
   };
 }
 
-/** Cookie holding the villa (or the company) chosen in the sidebar; absent = all of them. */
+/** Cookie holding the villa (or the company) chosen in the sidebar, or "all"; absent = nothing chosen yet. */
 export const PLACE_COOKIE = "splyce_place";
+export const ALL_PLACES = "all";
 
 type Member = Extract<CurrentOrg, { kind: "member" }>;
 
-/** The villa or company chosen in the sidebar, if it still exists in this organization. */
+/**
+ * The villa or company chosen in the sidebar; null for all of them. Until the user chooses, the place of the
+ * latest entry written: the app opens where the last change was made.
+ */
 export async function selectedPlace(org: Member) {
   const id = (await cookies()).get(PLACE_COOKIE)?.value;
-  return places(org).find((p) => p.id === id) ?? null;
+  if (id === ALL_PLACES) return null;
+  const all = places(org);
+  const chosen = all.find((p) => p.id === id);
+  if (chosen || all.length < 2) return chosen ?? null;
+  const last = await lastChangedPlace(org.id);
+  return all.find((p) => p.id === last) ?? null;
 }
+
+/** The villa (or company) of the most recently written entry; once per request. */
+const lastChangedPlace = cache(async (orgId: string): Promise<string | null> => {
+  const db = await createClient();
+  const { data } = await db.from("transactions").select("villa_id")
+    .eq("organization_id", orgId).order("created_at", { ascending: false }).limit(1);
+  return data?.[0]?.villa_id ?? null;
+});
 
 /**
  * The organization as the sidebar's choice shows it: only the chosen villa (or only the company).
