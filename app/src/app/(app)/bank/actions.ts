@@ -4,6 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
 import { autoMatch, CHARGE, ingestStatement, INTEREST, WITHHELD_TAX } from "@/lib/bank/ops";
 import { readStatementPdf, StatementError } from "@/lib/bank/statement-pdf";
+import { parseWiseCsv, WiseCsvError } from "@/lib/bank/wise-csv";
 import { equalShares } from "@/lib/split/shares";
 import { getCurrentOrg, places } from "@/lib/org";
 import { bankSettings, type Bearer } from "@/lib/settings";
@@ -23,25 +24,32 @@ function done(message?: string): Result {
   return { ok: true, message };
 }
 
-/** The browser has put the PDF in the bank bucket; read it, store its lines, link what is obvious. */
+/** The browser has put the statement (PDF, or Wise CSV) in the bank bucket; read it, store its lines, link what is obvious. */
 export async function addStatement(file: { path: string; name: string; mimeType: string }): Promise<Result> {
   const org = await admin();
   if (!org) return { ok: false, error: "Only admins can add bank statements." };
-  if (!file.path.startsWith(`${org.id}/`) || file.mimeType !== "application/pdf") return { ok: false, error: "Unknown file." };
+  const csv = file.mimeType === "text/csv";
+  if (!file.path.startsWith(`${org.id}/`) || !(csv || file.mimeType === "application/pdf")) return { ok: false, error: "Unknown file." };
   const db = await createClient();
 
-  const { data: granted } = await db.rpc("ai_take", { org: org.id, k: "bank_statement", wanted: 1 });
-  if (!granted) return { ok: false, error: "This month's statement reading allowance is used up; it renews on the 1st." };
+  // A PDF is read by Claude and counts against the monthly allowance; a Wise CSV is read as it is.
+  if (!csv) {
+    const { data: granted } = await db.rpc("ai_take", { org: org.id, k: "bank_statement", wanted: 1 });
+    if (!granted) return { ok: false, error: "This month's statement reading allowance is used up; it renews on the 1st." };
+  }
 
   const { data: blob, error: dlErr } = await db.storage.from("bank").download(file.path);
   if (dlErr || !blob) return { ok: false, error: "The file could not be opened. Try again." };
   let statement;
   try {
-    statement = await readStatementPdf(new Anthropic(), Buffer.from(await blob.arrayBuffer()).toString("base64"));
+    statement = csv
+      ? parseWiseCsv(await blob.text(), file.name)
+      : await readStatementPdf(new Anthropic(), Buffer.from(await blob.arrayBuffer()).toString("base64"));
   } catch (e) {
     console.error("[bank] read:", e);
     await db.storage.from("bank").remove([file.path]);
-    return { ok: false, error: e instanceof StatementError ? e.message : "The statement could not be read. Try again in a minute." };
+    const known = e instanceof StatementError || e instanceof WiseCsvError;
+    return { ok: false, error: known ? (e as Error).message : "The statement could not be read. Try again in a minute." };
   }
   if (!statement.lines.length) {
     await db.storage.from("bank").remove([file.path]);
@@ -108,13 +116,8 @@ export async function bookCharges(statementId: string): Promise<Result> {
     return { ok: false, error: "Book these one by one: they are not in your reporting currency." };
   }
   const category = (kind: "income" | "expense", re: RegExp) => (cats ?? []).find((c) => c.kind === kind && re.test(c.name))?.id ?? null;
-  const month = charges.map((l) => l.date).sort().at(-1)!.slice(0, 7);
   const total = (xs: typeof charges) => Math.round(xs.reduce((s, l) => s + Number(l.amount), 0) * 100) / 100;
   const fmt = (n: number) => n.toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-  const interest = charges.filter((l) => l.direction === "in" && INTEREST.test(l.description));
-  const tax = charges.filter((l) => l.direction === "out" && WITHHELD_TAX.test(l.description));
-  const fees = charges.filter((l) => !interest.includes(l) && !tax.includes(l) && l.direction === "out");
 
   // One entry per place; split in equal shares when it goes to several villas. The lines link to the first share.
   const book = async (group: typeof charges, to: Bearer, entry: { direction: "in" | "out"; amount: number; category_id: string | null; description: string }) => {
@@ -131,26 +134,36 @@ export async function bookCharges(statementId: string): Promise<Result> {
     return null;
   };
 
-  const problems = [
-    await book(fees, settings.feesTo, {
+  // One booking per month: an export can cover many months (a Wise CSV), and each month's charges belong to it.
+  const problems: (string | null)[] = [];
+  for (const month of [...new Set(charges.map((l) => l.date.slice(0, 7)))].sort()) {
+    const monthCharges = charges.filter((l) => l.date.startsWith(month));
+    const interest = monthCharges.filter((l) => l.direction === "in" && INTEREST.test(l.description));
+    const tax = monthCharges.filter((l) => l.direction === "out" && WITHHELD_TAX.test(l.description));
+    const fees = monthCharges.filter((l) => !interest.includes(l) && !tax.includes(l) && l.direction === "out");
+    problems.push(await book(fees, settings.feesTo, {
       direction: "out", amount: total(fees), category_id: category("expense", /bank/i),
       description: `Bank fees, ${month} (${fees.length} line${fees.length === 1 ? "" : "s"})`,
-    }),
-  ];
-  const gross = total(interest), withheld = total(tax);
-  if (interest.length) {
-    problems.push(await book([...interest, ...tax], settings.interestTo, {
-      direction: "in", amount: Math.round((gross - withheld) * 100) / 100, category_id: category("income", /interest|other income/i),
-      description: withheld ? `Bank interest, ${month}: ${fmt(gross)} less ${fmt(withheld)} tax withheld` : `Bank interest, ${month}`,
     }));
-  } else if (tax.length) {
-    // Tax without interest on this statement: book it on its own, as a tax.
-    problems.push(await book(tax, settings.interestTo, {
-      direction: "out", amount: withheld, category_id: category("expense", /tax/i), description: `Tax withheld by the bank, ${month}`,
-    }));
+    const gross = total(interest), withheld = total(tax);
+    if (interest.length) {
+      problems.push(await book([...interest, ...tax], settings.interestTo, {
+        direction: "in", amount: Math.round((gross - withheld) * 100) / 100, category_id: category("income", /interest|other income/i),
+        description: withheld ? `Bank interest, ${month}: ${fmt(gross)} less ${fmt(withheld)} tax withheld` : `Bank interest, ${month}`,
+      }));
+    } else if (tax.length) {
+      // Tax without interest on this statement: book it on its own, as a tax.
+      problems.push(await book(tax, settings.interestTo, {
+        direction: "out", amount: withheld, category_id: category("expense", /tax/i), description: `Tax withheld by the bank, ${month}`,
+      }));
+    }
   }
+  // A closed month keeps its lines in the list; the other months are booked.
   const problem = problems.find(Boolean);
-  if (problem) return { ok: false, error: problem };
+  if (problem) {
+    revalidatePath("/transactions");
+    return { ok: false, error: `${problem} Months that could be booked were.` };
+  }
   revalidatePath("/transactions");
   revalidatePath("/overview");
   return done();

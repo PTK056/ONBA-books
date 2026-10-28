@@ -85,13 +85,15 @@ function AddStatement({ organizationId }: { organizationId: string }) {
 
   async function pick(file: File | undefined) {
     if (!file) return;
-    if (file.type !== "application/pdf") { alert("Add the statement as a PDF."); return; }
+    const csv = /\.csv$/i.test(file.name);
+    if (!csv && file.type !== "application/pdf") { alert("Add a bank statement PDF, or a Wise export (CSV)."); return; }
+    const mimeType = csv ? "text/csv" : "application/pdf";
     setStep("uploading");
-    const path = `${organizationId}/${crypto.randomUUID()}.pdf`;
-    const { error: upErr } = await createClient().storage.from("bank").upload(path, file, { contentType: "application/pdf" });
+    const path = `${organizationId}/${crypto.randomUUID()}.${csv ? "csv" : "pdf"}`;
+    const { error: upErr } = await createClient().storage.from("bank").upload(path, file, { contentType: mimeType });
     if (upErr) { setStep("idle"); alert("The file could not be uploaded. Try again."); return; }
     setStep("reading");
-    go(() => addStatement({ path, name: file.name, mimeType: file.type }), () => setStep("idle"));
+    go(() => addStatement({ path, name: file.name, mimeType }), () => setStep("idle"));
   }
   const busy = step !== "idle" && !error && !message;
 
@@ -101,16 +103,16 @@ function AddStatement({ organizationId }: { organizationId: string }) {
       <div className="flex-1 text-sm">
         <p className="font-medium">Add a bank statement</p>
         <p className="text-zinc-500">
-          {busy && step === "reading" ? "Reading the statement… about 30 seconds."
-            : "A monthly PDF (Danamon for now), unlocked. Lines already added from another statement are skipped."}
+          {busy && step === "reading" ? "Reading the statement… a PDF takes about 30 seconds."
+            : "A monthly PDF from your bank (unlocked), or a Wise export in CSV. Lines already added from another statement are skipped."}
         </p>
         {error && <p className="mt-1 text-red-600">{error}</p>}
         {message && <p className="mt-1 text-emerald-700 dark:text-emerald-400">{message}</p>}
       </div>
-      <input ref={input} type="file" accept="application/pdf" className="hidden"
+      <input ref={input} type="file" accept="application/pdf,.csv,text/csv" className="hidden"
         onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ""; }} />
       <button className={primary} disabled={busy} onClick={() => input.current?.click()}>
-        {busy ? (step === "uploading" ? "Uploading…" : "Reading…") : "Choose a PDF"}
+        {busy ? (step === "uploading" ? "Uploading…" : "Reading…") : "Choose a file"}
       </button>
     </section>
   );
