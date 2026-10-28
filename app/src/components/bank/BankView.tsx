@@ -1,10 +1,10 @@
 "use client";
 
-import { AlertTriangle, BedDouble, Check, Copy, FileText, Link2, Undo2, UserRound } from "lucide-react";
+import { AlertTriangle, BedDouble, Check, Copy, FileText, Link2, Search, Undo2, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
-import { addStatement, bookCharges, createFromLine, linkLine, linkStay, markPersonal, matchAgain, resetLine, type Result } from "@/app/(app)/bank/actions";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { addStatement, bookCharges, createFromLine, findEntries, linkLine, linkStay, markPersonal, matchAgain, resetLine, type EntryCandidate, type Result } from "@/app/(app)/bank/actions";
 import { money } from "@/components/overview/format";
 import type { BankLineRow, BankStatementRow } from "@/lib/bank/data";
 import { shortDate } from "@/lib/format/date";
@@ -175,7 +175,7 @@ function Amount({ line }: { line: BankLineRow }) {
 }
 
 function TodoLine({ line, villas, categories, reportingCurrency }: { line: BankLineRow } & Props) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState<"add" | "find" | null>(null);
   const { error, pending, go } = useAction();
   const kind = line.direction === "in" ? "income" : "expense";
 
@@ -184,7 +184,7 @@ function TodoLine({ line, villas, categories, reportingCurrency }: { line: BankL
     go(() => createFromLine(line.id, {
       villaId: get("villa") || villas[0].id, categoryId: get("category") || null,
       description: get("description"), fxRate: Number(get("fx")) || null,
-    }), () => setOpen(false));
+    }), () => setOpen(null));
   }
 
   return (
@@ -227,12 +227,17 @@ function TodoLine({ line, villas, categories, reportingCurrency }: { line: BankL
             <Copy size={13} /> Like {monthName(line.template.fromDate)}: {[line.template.category, line.template.description].filter(Boolean).join(" · ")}
           </button>
         )}
-        <button className={small} disabled={pending} onClick={() => setOpen((o) => !o)}>Add to the books</button>
+        <button className={small} disabled={pending} onClick={() => setOpen((o) => (o === "find" ? null : "find"))}
+          title="Already in the books with another amount or date: link this line to it instead of adding it twice">
+          <Search size={13} /> Already in the books
+        </button>
+        <button className={small} disabled={pending} onClick={() => setOpen((o) => (o === "add" ? null : "add"))}>Add to the books</button>
         <button className={small} disabled={pending} onClick={() => go(() => markPersonal(line.id))}>
           <UserRound size={13} /> Personal
         </button>
       </div>
-      {open && (
+      {open === "find" && <FindEntry line={line} />}
+      {open === "add" && (
         <form action={submit} className="flex flex-wrap items-end gap-2 pl-20 max-sm:pl-0">
           {villas.length > 1 && (
             <select name="villa" required className={field} aria-label="Villa" defaultValue={line.known?.villaId ?? (villas.length === 2 ? villas[0].id : "")}>
@@ -252,6 +257,56 @@ function TodoLine({ line, villas, categories, reportingCurrency }: { line: BankL
         </form>
       )}
       {error && <p className="pl-20 text-red-600 max-sm:pl-0">{error}</p>}
+    </div>
+  );
+}
+
+/** Search the books for the entry this line pays, when no suggestion came up; the closest amounts first. */
+function FindEntry({ line }: { line: BankLineRow }) {
+  const [search, setSearch] = useState("");
+  const [entries, setEntries] = useState<EntryCandidate[] | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const { error, pending, go } = useAction();
+
+  useEffect(() => {
+    let live = true;
+    const t = setTimeout(async () => {
+      const r = await findEntries(line.id, search);
+      if (!live) return;
+      if (r.ok) { setEntries(r.entries); setFailed(null); } else setFailed(r.error);
+    }, search ? 300 : 0);
+    return () => { live = false; clearTimeout(t); };
+  }, [line.id, search]);
+
+  return (
+    <div className="flex flex-col gap-2 pl-20 max-sm:pl-0">
+      <input className={`${field} max-w-sm`} value={search} onChange={(e) => setSearch(e.target.value)} autoFocus
+        placeholder="Search a description (optional)" aria-label="Search the books" />
+      {entries === null && !failed && <p className="text-xs text-zinc-500">Looking…</p>}
+      {entries?.length === 0 && <p className="text-xs text-zinc-500">No entry left to link from 3 months before to 1 month after this line.</p>}
+      {entries && entries.length > 0 && (
+        <ul className="flex flex-col divide-y divide-zinc-100 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+          {entries.map((e) => {
+            const gap = e.inLineCurrency === null ? 0 : Math.round(e.inLineCurrency - line.amount);
+            return (
+              <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+                <span className="w-14 tabular-nums text-zinc-500">{shortDate(e.date)}</span>
+                <span className="min-w-0 flex-1 truncate">
+                  {[e.category, e.villa, e.description].filter(Boolean).join(" · ") || "No description"}
+                </span>
+                <span className="tabular-nums">
+                  {money(e.amount, e.currency)} <span className="text-xs text-zinc-400">{e.currency}</span>
+                  {gap !== 0 && <span className="ml-1 text-xs text-amber-700 dark:text-amber-400">({gap > 0 ? "+" : "−"}{money(Math.abs(gap), line.currency)})</span>}
+                </span>
+                <button className={small} disabled={pending} onClick={() => go(() => linkLine(line.id, e.id))}>
+                  <Link2 size={13} /> This one
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {(failed || error) && <p className="text-red-600">{failed ?? error}</p>}
     </div>
   );
 }

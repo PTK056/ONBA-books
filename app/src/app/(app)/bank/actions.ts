@@ -2,7 +2,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
-import { autoMatch, CHARGE, ingestStatement, INTEREST, learnPayees, WITHHELD_TAX } from "@/lib/bank/ops";
+import { autoMatch, CHARGE, ingestStatement, INTEREST, learnPayees, shift, WITHHELD_TAX } from "@/lib/bank/ops";
 import { readStatementPdf, StatementError } from "@/lib/bank/statement-pdf";
 import { parseWiseCsv, WiseCsvError } from "@/lib/bank/wise-csv";
 import { equalShares } from "@/lib/split/shares";
@@ -186,11 +186,64 @@ export async function linkLine(lineId: string, transactionId: string): Promise<R
   const org = await admin();
   if (!org || !UUID.test(lineId) || !UUID.test(transactionId)) return { ok: false, error: "Not allowed." };
   const db = await createClient();
+  const [{ data: line }, { data: tx }, { count }] = await Promise.all([
+    db.from("bank_lines").select("direction").eq("id", lineId).eq("organization_id", org.id).single(),
+    db.from("transactions").select("direction").eq("id", transactionId).eq("organization_id", org.id).single(),
+    db.from("bank_lines").select("id", { count: "exact", head: true }).eq("organization_id", org.id).eq("transaction_id", transactionId),
+  ]);
+  if (!line || !tx || line.direction !== tx.direction) return { ok: false, error: "Not allowed." };
+  if (count) return { ok: false, error: "That entry is already linked to another bank line." };
   const { error } = await db.from("bank_lines").update({ status: "matched", transaction_id: transactionId, matched_by: "manual" })
     .eq("id", lineId).eq("organization_id", org.id).eq("status", "unmatched");
   if (error) return { ok: false, error: "Could not link. Try again." };
   await learnPayees(db, org.id);
   return done();
+}
+
+export interface EntryCandidate {
+  id: string; date: string; amount: number; currency: string;
+  /** In the line's currency, to compare; null when the two currencies cannot be compared. */
+  inLineCurrency: number | null;
+  villa: string | null; category: string | null; description: string | null;
+}
+
+/**
+ * Entries this line could be, when the amount or the date is not close enough for a suggestion: an expense booked
+ * with the fee included, from a receipt dated weeks before. Same direction, not linked to a bank line yet; the
+ * closest amounts first, or those whose description contains the search.
+ */
+export async function findEntries(lineId: string, search: string): Promise<{ ok: true; entries: EntryCandidate[] } | { ok: false; error: string }> {
+  const org = await admin();
+  if (!org || !UUID.test(lineId)) return { ok: false, error: "Not allowed." };
+  const db = await createClient();
+  const { data: line } = await db.from("bank_lines").select("date, direction, amount, currency, status").eq("id", lineId).eq("organization_id", org.id).single();
+  if (!line || line.status !== "unmatched") return { ok: false, error: "This line was already handled." };
+
+  const words = search.trim().slice(0, 60).replace(/[%_,()]/g, " ").trim();
+  let q = db.from("transactions")
+    .select("id, date, amount, currency, amount_reporting, description, villa:villas (name), category:categories (name)")
+    .eq("organization_id", org.id).eq("status", "validated").eq("direction", line.direction).is("stay_id", null)
+    .gte("date", shift(line.date, -90)).lte("date", shift(line.date, 30));
+  if (words) q = q.ilike("description", `%${words}%`);
+  const [{ data: txs }, { data: taken }] = await Promise.all([
+    q.limit(500),
+    db.from("bank_lines").select("transaction_id").eq("organization_id", org.id).not("transaction_id", "is", null),
+  ]);
+  const used = new Set((taken ?? []).map((t) => t.transaction_id));
+  type Tx = { id: string; date: string; amount: number; currency: string; amount_reporting: number; description: string | null;
+    villa: { name: string } | null; category: { name: string } | null };
+  const amount = Number(line.amount);
+  const days = (d: string) => Math.abs(Date.parse(d) - Date.parse(line.date)) / 86_400_000;
+  const entries: EntryCandidate[] = ((txs ?? []) as unknown as Tx[])
+    .filter((t) => !used.has(t.id))
+    .map((t) => ({ id: t.id, date: t.date, amount: Number(t.amount), currency: t.currency,
+      inLineCurrency: t.currency === line.currency ? Number(t.amount) : line.currency === org.reportingCurrency ? Number(t.amount_reporting) : null,
+      villa: t.villa?.name ?? null, category: t.category?.name ?? null, description: t.description }));
+  // Relative amount gap first (an amount that cannot be compared counts as twice as far); a day apart weighs like 0.5%.
+  const score = (e: EntryCandidate) => (e.inLineCurrency === null ? 2 : Math.abs(e.inLineCurrency - amount) / amount) + days(e.date) * 0.005;
+  const ranked = entries.sort((a, b) => score(a) - score(b))
+    .slice(0, 8);
+  return { ok: true, entries: ranked };
 }
 
 /** Links an incoming transfer to the stay it pays (a deposit, the balance, an extension); the income is already booked. */
