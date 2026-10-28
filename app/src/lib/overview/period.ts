@@ -1,6 +1,6 @@
 import "server-only";
 import { connection } from "next/server";
-import { getCurrentOrg } from "@/lib/org";
+import { getCurrentOrg, scopedOrg } from "@/lib/org";
 import { createClient } from "@/lib/supabase/server";
 import { availableNights, openingDays } from "./availability";
 import type { CategoryLine, MonthOccupancy, MonthTotals } from "./data";
@@ -43,17 +43,24 @@ export async function loadPeriod(kind: "year" | "all", requestedYear?: string): 
   { kind: "signed_out" } | { kind: "no_organization" } | { kind: "ready"; data: PeriodOverview }
 > {
   await connection();
-  const org = await getCurrentOrg();
-  if (org.kind === "signed_out") return { kind: "signed_out" };
-  if (org.kind === "none") return { kind: "no_organization" };
+  const full = await getCurrentOrg();
+  if (full.kind === "signed_out") return { kind: "signed_out" };
+  if (full.kind === "none") return { kind: "no_organization" };
+  // The villa chosen in the sidebar, if any: everything below is about it alone.
+  const { org, scope } = await scopedOrg(full);
   const db = await createClient();
   const today = new Date().toISOString().slice(0, 10);
   const thisMonth = today.slice(0, 7);
 
   // Years that have entries, for the switcher and the default year.
+  // A fresh query each time: a query builder changes as it is used.
+  const dated = () => {
+    const q = db.from("transactions").select("date").eq("organization_id", org.id).eq("status", "validated");
+    return scope ? q.in("villa_id", scope) : q;
+  };
   const [{ data: first }, { data: last }] = await Promise.all([
-    db.from("transactions").select("date").eq("organization_id", org.id).eq("status", "validated").order("date").limit(1),
-    db.from("transactions").select("date").eq("organization_id", org.id).eq("status", "validated").order("date", { ascending: false }).limit(1),
+    dated().order("date").limit(1),
+    dated().order("date", { ascending: false }).limit(1),
   ]);
   const firstYear = first?.[0]?.date.slice(0, 4) ?? today.slice(0, 4);
   const lastYear = last?.[0]?.date.slice(0, 4) ?? today.slice(0, 4);
@@ -65,14 +72,20 @@ export async function loadPeriod(kind: "year" | "all", requestedYear?: string): 
   const from = year ? `${year}-01-01` : `${firstYear}-01-01`;
   const to = year ? `${+year + 1}-01-01` : `${+lastYear + 1}-01-01`;
 
+  let txQuery = db.from("transactions")
+    .select("date, direction, source, amount_reporting, villa_id, category:categories (name), evidence (extracted)")
+    .eq("organization_id", org.id).eq("status", "validated").gte("date", from).lt("date", to).limit(MAX_ROWS);
+  if (scope) txQuery = txQuery.in("villa_id", scope);
+  let staysQuery = db.from("stays").select("check_in, check_out, gross_amount, net_amount")
+    .eq("organization_id", org.id).lt("check_in", to).gt("check_out", from).limit(MAX_ROWS);
+  if (scope) staysQuery = staysQuery.in("villa_id", scope);
+  let missingQuery = db.from("expenses_missing_evidence").select("id", { count: "exact", head: true })
+    .eq("organization_id", org.id).gte("date", from).lt("date", to);
+  if (scope) missingQuery = missingQuery.in("villa_id", scope);
   const [txs, stays, missing, toReview, toRead] = await Promise.all([
-    db.from("transactions")
-      .select("date, direction, source, amount_reporting, villa_id, category:categories (name), evidence (extracted)")
-      .eq("organization_id", org.id).eq("status", "validated").gte("date", from).lt("date", to).limit(MAX_ROWS),
-    db.from("stays").select("check_in, check_out, gross_amount, net_amount")
-      .eq("organization_id", org.id).lt("check_in", to).gt("check_out", from).limit(MAX_ROWS),
-    db.from("expenses_missing_evidence").select("id", { count: "exact", head: true })
-      .eq("organization_id", org.id).gte("date", from).lt("date", to),
+    txQuery,
+    staysQuery,
+    missingQuery,
     db.from("receipt_items").select("id", { count: "exact", head: true })
       .eq("organization_id", org.id).eq("status", "pending").not("read_at", "is", null),
     db.from("receipt_items").select("id", { count: "exact", head: true })

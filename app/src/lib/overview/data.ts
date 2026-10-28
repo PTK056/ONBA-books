@@ -2,7 +2,7 @@ import "server-only";
 import { connection } from "next/server";
 import { todayIn } from "@/lib/format/date";
 import { availableNights, openingDays } from "./availability";
-import { getCurrentOrg, places } from "@/lib/org";
+import { getCurrentOrg, places, scopedOrg } from "@/lib/org";
 import { createClient } from "@/lib/supabase/server";
 
 export const TREND_MONTHS = 12;
@@ -119,9 +119,11 @@ type Row = {
 /** Figures for one month (default: the current month in the organization's time zone) and the 12 months up to it. */
 export async function loadOverview(requested?: string): Promise<OverviewResult> {
   await connection();
-  const org = await getCurrentOrg();
-  if (org.kind === "signed_out") return { kind: "signed_out" };
-  if (org.kind === "none") return { kind: "no_organization" };
+  const full = await getCurrentOrg();
+  if (full.kind === "signed_out") return { kind: "signed_out" };
+  if (full.kind === "none") return { kind: "no_organization" };
+  // The villa chosen in the sidebar, if any: everything below is about it alone.
+  const { org, scope } = await scopedOrg(full);
   const db = await createClient();
 
   let month: Date;
@@ -136,23 +138,29 @@ export async function loadOverview(requested?: string): Promise<OverviewResult> 
   const to = iso(addMonths(month, 1));
   const windowFrom = iso(addMonths(month, -(TREND_MONTHS - 1)));
 
+  let txQuery = db.from("transactions")
+    .select("id, date, direction, source, amount, currency, amount_reporting, description, villa_id, category:categories (name), evidence (storage_path, extracted), stay_id, stay:stays (external_ref, platform, guest_name, check_in, check_out)")
+    .eq("organization_id", org.id).eq("status", "validated")
+    .gte("date", windowFrom).lt("date", to)
+    .order("date", { ascending: false }).limit(MAX_ENTRIES);
+  if (scope) txQuery = txQuery.in("villa_id", scope);
+  let missingQuery = db.from("expenses_missing_evidence").select("id, date, description, amount, currency")
+    .eq("organization_id", org.id).gte("date", from).lt("date", to).order("date");
+  if (scope) missingQuery = missingQuery.in("villa_id", scope);
+  let staysQuery = db.from("stays").select("villa_id, check_in, check_out, gross_amount, net_amount")
+    .eq("organization_id", org.id).lt("check_in", to).gt("check_out", windowFrom).limit(MAX_ENTRIES);
+  if (scope) staysQuery = staysQuery.in("villa_id", scope);
   const [orgRow, txs, missing, closes, toReview, toRead, stays] = await Promise.all([
     db.from("organizations").select("fiscal_year_start").eq("id", org.id).single(),
-    db.from("transactions")
-      .select("id, date, direction, source, amount, currency, amount_reporting, description, villa_id, category:categories (name), evidence (storage_path, extracted), stay_id, stay:stays (external_ref, platform, guest_name, check_in, check_out)")
-      .eq("organization_id", org.id).eq("status", "validated")
-      .gte("date", windowFrom).lt("date", to)
-      .order("date", { ascending: false }).limit(MAX_ENTRIES),
-    db.from("expenses_missing_evidence").select("id, date, description, amount, currency")
-      .eq("organization_id", org.id).gte("date", from).lt("date", to).order("date"),
+    txQuery,
+    missingQuery,
     db.from("month_closes").select("villa_id, status, closed_at")
       .eq("organization_id", org.id).eq("month", from),
     db.from("receipt_items").select("id", { count: "exact", head: true })
       .eq("organization_id", org.id).eq("status", "pending").not("read_at", "is", null),
     db.from("receipt_items").select("id", { count: "exact", head: true })
       .eq("organization_id", org.id).eq("status", "pending").is("read_at", null),
-    db.from("stays").select("villa_id, check_in, check_out, gross_amount, net_amount")
-      .eq("organization_id", org.id).lt("check_in", to).gt("check_out", windowFrom).limit(MAX_ENTRIES),
+    staysQuery,
   ]);
   const rows = (txs.data ?? []) as unknown as Row[];
   const villaName = new Map(places(org).map((v) => [v.id, v.name]));

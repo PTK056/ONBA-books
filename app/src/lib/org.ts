@@ -1,4 +1,5 @@
 import "server-only";
+import { cookies } from "next/headers";
 import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -51,4 +52,26 @@ export async function getCurrentOrg(): Promise<CurrentOrg> {
     villas: (places ?? []).filter((v) => v.kind === "villa").map(strip),
     company: (places ?? []).filter((v) => v.kind === "company").map(strip)[0] ?? null,
   };
+}
+
+/** Cookie holding the villa (or the company) chosen in the sidebar; absent = all of them. */
+export const PLACE_COOKIE = "splyce_place";
+
+type Member = Extract<CurrentOrg, { kind: "member" }>;
+
+/** The villa or company chosen in the sidebar, if it still exists in this organization. */
+export async function selectedPlace(org: Member) {
+  const id = (await cookies()).get(PLACE_COOKIE)?.value;
+  return places(org).find((p) => p.id === id) ?? null;
+}
+
+/**
+ * The organization as the sidebar's choice shows it: only the chosen villa (or only the company).
+ * `scope` lists the ids to filter entries on, null when everything is shown.
+ */
+export async function scopedOrg(org: Member): Promise<{ org: Member; scope: string[] | null }> {
+  const place = await selectedPlace(org);
+  if (!place) return { org, scope: null };
+  const isCompany = place.id === org.company?.id;
+  return { org: { ...org, villas: isCompany ? [] : [place], company: isCompany ? place : null }, scope: [place.id] };
 }

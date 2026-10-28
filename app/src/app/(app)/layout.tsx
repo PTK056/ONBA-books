@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { OrgName, ReviewBadge, SidebarForRole, UserMenu } from "@/components/shell/ShellParts";
+import { OrgName, PlacePicker, ReviewBadge, SidebarForRole, UserMenu } from "@/components/shell/ShellParts";
 import { SidebarView } from "@/components/shell/Sidebar";
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
@@ -10,6 +10,8 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
           org={<Suspense fallback="…"><OrgName /></Suspense>}
           reviewBadge={<Suspense><ReviewBadge /></Suspense>}
           user={<Suspense><UserMenu /></Suspense>}
+          place={<Suspense><PlacePicker /></Suspense>}
+          placeCompact={<Suspense><PlacePicker compact /></Suspense>}
         />
       </Suspense>
       <div className="flex min-w-0 flex-1 flex-col lg:pl-60">{children}</div>

@@ -1,9 +1,10 @@
 import { LogOut } from "lucide-react";
 import { connection } from "next/server";
 import { signOut } from "@/app/auth/signout/actions";
-import { getCurrentOrg } from "@/lib/org";
+import { getCurrentOrg, places, selectedPlace } from "@/lib/org";
 import { createClient } from "@/lib/supabase/server";
 
+import { PlaceSelect } from "./PlaceSelect";
 import { Sidebar } from "./Sidebar";
 
 // Session-dependent pieces of the sidebar, each streamed behind its own Suspense boundary.
@@ -17,6 +18,16 @@ export async function SidebarForRole(props: Omit<React.ComponentProps<typeof Sid
 export async function OrgName() {
   const org = await getCurrentOrg();
   return <>{org.kind === "member" ? org.name : "—"}</>;
+}
+
+/** The villa chooser; hidden when there is only one place to show. */
+export async function PlacePicker({ compact }: { compact?: boolean }) {
+  const org = await getCurrentOrg();
+  if (org.kind !== "member") return null;
+  const all = places(org);
+  if (all.length < 2) return null;
+  const selected = await selectedPlace(org);
+  return <PlaceSelect places={all.map((p) => ({ id: p.id, name: p.name }))} selected={selected?.id ?? null} compact={compact} />;
 }
 
 export async function ReviewBadge() {

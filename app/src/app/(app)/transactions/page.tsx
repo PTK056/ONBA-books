@@ -32,7 +32,7 @@ async function Content({ searchParams }: Pick<PageProps<"/transactions">, "searc
   const result = await listTransactions(filters);
   if (result.kind === "signed_out") redirect("/login?next=/transactions");
   if (result.kind === "no_organization") redirect("/setup");
-  const { org, rows, categories, truncated } = result;
+  const { org, rows, categories, truncated, villa } = result;
   const cur = org.reportingCurrency;
   const editor = org.role !== "owner_viewer";
   const income = rows.filter((r) => r.direction === "in").reduce((s, r) => s + r.amountReporting, 0);
@@ -40,7 +40,7 @@ async function Content({ searchParams }: Pick<PageProps<"/transactions">, "searc
   const missing = rows.filter((r) => needsReceipt(r) && !r.files.length).length;
   const filtered = Object.values(filters).some(Boolean);
   // Which villa (or the company) only matters once entries are spread over more than one place.
-  const showVilla = org.villas.length > 1 || (!!org.company && (filters.villa === org.company.id || rows.some((r) => r.villa.id === org.company!.id)));
+  const showVilla = org.villas.length > 1 || (!!org.company && (villa === org.company.id || rows.some((r) => r.villa.id === org.company!.id)));
 
   return (
     <>
@@ -71,8 +71,8 @@ async function Content({ searchParams }: Pick<PageProps<"/transactions">, "searc
           {filtered && <Link href="/transactions" className="flex h-9 items-center rounded-lg px-2 text-sm text-zinc-500 hover:text-zinc-900">Clear</Link>}
         </div>
         {showVilla && (
-          <select name="villa" defaultValue={filters.villa ?? ""} aria-label="Villa" className={input}>
-            <option value="">All villas</option>
+          <select name="villa" defaultValue={villa ?? "all"} aria-label="Villa" className={input}>
+            <option value="all">All villas</option>
             {places(org).map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
         )}

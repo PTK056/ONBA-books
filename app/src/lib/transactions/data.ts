@@ -1,6 +1,6 @@
 import "server-only";
 import { connection } from "next/server";
-import { getCurrentOrg, places, type CurrentOrg } from "@/lib/org";
+import { getCurrentOrg, places, selectedPlace, type CurrentOrg } from "@/lib/org";
 import { createClient } from "@/lib/supabase/server";
 import { documentFileName } from "./names";
 
@@ -73,7 +73,7 @@ export const needsReceipt = (t: Pick<Tx, "direction" | "source">) =>
 
 export async function listTransactions(f: TxFilters): Promise<
   | { kind: "signed_out" } | { kind: "no_organization" }
-  | { kind: "ready"; org: Member; rows: Tx[]; truncated: boolean; categories: { id: string; name: string; kind: string }[] }
+  | { kind: "ready"; org: Member; rows: Tx[]; truncated: boolean; categories: { id: string; name: string; kind: string }[]; villa: string | null }
 > {
   await connection();
   const org = await getCurrentOrg();
@@ -89,7 +89,9 @@ export async function listTransactions(f: TxFilters): Promise<
     const end = new Date(Date.UTC(+f.month.slice(0, 4), +f.month.slice(5, 7), 1)).toISOString().slice(0, 10);
     query = query.gte("date", start).lt("date", end);
   }
-  if (f.villa) query = query.eq("villa_id", f.villa);
+  // No villa in the filters: the one chosen in the sidebar, if any ("all" overrides it).
+  const villa = f.villa === "all" ? null : f.villa ?? (await selectedPlace(org))?.id ?? null;
+  if (villa) query = query.eq("villa_id", villa);
   if (f.category) query = query.eq("category_id", f.category);
   if (f.direction) query = query.eq("direction", f.direction);
   if (f.source) query = query.eq("source", f.source);
@@ -109,7 +111,7 @@ export async function listTransactions(f: TxFilters): Promise<
       [t.description, t.merchant, t.category?.name, t.villa.name, t.stayCode, String(t.amount)]
         .some((v) => v?.toLowerCase().includes(q)));
   }
-  return { kind: "ready", org, rows, truncated: (data?.length ?? 0) >= MAX_ROWS, categories: categories ?? [] };
+  return { kind: "ready", org, rows, truncated: (data?.length ?? 0) >= MAX_ROWS, categories: categories ?? [], villa };
 }
 
 export interface TxFileLinks extends TxFile { name: string; viewUrl: string | null; downloadUrl: string | null }

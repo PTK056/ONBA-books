@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Uploader } from "@/components/upload/Uploader";
-import { getCurrentOrg } from "@/lib/org";
+import { getCurrentOrg, selectedPlace } from "@/lib/org";
 
 export default function UploadPage() {
   return (
@@ -25,7 +25,7 @@ async function Upload() {
   if (org.role === "owner_viewer") redirect("/overview");
   return (
     <div className="card p-6">
-      <Uploader organizationId={org.id} villas={org.villas} />
+      <Uploader organizationId={org.id} villas={org.villas} defaultVilla={(await selectedPlace(org))?.id} />
     </div>
   );
 }

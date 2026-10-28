@@ -13,12 +13,15 @@ type Phase = "picking" | "uploading" | "reading" | "done";
 interface Props {
   organizationId: string;
   villas: { id: string; name: string }[];
+  /** The villa chosen in the sidebar, if it is one of these. */
+  defaultVilla?: string;
 }
 
 /** Pick photos or PDFs, upload them as one batch, then have the engine read them. */
-export function Uploader({ organizationId, villas }: Props) {
+export function Uploader({ organizationId, villas, defaultVilla }: Props) {
   const [entries, setEntries] = useState<Entry[]>([]);
-  const [villaId, setVillaId] = useState(villas.length === 1 ? villas[0].id : "");
+  const [villaId, setVillaId] = useState(
+    villas.length === 1 ? villas[0].id : villas.some((v) => v.id === defaultVilla) ? defaultVilla! : "");
   const [phase, setPhase] = useState<Phase>("picking");
   const [summary, setSummary] = useState<ReadSummary | null>(null);
   const [error, setError] = useState<string | null>(null);

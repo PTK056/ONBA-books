@@ -21,6 +21,9 @@ interface Props {
   org: React.ReactNode;
   reviewBadge: React.ReactNode;
   user: React.ReactNode;
+  /** The villa chooser, under the organization (and in the top bar on small screens). */
+  place?: React.ReactNode;
+  placeCompact?: React.ReactNode;
   /** Shows the admin-only pages (Bank, Settings). */
   admin?: boolean;
 }
@@ -31,7 +34,7 @@ export function Sidebar(props: Props) {
 }
 
 /** The same sidebar with no current page highlighted, shown while the path is resolved. */
-export function SidebarView({ org, reviewBadge, user, path, admin }: Props & { path: string | null }) {
+export function SidebarView({ org, reviewBadge, user, path, admin, place, placeCompact }: Props & { path: string | null }) {
   const active = (href: string) => path !== null && (path === href || path.startsWith(`${href}/`));
   const nav = NAV.filter((item) => admin || !("adminOnly" in item));
 
@@ -41,6 +44,12 @@ export function SidebarView({ org, reviewBadge, user, path, admin }: Props & { p
         <Link href="/overview" className="px-2"><Logo /></Link>
         <div className="mt-6 px-2 text-xs font-medium uppercase tracking-wide text-zinc-400">Organization</div>
         <div className="mt-1 truncate px-2 text-sm font-medium">{org}</div>
+        {place && (
+          <>
+            <div className="mt-4 px-2 text-xs font-medium uppercase tracking-wide text-zinc-400">Villa</div>
+            <div className="mt-1 px-1">{place}</div>
+          </>
+        )}
         <nav className="mt-6 flex flex-col gap-0.5">
           {nav.map(({ href, label, icon: Icon, ...rest }) => (
             <Link
@@ -58,6 +67,7 @@ export function SidebarView({ org, reviewBadge, user, path, admin }: Props & { p
 
       <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-zinc-200 bg-white/90 px-4 backdrop-blur lg:hidden dark:border-zinc-800 dark:bg-zinc-950/90">
         <Link href="/overview"><Logo className="text-sm" /></Link>
+        {placeCompact}
         <nav className="ml-auto flex gap-1 overflow-x-auto">
           {nav.map(({ href, label, icon: Icon, ...rest }) => (
             <Link
