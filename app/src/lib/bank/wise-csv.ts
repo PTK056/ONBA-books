@@ -3,6 +3,7 @@
 // becomes two lines: the payment itself (what the books record) and the Wise fee (a bank charge).
 
 import { readCsv } from "../stays/airbnb.ts";
+import { last4 } from "./payees.ts";
 import { mask, type Statement, type StatementLine } from "./statement-pdf.ts";
 
 const REQUIRED = ["TransferWise ID", "Date", "Amount", "Currency", "Running Balance"];
@@ -40,7 +41,10 @@ export function parseWiseCsv(text: string, fileName = ""): Statement {
     const balance = r["Running Balance"] ? num(r["Running Balance"]) : null;
     // An outgoing payment with a fee: the payment, then the fee. Incoming: Wise deducts nothing here.
     const paid = direction === "out" && fee > 0 ? round2(Math.abs(amount) - fee) : Math.abs(amount);
-    lines.push({ date, direction, amount: paid, description, counterparty: who && mask(who), reference: reference && mask(reference), balance: direction === "out" && fee > 0 ? null : balance });
+    lines.push({
+      date, direction, amount: paid, description, counterparty: who && mask(who), reference: reference && mask(reference),
+      balance: direction === "out" && fee > 0 ? null : balance, payee_last4: last4(r["Payee Account Number"]),
+    });
     if (direction === "out" && fee > 0) {
       lines.push({ date, direction: "out", amount: fee, description: `Wise fee · ${who ?? "transfer"}`, counterparty: "Wise", reference: r["TransferWise ID"] ? `${r["TransferWise ID"]} fee` : null, balance });
     }

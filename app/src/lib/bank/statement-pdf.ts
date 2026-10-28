@@ -14,6 +14,8 @@ export interface StatementLine {
   counterparty: string | null;
   reference: string | null;
   balance: number | null;    // running balance after the line, when printed
+  /** Last 4 digits of the payee's account, when the statement gives it (Wise); never more. */
+  payee_last4?: string | null;
 }
 
 export interface Statement {

@@ -66,9 +66,18 @@ select pg_temp.expect((select status = 'unmatched' from bank_lines), 'deleting t
 update bank_lines set status = 'personal';
 select pg_temp.expect((select status from bank_lines) = 'personal', 'a line can be marked personal');
 
+insert into bank_payees (organization_id, key, name, direction, villa_id)
+select o.v, 'acct:5466', 'I MADE JIWA', 'out', vl.v from ids o, ids vl where o.k = 'org' and vl.k = 'villa';
+select pg_temp.expect((select count(*) from bank_payees) = 1, 'admin keeps a payee memory');
+do $$ begin
+  insert into bank_payees (organization_id, key, direction) select v, '1450017035466', 'out' from ids where k = 'org';
+  raise exception 'FAILED: a full account number was stored as a payee key';
+exception when check_violation then raise notice 'ok - a payee key is never a full account number';
+end $$;
+
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000a1');
-select pg_temp.expect((select count(*) from bank_lines) + (select count(*) from bank_statements) + (select count(*) from bank_accounts) = 0,
-  'staff sees no account, statement or line');
+select pg_temp.expect((select count(*) from bank_lines) + (select count(*) from bank_statements) + (select count(*) from bank_accounts)
+  + (select count(*) from bank_payees) = 0, 'staff sees no account, statement, line or payee');
 do $$ begin
   insert into storage.objects (bucket_id, name) select 'bank', v || '/x.pdf' from ids where k = 'org';
   raise exception 'FAILED: staff uploaded a statement';

@@ -25,6 +25,7 @@ test("a transfer with a fee becomes the payment and the Wise fee", () => {
     ["2026-10-20", "in", 1500000], ["2026-10-25", "out", 830000], ["2026-10-27", "out", 125000], ["2026-10-27", "out", 6458],
   ]);
   assert.equal(s.lines[2].counterparty, "NYOMAN");
+  assert.equal(s.lines[2].payee_last4, "7417");
   assert.match(s.lines[3].description, /Wise fee/);
 });
 

@@ -210,7 +210,16 @@ function TodoLine({ line, villas, categories, reportingCurrency }: { line: BankL
             <BedDouble size={13} /> Pays the stay of {x.guest ?? x.platform}, {shortDate(x.checkIn)} → {shortDate(x.checkOut)}
           </button>
         ))}
-        {line.template && (
+        {line.known && (
+          <button className={small} disabled={pending}
+            title={`Booked like the last ${line.known.uses > 1 ? `${line.known.uses} payments` : "payment"} to this payee`}
+            onClick={() => go(() => createFromLine(line.id, {
+              villaId: line.known!.villaId, categoryId: line.known!.categoryId, description: line.known!.description ?? "", fxRate: null,
+            }))}>
+            <Copy size={13} /> Like last time: {[line.known.category, line.known.villa, line.known.description].filter(Boolean).join(" · ")}
+          </button>
+        )}
+        {line.template && !line.known && (
           <button className={small} disabled={pending} title={`Same villa, category and description as the entry of ${shortDate(line.template.fromDate)}`}
             onClick={() => go(() => createFromLine(line.id, {
               villaId: line.template!.villaId, categoryId: line.template!.categoryId, description: line.template!.description, fxRate: null,
@@ -226,16 +235,16 @@ function TodoLine({ line, villas, categories, reportingCurrency }: { line: BankL
       {open && (
         <form action={submit} className="flex flex-wrap items-end gap-2 pl-20 max-sm:pl-0">
           {villas.length > 1 && (
-            <select name="villa" required className={field} aria-label="Villa" defaultValue={villas.length === 2 ? villas[0].id : ""}>
+            <select name="villa" required className={field} aria-label="Villa" defaultValue={line.known?.villaId ?? (villas.length === 2 ? villas[0].id : "")}>
               <option value="" disabled>Villa…</option>
               {villas.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
           )}
-          <select name="category" className={field} aria-label="Category" defaultValue="">
+          <select name="category" className={field} aria-label="Category" defaultValue={line.known?.categoryId ?? ""}>
             <option value="">Category…</option>
             {categories.filter((c) => c.kind === kind).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          <input name="description" className={`${field} min-w-48 flex-1`} placeholder="What was it?" defaultValue={line.counterparty ?? ""} />
+          <input name="description" className={`${field} min-w-48 flex-1`} placeholder="What was it?" defaultValue={line.known?.description ?? line.counterparty ?? ""} />
           {line.currency !== reportingCurrency && (
             <input name="fx" inputMode="decimal" required className={`${field} w-36`} placeholder={`1 ${line.currency} = ? ${reportingCurrency}`} />
           )}

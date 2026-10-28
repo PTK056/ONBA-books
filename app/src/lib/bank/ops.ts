@@ -1,16 +1,13 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { matchLines, type BookEntry, type StayNet } from "./match";
+import { payeeKey } from "./payees";
 import type { Statement } from "./statement-pdf";
 
 // Writing a read statement to the books' side tables, and linking its lines to what is already there.
 // Runs with the caller's client: RLS keeps all of it to admins.
 
-/** Bank charges and interest, booked together rather than line by line. */
-export const CHARGE = /\b(FEE|FEES|BIAYA|ADM|ADMIN|CHARGE|TAX|PAJAK|INTEREST|BUNGA)\b/i;
-export const INTEREST = /\b(INTEREST|BUNGA)\b/i;
-/** Tax the bank withholds on interest (Indonesia: 20% final tax). */
-export const WITHHELD_TAX = /\b(TAX|PAJAK)\b/i;
+export { CHARGE, INTEREST, WITHHELD_TAX } from "./charges";
 
 export interface Ingested { statementId: string; accountId: string; added: number; skipped: number }
 
@@ -47,13 +44,19 @@ export async function ingestStatement(
     return {
       organization_id: orgId, account_id: accountId, statement_id: st.id, date: l.date, direction: l.direction,
       amount: l.amount, currency: s.currency, description: l.description, counterparty: l.counterparty,
-      reference: l.reference, balance: l.balance, fingerprint: `${base}|${n}`,
+      reference: l.reference, balance: l.balance, payee_last4: l.payee_last4 ?? null, fingerprint: `${base}|${n}`,
     };
   });
   const { data: added, error } = await db.from("bank_lines")
     .upsert(rows, { onConflict: "account_id,fingerprint", ignoreDuplicates: true }).select("id");
   if (error) throw new Error(`bank_lines: ${error.message}`);
   const count = added?.length ?? 0;
+  // Lines already known from an earlier import may lack the payee's last 4 digits: fill them in.
+  for (const r of rows) {
+    if (!r.payee_last4) continue;
+    await db.from("bank_lines").update({ payee_last4: r.payee_last4 })
+      .eq("account_id", accountId).eq("fingerprint", r.fingerprint).is("payee_last4", null);
+  }
   await db.from("bank_statements").update({ lines_added: count, lines_skipped: rows.length - count }).eq("id", st.id);
   return { statementId: st.id, accountId, added: count, skipped: rows.length - count };
 }
@@ -104,4 +107,29 @@ export async function autoMatch(db: SupabaseClient, orgId: string, reportingCurr
 
 export function shift(date: string, days: number): string {
   return new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+}
+
+/**
+ * Rebuilds the memory of regular payees from every line already in the books: for each payee (and direction),
+ * the villa, category and description of the latest entry. Cheap enough to run after each match.
+ */
+export async function learnPayees(db: SupabaseClient, orgId: string): Promise<void> {
+  const { data } = await db.from("bank_lines")
+    .select("date, direction, description, counterparty, payee_last4, transaction:transactions (villa_id, category_id, description)")
+    .eq("organization_id", orgId).eq("status", "matched").not("transaction_id", "is", null).order("date");
+  type Row = { date: string; direction: "in" | "out"; description: string; counterparty: string | null; payee_last4: string | null;
+    transaction: { villa_id: string; category_id: string | null; description: string | null } | null };
+  const memory = new Map<string, { row: Row; uses: number }>();
+  for (const row of (data ?? []) as unknown as Row[]) {
+    const key = payeeKey(row);
+    if (!key || !row.transaction) continue;
+    const id = `${key}|${row.direction}`;
+    memory.set(id, { row, uses: (memory.get(id)?.uses ?? 0) + 1 }); // ordered by date: the latest wins
+  }
+  if (!memory.size) return;
+  await db.from("bank_payees").upsert([...memory.entries()].map(([id, { row, uses }]) => ({
+    organization_id: orgId, key: id.split("|")[0], direction: row.direction, name: row.counterparty,
+    villa_id: row.transaction!.villa_id, category_id: row.transaction!.category_id, description: row.transaction!.description,
+    uses, last_used: row.date,
+  })), { onConflict: "organization_id,key,direction" });
 }

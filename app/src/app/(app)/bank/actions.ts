@@ -2,7 +2,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
-import { autoMatch, CHARGE, ingestStatement, INTEREST, WITHHELD_TAX } from "@/lib/bank/ops";
+import { autoMatch, CHARGE, ingestStatement, INTEREST, learnPayees, WITHHELD_TAX } from "@/lib/bank/ops";
 import { readStatementPdf, StatementError } from "@/lib/bank/statement-pdf";
 import { parseWiseCsv, WiseCsvError } from "@/lib/bank/wise-csv";
 import { equalShares } from "@/lib/split/shares";
@@ -59,6 +59,7 @@ export async function addStatement(file: { path: string; name: string; mimeType:
   try {
     const r = await ingestStatement(db, org.id, statement, file);
     const matched = await autoMatch(db, org.id, org.reportingCurrency);
+    await learnPayees(db, org.id);
     const parts = [`${r.added} line${r.added === 1 ? "" : "s"} added`];
     if (r.skipped) parts.push(`${r.skipped} already known`);
     parts.push(`${matched} matched with your books`);
@@ -74,7 +75,9 @@ export async function addStatement(file: { path: string; name: string; mimeType:
 export async function matchAgain(): Promise<Result> {
   const org = await admin();
   if (!org) return { ok: false, error: "Not allowed." };
-  const matched = await autoMatch(await createClient(), org.id, org.reportingCurrency);
+  const db = await createClient();
+  const matched = await autoMatch(db, org.id, org.reportingCurrency);
+  await learnPayees(db, org.id);
   return done(matched ? `${matched} more line${matched === 1 ? "" : "s"} matched.` : "Nothing new to match.");
 }
 
@@ -97,6 +100,7 @@ export async function createFromLine(lineId: string, input: { villaId: string; c
   }).select("id").single();
   if (error || !tx) return { ok: false, error: error?.message.includes("closed") ? "That month is closed for this villa." : "Could not save. Try again." };
   await db.from("bank_lines").update({ status: "matched", transaction_id: tx.id, matched_by: "created" }).eq("id", lineId);
+  await learnPayees(db, org.id);
   revalidatePath("/transactions");
   revalidatePath("/overview");
   return done();
@@ -184,7 +188,9 @@ export async function linkLine(lineId: string, transactionId: string): Promise<R
   const db = await createClient();
   const { error } = await db.from("bank_lines").update({ status: "matched", transaction_id: transactionId, matched_by: "manual" })
     .eq("id", lineId).eq("organization_id", org.id).eq("status", "unmatched");
-  return error ? { ok: false, error: "Could not link. Try again." } : done();
+  if (error) return { ok: false, error: "Could not link. Try again." };
+  await learnPayees(db, org.id);
+  return done();
 }
 
 /** Links an incoming transfer to the stay it pays (a deposit, the balance, an extension); the income is already booked. */
