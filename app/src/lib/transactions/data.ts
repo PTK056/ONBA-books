@@ -24,6 +24,8 @@ export interface Tx {
   amountReporting: number;
   stayCode: string | null;
   files: TxFile[];
+  /** Shares of the same split expense, one per villa (null when not split). */
+  splitGroup: string | null;
 }
 
 export interface TxFilters {
@@ -40,13 +42,13 @@ type Member = Extract<CurrentOrg, { kind: "member" }>;
 
 type Row = {
   id: string; date: string; direction: "in" | "out"; source: Tx["source"]; description: string | null;
-  amount: number; currency: string; fx_rate: number; amount_reporting: number; villa_id: string;
+  amount: number; currency: string; fx_rate: number; amount_reporting: number; villa_id: string; split_group: string | null;
   category: { id: string; name: string } | null;
   stay: { external_ref: string | null } | null;
   evidence: { id: string; storage_path: string; mime_type: string; extracted: { merchant?: string | null } | null }[];
 };
 
-const SELECT = "id, date, direction, source, description, amount, currency, fx_rate, amount_reporting, villa_id, category:categories (id, name), stay:stays (external_ref), evidence (id, storage_path, mime_type, extracted)";
+const SELECT = "id, date, direction, source, description, amount, currency, fx_rate, amount_reporting, villa_id, split_group, category:categories (id, name), stay:stays (external_ref), evidence (id, storage_path, mime_type, extracted)";
 
 function toTx(r: Row, villaNames: Map<string, string>): Tx {
   return {
@@ -64,6 +66,7 @@ function toTx(r: Row, villaNames: Map<string, string>): Tx {
     amountReporting: Number(r.amount_reporting),
     stayCode: r.stay?.external_ref ?? null,
     files: (r.evidence ?? []).map((e) => ({ id: e.id, path: e.storage_path, mime: e.mime_type })),
+    splitGroup: r.split_group,
   };
 }
 
@@ -116,7 +119,13 @@ export async function listTransactions(f: TxFilters): Promise<
 
 export interface TxFileLinks extends TxFile { name: string; viewUrl: string | null; downloadUrl: string | null }
 
-export async function getTransaction(id: string): Promise<{ org: Member; tx: Tx; files: TxFileLinks[]; closed: boolean; categories: { id: string; name: string; kind: string }[] } | null> {
+export interface SplitShare { id: string; villa: string; amount: number }
+
+export async function getTransaction(id: string): Promise<{
+  org: Member; tx: Tx; files: TxFileLinks[]; closed: boolean; categories: { id: string; name: string; kind: string }[];
+  /** All the shares of a split expense, this one included; empty when not split. */
+  shares: SplitShare[];
+} | null> {
   await connection();
   const org = await getCurrentOrg();
   if (org.kind !== "member") return null;
@@ -125,12 +134,17 @@ export async function getTransaction(id: string): Promise<{ org: Member; tx: Tx;
   if (!data) return null;
   const tx = toTx(data as unknown as Row, new Map(places(org).map((v) => [v.id, v.name])));
 
-  const [files, close, categories] = await Promise.all([
+  const names = new Map(places(org).map((v) => [v.id, v.name]));
+  const [files, close, categories, split] = await Promise.all([
     signFiles(tx),
     db.from("month_closes").select("status").eq("villa_id", tx.villa.id).eq("month", `${tx.date.slice(0, 7)}-01`).maybeSingle(),
     db.from("categories").select("id, name, kind").eq("organization_id", org.id).is("archived_at", null).order("name"),
+    tx.splitGroup
+      ? db.from("transactions").select("id, villa_id, amount").eq("organization_id", org.id).eq("split_group", tx.splitGroup).order("amount", { ascending: false })
+      : Promise.resolve({ data: [] as { id: string; villa_id: string; amount: number }[] }),
   ]);
-  return { org, tx, files, closed: close.data?.status === "closed", categories: categories.data ?? [] };
+  const shares = (split.data ?? []).map((s) => ({ id: s.id, villa: names.get(s.villa_id) ?? "", amount: Number(s.amount) }));
+  return { org, tx, files, closed: close.data?.status === "closed", categories: categories.data ?? [], shares };
 }
 
 /** View links for a transaction's files; downloads go through /documents/file/<id>, which logs them. */

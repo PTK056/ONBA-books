@@ -23,5 +23,9 @@ async function Content() {
   if (org.kind === "none") redirect("/setup");
   if (org.role !== "admin" || !org.company) notFound();
   const bank = await bankSettings(await createClient(), org.id);
-  return <SettingsForms company={org.company.name} villaCount={org.villas.length} bank={bank} />;
+  return (
+    <SettingsForms
+      company={org.company.name} villas={org.villas} defaultCurrency={org.villas[0]?.currency ?? org.reportingCurrency} bank={bank}
+    />
+  );
 }

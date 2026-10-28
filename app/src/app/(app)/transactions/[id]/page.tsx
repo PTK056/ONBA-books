@@ -27,7 +27,7 @@ async function Content({ params, searchParams }: Pick<PageProps<"/transactions/[
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const data = await getTransaction(id);
   if (!data) redirect("/transactions");
-  const { org, tx, files, closed, categories } = data;
+  const { org, tx, files, closed, categories, shares } = data;
   const cur = org.reportingCurrency;
   const editor = org.role !== "owner_viewer";
   const editable = editor && !closed && (tx.source === "manual" || tx.source === "receipt" || tx.source === "module");
@@ -50,6 +50,24 @@ async function Content({ params, searchParams }: Pick<PageProps<"/transactions/[
           <p className="mt-1 text-sm text-zinc-500">{tx.category?.name ?? "No category"}{tx.stayCode && ` · ${tx.stayCode}`}</p>
         </div>
       </div>
+
+      {shares.length > 1 && (
+        <section className="card p-4 text-sm">
+          <p className="font-medium">
+            Shared expense: {money(shares.reduce((s, x) => s + x.amount, 0), tx.currency)} {tx.currency} split between {shares.length} villas
+          </p>
+          <ul className="mt-2 flex flex-col gap-1">
+            {shares.map((s) => (
+              <li key={s.id} className="flex justify-between gap-4">
+                {s.id === tx.id ? <span className="font-medium">{s.villa} (this one)</span>
+                  : <Link href={`/transactions/${s.id}`} className="text-zinc-600 hover:underline dark:text-zinc-300">{s.villa}</Link>}
+                <span className="tabular-nums">{money(s.amount, tx.currency)}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-zinc-500">Each share has its own copy of the receipt. Deleting one deletes the whole split.</p>
+        </section>
+      )}
 
       {closed && (
         <p className="flex items-center gap-2 rounded-lg bg-zinc-100 px-4 py-2.5 text-sm text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
@@ -105,7 +123,7 @@ async function Content({ params, searchParams }: Pick<PageProps<"/transactions/[
           ) : (
             <p className="text-sm text-zinc-500">Correct the date, amount, category or villa if needed.</p>
           )}
-          {(tx.source === "manual" || tx.source === "module") && <div className="mt-4 border-t border-zinc-100 pt-4 dark:border-zinc-800"><DeleteEntry id={tx.id} /></div>}
+          {(tx.source === "manual" || tx.source === "module") && <div className="mt-4 border-t border-zinc-100 pt-4 dark:border-zinc-800"><DeleteEntry id={tx.id} shares={shares.length} /></div>}
         </section>
       )}
     </>

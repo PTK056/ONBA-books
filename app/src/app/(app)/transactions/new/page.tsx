@@ -29,7 +29,7 @@ async function Form({ searchParams }: Pick<PageProps<"/transactions/new">, "sear
     <div className="card p-6">
       <TxForm
         mode="create" organizationId={org.id} reportingCurrency={org.reportingCurrency}
-        villas={places(org)} categories={categories ?? []}
+        villas={places(org)} categories={categories ?? []} splitVillas={org.villas}
         initial={{ direction: type === "income" ? "in" : "out", villaId: (await selectedPlace(org))?.id }}
       />
     </div>

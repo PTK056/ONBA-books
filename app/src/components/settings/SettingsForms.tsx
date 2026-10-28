@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { renameCompany, saveBankSettings, type Result } from "@/app/(app)/settings/actions";
+import { addVilla, renameCompany, renameVilla, saveBankSettings, type Result } from "@/app/(app)/settings/actions";
 import type { BankSettings, Bearer } from "@/lib/settings";
 
 const field = "h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-900";
@@ -20,12 +20,59 @@ function useSave() {
   return { ...state, pending, save };
 }
 
-export function SettingsForms({ company, villaCount, bank }: { company: string; villaCount: number; bank: BankSettings }) {
+type Villa = { id: string; name: string; currency: string };
+
+export function SettingsForms({ company, villas, defaultCurrency, bank }: { company: string; villas: Villa[]; defaultCurrency: string; bank: BankSettings }) {
   return (
     <div className="flex flex-col gap-6">
+      <Villas villas={villas} defaultCurrency={defaultCurrency} />
       <CompanyName name={company} />
-      <BankForm bank={bank} villaCount={villaCount} company={company} />
+      <BankForm bank={bank} villaCount={villas.length} company={company} />
     </div>
+  );
+}
+
+function Villas({ villas, defaultCurrency }: { villas: Villa[]; defaultCurrency: string }) {
+  const [name, setName] = useState("");
+  const [currency, setCurrency] = useState(defaultCurrency);
+  const { error, pending, save } = useSave();
+  return (
+    <section className="card flex flex-col gap-3 p-5">
+      <div>
+        <h2 className="font-semibold">Your villas</h2>
+        <p className="text-sm text-zinc-500">Each villa has its own figures, receipts and month close. Rename one by editing its name.</p>
+      </div>
+      <div className="flex flex-col gap-2">
+        {villas.map((v) => <VillaName key={v.id} villa={v} />)}
+      </div>
+      <form className="flex flex-wrap items-end gap-2 border-t border-zinc-100 pt-3 dark:border-zinc-800"
+        action={() => save(async () => { const r = await addVilla(name, currency); if (r.ok) setName(""); return r; })}>
+        <label className="flex min-w-56 flex-1 flex-col gap-1 text-sm font-medium">
+          Add a villa
+          <input className={field} value={name} onChange={(e) => setName(e.target.value)} placeholder="Villa name" maxLength={80} />
+        </label>
+        <label className="flex w-24 flex-col gap-1 text-sm font-medium">
+          Currency
+          <input className={`${field} uppercase`} value={currency} maxLength={3}
+            onChange={(e) => setCurrency(e.target.value.toUpperCase().replace(/[^A-Z]/g, ""))} />
+        </label>
+        <button className={primary} disabled={pending || !name.trim()}>Add</button>
+      </form>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+    </section>
+  );
+}
+
+function VillaName({ villa }: { villa: Villa }) {
+  const [value, setValue] = useState(villa.name);
+  const { error, pending, save } = useSave();
+  return (
+    <form className="flex flex-wrap items-center gap-2" action={() => save(() => renameVilla(villa.id, value))}>
+      <input className={`${field} min-w-56 flex-1`} value={value} onChange={(e) => setValue(e.target.value)} aria-label="Villa name" maxLength={80} />
+      <span className="w-12 text-sm text-zinc-500">{villa.currency}</span>
+      {value.trim() !== villa.name && <button className={primary} disabled={pending}>Save</button>}
+      {error && <p className="w-full text-sm text-red-600">{error}</p>}
+    </form>
   );
 }
 

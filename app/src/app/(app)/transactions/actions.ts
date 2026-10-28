@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentOrg, places } from "@/lib/org";
+import { splitAmounts, SplitError, type Split } from "@/lib/split/book";
 import { documentFileName } from "@/lib/transactions/names";
 import { createClient } from "@/lib/supabase/server";
 import { logDownload } from "@/lib/downloads";
@@ -51,9 +52,14 @@ async function rateFor(orgId: string, reporting: string, currency: string, enter
 const friendly = (message: string) =>
   message.includes("closed") ? "That month is closed for this villa. Use a date in an open month." : "Could not save. Try again.";
 
-export async function createTransaction(input: TxInput, file: { path: string; mimeType: string } | null): Promise<TxResult> {
+/** With `split`, one entry per villa in shares (input.villaId is ignored), each with its own copy of the receipt. */
+export async function createTransaction(input: TxInput, file: { path: string; mimeType: string } | null, split?: Split): Promise<TxResult> {
   const org = await editor();
   if (!org) return { ok: false, error: "Only admins and staff can add entries." };
+  if (split) {
+    if (!split.villaIds.every((id) => org.villas.some((v) => v.id === id))) return { ok: false, error: "Choose the villas to split between." };
+    input = { ...input, villaId: split.villaIds[0] };
+  }
   const problem = invalid(input, new Set(places(org).map((v) => v.id)));
   if (problem) return { ok: false, error: problem };
   const fx = await rateFor(org.id, org.reportingCurrency, input.currency, input.fxRate);
@@ -61,19 +67,40 @@ export async function createTransaction(input: TxInput, file: { path: string; mi
   if (file && !file.path.startsWith(`${org.id}/`)) return { ok: false, error: "Unknown file." };
 
   const db = await createClient();
-  const { data, error } = await db.from("transactions").insert({
-    organization_id: org.id, villa_id: input.villaId, date: input.date, direction: input.direction,
+  const entry = {
+    organization_id: org.id, date: input.date, direction: input.direction,
     category_id: input.categoryId, description: input.description.trim() || null,
-    currency: input.currency, amount: input.amount, fx_rate: fx, status: "validated", source: "manual",
-  }).select("id").single();
-  if (error || !data) return { ok: false, error: friendly(error?.message ?? "") };
+    currency: input.currency, fx_rate: fx, status: "validated", source: "manual",
+  };
+  let rows: (typeof entry & { villa_id: string; amount: number; split_group?: string })[];
+  if (split) {
+    let amounts: number[];
+    try { amounts = await splitAmounts(db, org.id, input.amount, input.date, split); }
+    catch (e) { return { ok: false, error: e instanceof SplitError ? e.message : "Could not split. Try again." }; }
+    const group = crypto.randomUUID();
+    rows = split.villaIds.map((villa_id, i) => ({ ...entry, villa_id, amount: amounts[i], split_group: group })).filter((r) => r.amount > 0);
+  } else {
+    rows = [{ ...entry, villa_id: input.villaId, amount: input.amount }];
+  }
+  const { data, error } = await db.from("transactions").insert(rows).select("id");
+  if (error || !data?.length) return { ok: false, error: friendly(error?.message ?? "") };
 
   if (file) {
-    await db.from("evidence").insert({ organization_id: org.id, transaction_id: data.id, storage_path: file.path, mime_type: file.mimeType });
+    // One copy of the receipt per share: each villa's owner sees the proof of their share.
+    const ext = file.path.split(".").pop();
+    for (const [i, tx] of data.entries()) {
+      let path = file.path;
+      if (i > 0) {
+        path = `${org.id}/${crypto.randomUUID()}.${ext}`;
+        const { error: copyErr } = await db.storage.from("evidence").copy(file.path, path);
+        if (copyErr) continue;
+      }
+      await db.from("evidence").insert({ organization_id: org.id, transaction_id: tx.id, storage_path: path, mime_type: file.mimeType });
+    }
   }
   revalidatePath("/transactions");
   revalidatePath("/overview");
-  return { ok: true, id: data.id };
+  return { ok: true, id: data[0].id };
 }
 
 /** Attaches an uploaded file to an entry. Allowed in closed months too: it documents, it doesn't change figures. */
@@ -118,8 +145,11 @@ export async function deleteTransaction(id: string): Promise<TxResult> {
   const org = await editor();
   if (!org || !UUID.test(id)) return { ok: false, error: "Only admins and staff can delete entries." };
   const db = await createClient();
+  // A share of a split entry goes with the other shares: the split is deleted as a whole.
+  const { data: tx } = await db.from("transactions").select("split_group").eq("id", id).maybeSingle();
   // Entries from a receipt stay linked to their reviewed receipt; they are corrected, not deleted.
-  const { data, error } = await db.from("transactions").delete().eq("id", id).in("source", ["manual", "module"]).select("id");
+  const target = tx?.split_group ? db.from("transactions").delete().eq("split_group", tx.split_group) : db.from("transactions").delete().eq("id", id);
+  const { data, error } = await target.in("source", ["manual", "module"]).select("id");
   if (error) return { ok: false, error: friendly(error.message) };
   if (!data?.length) return { ok: false, error: "Only entries added by hand can be deleted; correct the others instead." };
   revalidatePath("/transactions");

@@ -105,7 +105,7 @@ export function AttachReceipt({ transactionId, organizationId, label = "Attach r
   );
 }
 
-export function DeleteEntry({ id }: { id: string }) {
+export function DeleteEntry({ id, shares = 0 }: { id: string; shares?: number }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,7 +119,7 @@ export function DeleteEntry({ id }: { id: string }) {
   }
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
-      <span>Delete this entry for good?</span>
+      <span>{shares > 1 ? `Delete the ${shares} shares of this expense for good?` : "Delete this entry for good?"}</span>
       <button
         disabled={pending}
         onClick={() => start(async () => {

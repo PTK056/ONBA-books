@@ -117,9 +117,3 @@ export function days(a: string, b: string): number {
   return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
 }
 
-/** Splits an amount in equal shares to the cent; the cents left over go to the first shares. */
-export function equalShares(amount: number, n: number): number[] {
-  const cents = Math.round(amount * 100);
-  const base = Math.floor(cents / n);
-  return Array.from({ length: n }, (_, i) => (base + (i < cents - base * n ? 1 : 0)) / 100);
-}

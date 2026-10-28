@@ -4,7 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
 import { autoMatch, CHARGE, ingestStatement, INTEREST, WITHHELD_TAX } from "@/lib/bank/ops";
 import { readStatementPdf, StatementError } from "@/lib/bank/statement-pdf";
-import { equalShares } from "@/lib/bank/match";
+import { equalShares } from "@/lib/split/shares";
 import { getCurrentOrg, places } from "@/lib/org";
 import { bankSettings, type Bearer } from "@/lib/settings";
 import { createClient } from "@/lib/supabase/server";
