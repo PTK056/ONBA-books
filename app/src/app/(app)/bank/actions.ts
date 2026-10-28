@@ -179,6 +179,19 @@ export async function linkLine(lineId: string, transactionId: string): Promise<R
   return error ? { ok: false, error: "Could not link. Try again." } : done();
 }
 
+/** Links an incoming transfer to the stay it pays (a deposit, the balance, an extension); the income is already booked. */
+export async function linkStay(lineId: string, stayId: string): Promise<Result> {
+  const org = await admin();
+  if (!org || !UUID.test(lineId) || !UUID.test(stayId)) return { ok: false, error: "Not allowed." };
+  const db = await createClient();
+  const { data: line } = await db.from("bank_lines").select("status, direction").eq("id", lineId).eq("organization_id", org.id).single();
+  if (!line || line.status !== "unmatched" || line.direction !== "in") return { ok: false, error: "This line was already handled." };
+  const { error } = await db.from("bank_line_stays").insert({ organization_id: org.id, line_id: lineId, stay_id: stayId });
+  if (error) return { ok: false, error: "Could not link. Try again." };
+  await db.from("bank_lines").update({ status: "matched", matched_by: "manual" }).eq("id", lineId);
+  return done();
+}
+
 export async function markPersonal(lineId: string): Promise<Result> {
   const org = await admin();
   if (!org || !UUID.test(lineId)) return { ok: false, error: "Not allowed." };

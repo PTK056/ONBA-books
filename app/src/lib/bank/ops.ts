@@ -71,7 +71,8 @@ export async function autoMatch(db: SupabaseClient, orgId: string, reportingCurr
       .eq("organization_id", orgId).eq("status", "validated").is("stay_id", null).gte("date", from).lte("date", to),
     db.from("bank_lines").select("transaction_id").eq("organization_id", orgId).not("transaction_id", "is", null),
     db.from("stays").select("id, check_in, check_out, payout_date, transactions (direction, amount_reporting, status)")
-      .eq("organization_id", orgId).gte("check_in", from).lte("check_in", to),
+      // Any stay a line could pay: a deposit up to three months before arrival, an extension until just after departure.
+      .eq("organization_id", orgId).gte("check_out", shift(from, -5)).lte("check_in", shift(to, 90)),
     db.from("bank_line_stays").select("stay_id").eq("organization_id", orgId),
   ]);
   const used = new Set((taken ?? []).map((t) => t.transaction_id as string));

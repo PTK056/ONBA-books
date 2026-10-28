@@ -31,8 +31,13 @@ const BEFORE_DAYS = 7;
 const AFTER_DAYS = 3;
 /** Airbnb sends the payout on its date (or about a day after check-in); the bank shows it up to a few days later. */
 const PAYOUT_DAYS = 5;
-/** A long stay can be paid in instalments; the last one arrives by a few days after check-out. */
+/**
+ * A stay can be paid in instalments: a deposit when booking (weeks before arrival), the rest on arrival, an extension
+ * during the stay. They arrive between INSTALMENT_BEFORE_CHECKIN days before arrival and a few days after departure.
+ */
+const INSTALMENT_BEFORE_CHECKIN = 90;
 const INSTALMENT_AFTER_CHECKOUT = 5;
+const MAX_INSTALMENTS = 3;
 
 export function matchLines(lines: BankLineIn[], entries: BookEntry[], stays: StayNet[], reportingCurrency: string): Match[] {
   type Pair = { line: BankLineIn; key: string; match: Match; gap: number };
@@ -75,28 +80,35 @@ export function matchLines(lines: BankLineIn[], entries: BookEntry[], stays: Sta
   return [...out, ...instalments(lines, stays, out, reportingCurrency)];
 }
 
-/** A stay still unpaid after the first pass, paid in two transfers: only when exactly one pair of lines adds up. */
+/** A stay still unpaid after the first pass, paid in 2 or 3 transfers: only when exactly one combination adds up. */
 function instalments(lines: BankLineIn[], stays: StayNet[], done: Match[], reportingCurrency: string): Match[] {
   const usedLines = new Set(done.map((m) => m.lineId));
   const paid = new Set(done.flatMap((m) => (m.kind === "stays" ? m.stayIds : [])));
   const free = lines.filter((l) => !usedLines.has(l.id) && l.direction === "in" && l.currency === reportingCurrency);
-  const found: { stay: StayNet; a: BankLineIn; b: BankLineIn }[] = [];
+  const found: { stay: StayNet; lines: BankLineIn[] }[] = [];
   for (const x of stays) {
     if (x.payoutDate || paid.has(x.id)) continue;
-    const window = free.filter((l) => days(x.checkIn, l.date) >= -1 && days(x.checkOut, l.date) <= INSTALMENT_AFTER_CHECKOUT);
-    const options: { a: BankLineIn; b: BankLineIn }[] = [];
-    for (const a of window) {
-      const gap = days(x.checkIn, a.date);
-      if (gap < -1 || gap > PAYOUT_DAYS) continue; // the first instalment comes right after check-in
-      for (const b of window) if (b !== a && b.date >= a.date && near(a.amount + b.amount, x.netReporting)) options.push({ a, b });
-    }
-    if (options.length === 1) found.push({ stay: x, ...options[0] });
+    const window = free.filter((l) => days(l.date, x.checkIn) <= INSTALMENT_BEFORE_CHECKIN && days(x.checkOut, l.date) <= INSTALMENT_AFTER_CHECKOUT);
+    const options = combinations(window, MAX_INSTALMENTS).filter((c) => c.length >= 2 && near(c.reduce((s, l) => s + l.amount, 0), x.netReporting));
+    if (options.length === 1) found.push({ stay: x, lines: options[0] });
   }
   // A line claimed by two stays is ambiguous: neither gets it.
-  const claims = groupBy(found.flatMap((f) => [f.a.id, f.b.id]), (id) => id);
+  const claims = groupBy(found.flatMap((f) => f.lines.map((l) => l.id)), (id) => id);
   return found
-    .filter((f) => claims.get(f.a.id)!.length === 1 && claims.get(f.b.id)!.length === 1)
-    .flatMap((f) => [f.a, f.b].map((l) => ({ lineId: l.id, kind: "stays" as const, stayIds: [f.stay.id] })));
+    .filter((f) => f.lines.every((l) => claims.get(l.id)!.length === 1))
+    .flatMap((f) => f.lines.map((l) => ({ lineId: l.id, kind: "stays" as const, stayIds: [f.stay.id] })));
+}
+
+/** Every subset of up to k items (a stay's window holds a handful of transfers, so this stays small). */
+function combinations<T>(xs: T[], k: number): T[][] {
+  const out: T[][] = [];
+  const walk = (from: number, acc: T[]) => {
+    if (acc.length) out.push(acc);
+    if (acc.length === k) return;
+    for (let i = from; i < xs.length; i++) walk(i + 1, [...acc, xs[i]]);
+  };
+  walk(0, []);
+  return out;
 }
 
 const sum = (xs: StayNet[]) => xs.reduce((s, x) => s + x.netReporting, 0);

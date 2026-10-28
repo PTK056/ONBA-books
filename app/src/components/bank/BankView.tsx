@@ -1,10 +1,10 @@
 "use client";
 
-import { AlertTriangle, Check, Copy, FileText, Link2, Undo2, UserRound } from "lucide-react";
+import { AlertTriangle, BedDouble, Check, Copy, FileText, Link2, Undo2, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
-import { addStatement, bookCharges, createFromLine, linkLine, markPersonal, resetLine, type Result } from "@/app/(app)/bank/actions";
+import { addStatement, bookCharges, createFromLine, linkLine, linkStay, markPersonal, resetLine, type Result } from "@/app/(app)/bank/actions";
 import { money } from "@/components/overview/format";
 import type { BankLineRow, BankStatementRow } from "@/lib/bank/data";
 import { shortDate } from "@/lib/format/date";
@@ -187,6 +187,12 @@ function TodoLine({ line, villas, categories, reportingCurrency }: { line: BankL
           <button key={s.id} className={small} disabled={pending} onClick={() => go(() => linkLine(line.id, s.id))}
             title="This line is that entry">
             <Link2 size={13} /> {shortDate(s.date)} {s.category ?? ""} {s.description && `· ${s.description}`}
+          </button>
+        ))}
+        {line.stays.map((x) => (
+          <button key={x.id} className={small} disabled={pending} onClick={() => go(() => linkStay(line.id, x.id))}
+            title="This transfer pays this stay (deposit, balance or extension); its income is already in the books">
+            <BedDouble size={13} /> Pays the stay of {x.guest ?? x.platform}, {shortDate(x.checkIn)} → {shortDate(x.checkOut)}
           </button>
         ))}
         {line.template && (

@@ -16,7 +16,10 @@ export interface BankLineRow {
   suggestions: Suggestion[];
   /** A monthly payment whose month is missing: book it like the neighbouring month's entry. */
   template: Template | null;
+  /** Incoming: stays this transfer could pay (deposit before arrival, balance, extension). */
+  stays: StaySuggestion[];
 }
+export interface StaySuggestion { id: string; guest: string | null; platform: string; checkIn: string; checkOut: string }
 
 const AROUND_DAYS = 45; // wide enough to see last month's and next month's entries
 
@@ -59,6 +62,20 @@ export async function bankPage(db: SupabaseClient, orgId: string) {
       villaId: t.villa_id, categoryId: t.category_id, category: t.category?.name ?? null, description: t.description, linked: used.has(t.id),
     })));
   }
+  // Stays an incoming transfer could pay: arrival up to 90 days after it, or departure up to 5 days before it.
+  const incoming = open.filter((r) => r.direction === "in");
+  let staysAround: StaySuggestion[] = [];
+  if (incoming.length) {
+    const dates = incoming.map((r) => r.date).sort();
+    const { data } = await db.from("stays").select("id, guest_name, platform, check_in, check_out")
+      .eq("organization_id", orgId).gte("check_out", shift(dates[0], -5)).lte("check_in", shift(dates.at(-1)!, 90)).order("check_in");
+    staysAround = (data ?? []).map((x) => ({ id: x.id, guest: x.guest_name, platform: x.platform, checkIn: x.check_in, checkOut: x.check_out }));
+  }
+  const staysFor = (date: string) => staysAround
+    .filter((x) => shift(date, 90) >= x.checkIn && shift(x.checkOut, 5) >= date)
+    .sort((a, b) => Math.abs(Date.parse(a.checkIn) - Date.parse(date)) - Math.abs(Date.parse(b.checkIn) - Date.parse(date)))
+    .slice(0, 3);
+
   const near = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) <= LINK_DAYS * 86_400_000;
 
   const out: BankLineRow[] = rows.map((r) => {
@@ -73,10 +90,11 @@ export async function bankPage(db: SupabaseClient, orgId: string) {
       .slice(0, 3)
       .map((t) => ({ id: t.id, date: t.date, description: t.description ?? "", category: t.category }));
     const template = r.status === "unmatched" ? monthlyTemplate(line, around) : null;
+    const payable = r.status === "unmatched" && r.direction === "in" ? staysFor(r.date) : [];
     return {
       id: r.id, statementId: r.statement_id, account: accountName.get(r.account_id) ?? "", date: r.date, direction: r.direction,
       amount: Number(r.amount), currency: r.currency, description: r.description, counterparty: r.counterparty,
-      status: r.status, matchedBy: r.matched_by, linkedTo, suggestions, template,
+      status: r.status, matchedBy: r.matched_by, linkedTo, suggestions, template, stays: payable,
     };
   });
 

@@ -71,3 +71,18 @@ test("a long stay paid in two instalments links both lines", () => {
   assert.deepEqual(out.map((m) => m.lineId + (m.kind === "stays" ? m.stayIds.join() : "")).sort(), ["L1S1", "L2S1", "L3S2"]);
 });
 
+
+// Real case (direct booking): half when booking, the rest on arrival, then an extension; the stay's net is the sum.
+test("a direct booking paid as deposit, balance on arrival and an extension links all three", () => {
+  const out = matchLines(
+    [line("L1", "2026-02-05", 18_500_000, "in"), line("L2", "2026-03-28", 21_500_000, "in"), line("L3", "2026-04-09", 20_000_000, "in"), line("L4", "2026-05-09", 320_000, "in")],
+    [], [stay("S1", "2026-03-28", "2026-05-10", 60_000_000)], "IDR");
+  assert.deepEqual(out.map((m) => m.lineId).sort(), ["L1", "L2", "L3"]);
+});
+
+test("two combinations that add up: left for a person", () => {
+  const out = matchLines(
+    [line("L1", "2026-03-01", 500, "in"), line("L2", "2026-03-02", 500, "in"), line("L3", "2026-03-03", 500, "in")],
+    [], [stay("S1", "2026-03-10", "2026-03-12", 1000)], "IDR");
+  assert.deepEqual(out, []);
+});
