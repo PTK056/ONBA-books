@@ -129,7 +129,7 @@ export function StaffForm({ person, villas, categories, currency, onDone }: {
 /** A collapsible "Add person" panel. */
 export function AddStaff(props: { villas: Option[]; categories: Option[]; currency: string }) {
   const [open, setOpen] = useState(false);
-  if (!open) return <button onClick={() => setOpen(true)} className={`${primary} inline-flex items-center gap-1.5`}><Plus size={15} />Add person</button>;
+  if (!open) return <button onClick={() => setOpen(true)} className={`${secondary} inline-flex items-center gap-1.5 font-medium`}><Plus size={15} />Add person</button>;
   return <div className="card w-full p-5"><StaffForm {...props} onDone={() => setOpen(false)} /></div>;
 }
 
@@ -140,7 +140,7 @@ export function EditStaff({ person, ...props }: { person: Staff; villas: Option[
 }
 
 /** Log a day of work: hours, jobs or an extra amount. */
-export function LogForm({ staff, villas, today }: { staff: Staff[]; villas: Option[]; today: string }) {
+export function LogForm({ staff, villas, today, onDone }: { staff: Staff[]; villas: Option[]; today: string; onDone?: () => void }) {
   const { error, pending, go } = useAction();
   const [staffId, setStaffId] = useState(staff[0]?.id ?? "");
   const person = staff.find((p) => p.id === staffId);
@@ -152,7 +152,7 @@ export function LogForm({ staff, villas, today }: { staff: Staff[]; villas: Opti
       staff_id: staffId, date: get("date"), villa_id: get("villa_id") || null,
       hours: byHours ? Number(get("hours")) || null : null, jobs: !byHours ? Number(get("jobs")) || null : null,
       extra_amount: amount(get("extra_amount"), person?.currency ?? ""), task: get("task"),
-    }));
+    }), onDone);
   }
 
   if (!staff.length) return <p className="text-sm text-zinc-500">Add a person first.</p>;
@@ -173,8 +173,11 @@ export function LogForm({ staff, villas, today }: { staff: Staff[]; villas: Opti
           <option value="">{villas.length === 1 ? villas[0].name : "Their villa"}</option>{villas.length > 1 && villas.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
         </select>
       </label>
-      <label className={`${label} sm:col-span-5`}>Task<input name="task" placeholder="Full cleaning, garden, check-in…" className={field} /></label>
-      <button disabled={pending} className={primary}>{pending ? "Saving…" : "Log work"}</button>
+      <label className={`${label} sm:col-span-6`}>Task<input name="task" placeholder="Full cleaning, garden, check-in…" className={field} /></label>
+      <div className="flex gap-2 sm:col-span-6">
+        <button disabled={pending} className={primary}>{pending ? "Saving…" : "Log work"}</button>
+        {onDone && <button type="button" onClick={onDone} className={secondary}>Cancel</button>}
+      </div>
       {error && <p className="text-sm text-red-600 sm:col-span-6">{error}</p>}
     </form>
   );
@@ -206,7 +209,7 @@ export function PayButton({ runId, today }: { runId: string; today: string }) {
     <div className="flex flex-col items-end gap-1">
       <div className="flex items-center gap-2">
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Payment date" className="h-9 rounded-lg border border-zinc-300 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
-        <button disabled={pending} onClick={() => go(() => pay(runId, date))} className="h-9 rounded-lg bg-zinc-900 px-3 text-sm font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900">{pending ? "…" : "Mark paid"}</button>
+        <button disabled={pending} onClick={() => go(() => pay(runId, date))} className="h-9 whitespace-nowrap rounded-lg bg-zinc-900 px-3 text-sm font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900">{pending ? "…" : "Mark paid"}</button>
       </div>
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>

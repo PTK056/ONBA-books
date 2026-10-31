@@ -194,7 +194,7 @@ export async function markPaid(db: SupabaseClient, orgId: string, runId: string,
 }
 
 /** Plain-language summary of a pay computation, e.g. "2,000,000 fixed + 2 extra visits × 150,000". */
-export function describePay(b: PayBreakdown): string {
+export function describePay(b: PayBreakdown, { period = true } = {}): string {
   const n = (x: number) => x.toLocaleString("en");
   const parts: string[] = [];
   const short = (d: string) => `${+d.slice(8, 10)}/${+d.slice(5, 7)}`;
@@ -206,5 +206,5 @@ export function describePay(b: PayBreakdown): string {
   if (b.mode === "per_job") parts.push(`${n(b.jobs ?? 0)} job${b.jobs === 1 ? "" : "s"} × ${n(b.job_rate ?? 0)}`);
   if (b.one_off_extras) parts.push(`+ ${n(b.one_off_extras)} extras`);
   // Pay prepared before periods existed has none recorded.
-  return b.period ? `${parts.join(", ")} (work ${short(b.period.from)}–${short(b.period.to)})` : parts.join(", ");
+  return period && b.period ? `${parts.join(", ")} (work ${short(b.period.from)}–${short(b.period.to)})` : parts.join(", ");
 }
