@@ -42,9 +42,12 @@ export async function accountStatus(accountId: string): Promise<string> {
   return r.status;
 }
 
-/** Removes the connection at Composio and revokes Google's access. */
-export async function deleteAccount(accountId: string) {
-  await call(`/connected_accounts/${encodeURIComponent(accountId)}?revoke_on_delete=true`, { method: "DELETE" });
+/**
+ * Removes the connection at Composio; with `revoke`, also withdraws Google's access, which Google
+ * applies to every connection of that mailbox through Composio's app, not just this one.
+ */
+export async function deleteAccount(accountId: string, revoke: boolean) {
+  await call(`/connected_accounts/${encodeURIComponent(accountId)}${revoke ? "?revoke_on_delete=true" : ""}`, { method: "DELETE" });
 }
 
 /** A Gmail API GET through Composio's proxy (Composio adds the Google credentials). */

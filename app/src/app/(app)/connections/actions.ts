@@ -47,10 +47,15 @@ export async function disconnectGmail(): Promise<Result> {
   const org = await admin();
   if (!org) return { ok: false, error: "Only admins can disconnect Gmail." };
   const db = await createClient();
-  const { data: conn } = await db.from("mail_connections").select("external_id").eq("organization_id", org.id).maybeSingle();
+  const { data: conn } = await db.from("mail_connections").select("external_id, account_label").eq("organization_id", org.id).maybeSingle();
   if (conn) {
+    // Same mailbox connected for another organization: revoking Google's access would cut that one too.
+    const { count } = conn.account_label
+      ? await adminClient().from("mail_connections").select("id", { count: "exact", head: true })
+          .eq("account_label", conn.account_label).neq("organization_id", org.id)
+      : { count: 0 };
     try {
-      await deleteAccount(conn.external_id);
+      await deleteAccount(conn.external_id, !count);
     } catch (e) {
       console.error("[gmail disconnect]", e); // removed here anyway; Google access can also be revoked from the Google account
     }
