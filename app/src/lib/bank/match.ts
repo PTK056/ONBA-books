@@ -25,6 +25,9 @@ export interface BookEntry {
 /** A stay's net (income minus platform fees) in the reporting currency; payoutDate when the platform export gave it. */
 export interface StayNet { id: string; checkIn: string; checkOut: string; netReporting: number; payoutDate: string | null }
 
+/** A platform payout read from its e-mail: the exact amount sent to the bank and when it should arrive. */
+export interface PayoutIn { key: string; stayId: string; sentOn: string; arrivesBy: string | null; received: number }
+
 export type Match =
   | { lineId: string; kind: "transaction"; transactionId: string }
   | { lineId: string; kind: "stays"; stayIds: string[] };
@@ -34,6 +37,9 @@ const BEFORE_DAYS = 7;
 const AFTER_DAYS = 3;
 /** Airbnb sends the payout on its date (or about a day after check-in); the bank shows it up to a few days later. */
 const PAYOUT_DAYS = 5;
+/** A payout read from its e-mail: Airbnb gives the latest arrival date; allow a few days for weekends and holidays. */
+const ARRIVES_BY_SLACK = 3;
+const ARRIVES_BY_DEFAULT = 7;
 /**
  * A stay can be paid in instalments: a deposit when booking (weeks before arrival), the rest on arrival, an extension
  * during the stay. They arrive between INSTALMENT_BEFORE_CHECKIN days before arrival and a few days after departure.
@@ -42,7 +48,7 @@ const INSTALMENT_BEFORE_CHECKIN = 90;
 const INSTALMENT_AFTER_CHECKOUT = 5;
 const MAX_INSTALMENTS = 3;
 
-export function matchLines(lines: BankLineIn[], entries: BookEntry[], stays: StayNet[], reportingCurrency: string): Match[] {
+export function matchLines(lines: BankLineIn[], entries: BookEntry[], stays: StayNet[], reportingCurrency: string, payouts: PayoutIn[] = []): Match[] {
   type Pair = { line: BankLineIn; key: string; match: Match; gap: number };
   const pairs: Pair[] = [];
   const named = namesOf(lines);
@@ -61,6 +67,13 @@ export function matchLines(lines: BankLineIn[], entries: BookEntry[], stays: Sta
       pairs.push({ line, key: `t:${e.id}`, gap: Math.abs(gap) - (fit === "this" ? 100 : 0), match: { lineId: line.id, kind: "transaction", transactionId: e.id } });
     }
     if (line.direction === "in" && line.currency === reportingCurrency) {
+      // Payouts read from e-mails: the exact amount, between the day it was sent and the day it should have arrived.
+      for (const p of payouts) {
+        const gap = days(p.sentOn, line.date);
+        const until = (p.arrivesBy ? days(p.sentOn, p.arrivesBy) : ARRIVES_BY_DEFAULT) + ARRIVES_BY_SLACK;
+        if (gap < 0 || gap > until || !near(p.received, line.amount)) continue;
+        pairs.push({ line, key: `po:${p.key}`, gap, match: { lineId: line.id, kind: "stays", stayIds: [p.stayId] } });
+      }
       // Stays the export gave a payout date: one transfer pays all the stays of that date.
       for (const [date, group] of groupBy(stays.filter((x) => x.payoutDate), (x) => x.payoutDate!)) {
         const gap = days(date, line.date);

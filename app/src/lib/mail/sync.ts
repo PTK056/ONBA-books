@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { allocateByNights } from "@/lib/stays/airbnb";
 import { readAirbnbEmail, type AirbnbEmail, type Canceled, type Confirmed } from "@/lib/stays/airbnb-email";
 import { receivedShares, stayFromEmails, type PaidLine } from "@/lib/stays/email-stay";
+import { autoMatch } from "@/lib/bank/ops";
 import { gmailGet } from "./composio";
 
 // Once a day per connected organization (and on "Check now"): fetch the e-mails from Airbnb,
@@ -71,6 +72,11 @@ export async function syncOrganization(db: Db, orgId: string): Promise<SyncSumma
       if (r === "booked") summary.booked++;
     }
     await refreshSupportAlerts(db, orgId);
+    if (codes.size) {
+      // A payout read after the bank statement was added: link its line now.
+      const { data: org } = await db.from("organizations").select("reporting_currency").eq("id", orgId).single();
+      await autoMatch(db, orgId, org!.reporting_currency).catch((e) => console.error("[mail] bank match", orgId, e));
+    }
     const { count } = await db.from("inbound_emails").select("id", { count: "exact", head: true })
       .eq("organization_id", orgId).in("result", ["unrecognised", "alert"]).gte("created_at", startedAt.toISOString());
     summary.attention += count ?? 0;

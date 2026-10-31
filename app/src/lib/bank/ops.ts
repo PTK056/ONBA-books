@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { matchLines, type BookEntry, type StayNet } from "./match";
+import { matchLines, type BookEntry, type PayoutIn, type StayNet } from "./match";
+import { payoutStates } from "./payouts";
 import { payeeKey } from "./payees";
 import type { Statement } from "./statement-pdf";
 
@@ -84,8 +85,13 @@ export async function autoMatch(db: SupabaseClient, orgId: string, reportingCurr
     description: t.description,
   }));
   const paid = new Set((paidStays ?? []).map((x) => x.stay_id as string));
+  // Payouts read from e-mails still on their way; their stays are matched by payout, not by their net.
+  const states = await payoutStates(db, orgId, shift(from, -30));
+  const viaPayouts = new Set(states.filter((p) => p.stayId).map((p) => p.stayId!));
+  const payouts: PayoutIn[] = states.filter((p) => p.stayId && !p.lineId && p.currency === reportingCurrency)
+    .map((p) => ({ key: p.key, stayId: p.stayId!, sentOn: p.sentOn, arrivesBy: p.arrivesBy, received: p.received }));
   type StayRow = { id: string; check_in: string; check_out: string; payout_date: string | null; transactions: { direction: string; amount_reporting: number; status: string }[] };
-  const nets: StayNet[] = ((stays ?? []) as StayRow[]).filter((x) => !paid.has(x.id)).map((x) => ({
+  const nets: StayNet[] = ((stays ?? []) as StayRow[]).filter((x) => !paid.has(x.id) && !viaPayouts.has(x.id)).map((x) => ({
     id: x.id, checkIn: x.check_in, checkOut: x.check_out, payoutDate: x.payout_date,
     netReporting: x.transactions.filter((t) => t.status === "validated")
       .reduce((s, t) => s + (t.direction === "in" ? 1 : -1) * Number(t.amount_reporting), 0),
@@ -93,6 +99,7 @@ export async function autoMatch(db: SupabaseClient, orgId: string, reportingCurr
 
   const matches = matchLines(
     lines.map((l) => ({ ...l, amount: Number(l.amount), text: [l.counterparty, l.description].filter(Boolean).join(" · ") })), entries, nets, reportingCurrency,
+    payouts,
   );
   for (const m of matches) {
     if (m.kind === "transaction") {

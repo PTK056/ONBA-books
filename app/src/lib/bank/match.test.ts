@@ -105,3 +105,27 @@ test("an entry naming the payee goes to that line, not to another line of the sa
   const fee = { ...entry("T1", "2026-10-22", 6458), description: "Frais Wise – transfert #2446401555 (white stones, sulami)" };
   assert.deepEqual(matchLines(lines, [fee], [], "IDR"), [{ lineId: "F1", kind: "transaction", transactionId: "T1" }]);
 });
+
+test("payouts read from e-mails: exact amount, up to a few days after the date Airbnb gives", () => {
+  // Real case: Beck's payout sent 31 Oct, Rp 8,643,874, should arrive by 6 Nov.
+  const beck = { key: "P1|HMAAAA0001", stayId: "S1", sentOn: "2026-10-31", arrivesBy: "2026-11-06", received: 8_643_874 };
+  assert.deepEqual(matchLines([line("L1", "2026-11-05", 8_643_874, "in")], [], [], "IDR", [beck]),
+    [{ lineId: "L1", kind: "stays", stayIds: ["S1"] }]);
+  assert.deepEqual(matchLines([line("L1", "2026-11-09", 8_643_874, "in")], [], [], "IDR", [beck]).length, 1, "a weekend after the date");
+  assert.deepEqual(matchLines([line("L1", "2026-11-12", 8_643_874, "in")], [], [], "IDR", [beck]), [], "too late");
+  assert.deepEqual(matchLines([line("L1", "2026-10-30", 8_643_874, "in")], [], [], "IDR", [beck]), [], "before it was sent");
+  assert.deepEqual(matchLines([line("L1", "2026-11-05", 8_600_000, "in")], [], [], "IDR", [beck]), [], "another amount");
+});
+
+test("a night added after booking is a second payout of the same stay", () => {
+  const first = { key: "P1|HMAAAA0004", stayId: "S4", sentOn: "2026-09-30", arrivesBy: "2026-10-07", received: 18_096_227 };
+  const extra = { key: "P2|HMAAAA0004", stayId: "S4", sentOn: "2026-10-06", arrivesBy: "2026-10-13", received: 1_491_758 };
+  const out = matchLines([line("L1", "2026-10-02", 18_096_227, "in"), line("L2", "2026-10-08", 1_491_758, "in")], [], [], "IDR", [first, extra]);
+  assert.deepEqual(out, [{ lineId: "L1", kind: "stays", stayIds: ["S4"] }, { lineId: "L2", kind: "stays", stayIds: ["S4"] }]);
+});
+
+test("two payouts of the same amount in the same days: left for a person", () => {
+  const a = { key: "P1|A", stayId: "SA", sentOn: "2026-10-01", arrivesBy: "2026-10-08", received: 1_000_000 };
+  const b = { key: "P2|B", stayId: "SB", sentOn: "2026-10-01", arrivesBy: "2026-10-08", received: 1_000_000 };
+  assert.deepEqual(matchLines([line("L1", "2026-10-03", 1_000_000, "in")], [], [], "IDR", [a, b]), []);
+});

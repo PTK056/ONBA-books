@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { addStatement, bookCharges, createFromLine, findEntries, linkLine, linkStay, markPersonal, matchAgain, resetLine, type EntryCandidate, type Result } from "@/app/(app)/bank/actions";
 import { money } from "@/components/overview/format";
-import type { BankLineRow, BankStatementRow } from "@/lib/bank/data";
+import type { BankLineRow, BankStatementRow, ExpectedPayout, UnpaidStay } from "@/lib/bank/data";
 import { shortDate } from "@/lib/format/date";
 import { createClient } from "@/lib/supabase/client";
 
@@ -23,6 +23,8 @@ interface Props {
   categories: (Option & { kind: "income" | "expense" })[];
   statements: BankStatementRow[];
   lines: BankLineRow[];
+  expected: ExpectedPayout[];
+  unpaid: UnpaidStay[];
   /** Where bank fees and interest go, in words (from Settings). */
   chargesTo: string;
 }
@@ -60,6 +62,8 @@ export function BankView(props: Props) {
         </section>
       )}
 
+      <Payouts expected={props.expected} unpaid={props.unpaid} />
+
       {lines.length > 0 && (
         <section className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -77,6 +81,46 @@ export function BankView(props: Props) {
       {matched.length > 0 && <Done title="In your books" lines={matched} />}
       {personal.length > 0 && <Done title="Personal, not in the books" lines={personal} />}
     </div>
+  );
+}
+
+const PAYOUT_STATE: Record<ExpectedPayout["state"], { label: string; tone: string }> = {
+  on_its_way: { label: "On its way", tone: "text-zinc-500" },
+  no_statement_yet: { label: "Add a later statement to check", tone: "text-zinc-500" },
+  late: { label: "Not at the bank", tone: "text-amber-700 dark:text-amber-400" },
+};
+
+/** Airbnb payouts read from e-mails that no bank line has brought yet, and booked stays with no payout at all. */
+function Payouts({ expected, unpaid }: { expected: ExpectedPayout[]; unpaid: UnpaidStay[] }) {
+  if (!expected.length && !unpaid.length) return null;
+  return (
+    <section className="flex flex-col gap-3">
+      <h2 className="text-lg font-semibold">
+        Airbnb payouts on their way <span className="text-zinc-400">· {expected.length + unpaid.length}</span>
+      </h2>
+      <div className="card divide-y divide-zinc-100 dark:divide-zinc-800">
+        {expected.map((p) => {
+          const s = PAYOUT_STATE[p.state];
+          return (
+            <div key={p.key} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-3 text-sm">
+              <span className="font-medium">{p.guest ?? "Guest"}</span>
+              <span className="font-mono text-xs text-zinc-500">{p.code}</span>
+              <span className="tabular-nums">{money(p.received, p.currency)} {p.currency}</span>
+              <span className="text-zinc-500">sent {shortDate(p.sentOn)}{p.arrivesBy ? `, due by ${shortDate(p.arrivesBy)}` : ""}</span>
+              <span className={`ml-auto ${s.tone}`}>{s.label}</span>
+            </div>
+          );
+        })}
+        {unpaid.map((x) => (
+          <div key={x.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-3 text-sm">
+            <span className="font-medium">{x.guest ?? "Guest"}</span>
+            <span className="font-mono text-xs text-zinc-500">{x.code}</span>
+            <span className="text-zinc-500">arrived {shortDate(x.checkIn)}</span>
+            <span className="ml-auto text-amber-700 dark:text-amber-400">No payout from Airbnb yet: canceled?</span>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

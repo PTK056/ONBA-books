@@ -164,7 +164,7 @@ dans les notifications Airbnb). Il ne dit que ce qui concerne les comptes et la 
    chaque relève relit les e-mails non reconnus ou de modèle inconnu.
    Migration appliquée sur Supabase le 31/10/2026. Reste : variables Composio sur Vercel, commit et mise en ligne.
 2. **V2 (resserrée le 31/10/2026, surtout Bank)** :
-   - **Bank** : rapprochement exact d'une ligne Danamon avec un versement lu (montant IDR au rupiah près, entre l'envoi
+   - **Bank (codé le 31/10/2026)** : rapprochement exact d'une ligne Danamon avec un versement lu (montant IDR au rupiah près, entre l'envoi
      et quelques jours ouvrés après la date prévue) ; bloc **« versements attendus »** (envoyés, pas encore à la banque),
      où apparaît aussi un séjour compté en revenu mais jamais payé.
    - **Brief** : les trois lignes du §8 (séjour complet dans les comptes, versement en retard, relève en panne) + `answer_booking_alert`.

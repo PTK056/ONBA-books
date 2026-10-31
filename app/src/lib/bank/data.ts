@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { nameFit, namesOf } from "./match";
 import { payeeKey } from "./payees";
 import { CHARGE, shift } from "./ops";
+import { payoutStates } from "./payouts";
 import { LINK_DAYS, monthlyTemplate, retitle, type PastEntry, type Template } from "./recurring";
 
 export interface BankStatementRow {
@@ -29,6 +30,19 @@ export interface KnownPayee {
 export interface StaySuggestion { id: string; guest: string | null; platform: string; checkIn: string; checkOut: string }
 
 const AROUND_DAYS = 45; // wide enough to see last month's and next month's entries
+
+/** A payout Airbnb sent (read from its e-mail) that no bank line has brought yet. */
+export interface ExpectedPayout {
+  key: string; code: string; guest: string | null; sentOn: string; arrivesBy: string | null; received: number; currency: string;
+  /** late: the statements go past its arrival date (plus a few days) and it isn't there; waiting: no statement that far yet. */
+  state: "on_its_way" | "late" | "no_statement_yet";
+}
+/** A stay booked from its confirmation, arrived some days ago, and no payout read for it. */
+export interface UnpaidStay { id: string; code: string; guest: string | null; checkIn: string }
+
+const PAYOUTS_SINCE_DAYS = 120;
+const LATE_AFTER_DAYS = 3;   // past Airbnb's "should arrive by"
+const UNPAID_AFTER_DAYS = 3; // Airbnb pays about a day after arrival
 
 export async function bankPage(db: SupabaseClient, orgId: string) {
   const [{ data: accounts }, { data: statements }, { data: lines }, { data: payees }, { data: villas }, { data: cats }] = await Promise.all([
@@ -135,5 +149,23 @@ export async function bankPage(db: SupabaseClient, orgId: string) {
     id: s.id, account: accountName.get(s.account_id) ?? "", periodStart: s.period_start, periodEnd: s.period_end,
     linesAdded: s.lines_added, linesSkipped: s.lines_skipped, balanced: s.balanced, notes: s.notes, charges: charges.get(s.id) ?? 0,
   }));
-  return { statements: stmts, lines: out };
+  return { statements: stmts, lines: out, ...await payoutsPage(db, orgId, rows.map((r) => r.date).sort().at(-1) ?? null) };
+}
+
+/** What Airbnb sent and the bank hasn't shown yet, and stays booked from e-mails with no payout at all. */
+async function payoutsPage(db: SupabaseClient, orgId: string, lastLineDate: string | null) {
+  const today = new Date().toISOString().slice(0, 10);
+  const states = await payoutStates(db, orgId, shift(today, -PAYOUTS_SINCE_DAYS));
+  const expected: ExpectedPayout[] = states.filter((p) => p.stayId && !p.lineId).map((p) => {
+    const due = shift(p.arrivesBy ?? shift(p.sentOn, 7), LATE_AFTER_DAYS);
+    const state = due > today ? "on_its_way" : lastLineDate && lastLineDate >= due ? "late" : "no_statement_yet";
+    return { key: p.key, code: p.code, guest: p.guest, sentOn: p.sentOn, arrivesBy: p.arrivesBy, received: p.received, currency: p.currency, state };
+  });
+  const { data: stays } = await db.from("stays").select("id, external_ref, guest_name, check_in")
+    .eq("organization_id", orgId).eq("source", "email").eq("status", "confirmed")
+    .lte("check_in", shift(today, -UNPAID_AFTER_DAYS)).gte("check_in", shift(today, -PAYOUTS_SINCE_DAYS));
+  const withPayout = new Set(states.map((p) => p.code));
+  const unpaid: UnpaidStay[] = (stays ?? []).filter((s) => !withPayout.has(s.external_ref))
+    .map((s) => ({ id: s.id, code: s.external_ref, guest: s.guest_name, checkIn: s.check_in }));
+  return { expected, unpaid };
 }
