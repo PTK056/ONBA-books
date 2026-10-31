@@ -61,7 +61,7 @@ export async function disconnectGmail(): Promise<Result> {
     }
     await db.from("mail_connections").delete().eq("organization_id", org.id);
   }
-  revalidatePath("/connections");
+  revalidatePath("/connections", "layout");
   return { ok: true };
 }
 
@@ -71,7 +71,7 @@ export async function checkNow(): Promise<Result> {
   if (!org) return { ok: false, error: "Only admins can check e-mails." };
   try {
     const r = await syncOrganization(adminClient(), org.id);
-    revalidatePath("/connections");
+    revalidatePath("/connections", "layout");
     revalidatePath("/overview");
     const parts = [`${r.read} new e-mail${r.read === 1 ? "" : "s"}`];
     if (r.booked) parts.push(`${r.booked} stay${r.booked === 1 ? "" : "s"} added`);
@@ -80,7 +80,7 @@ export async function checkNow(): Promise<Result> {
     return { ok: true, message: parts.join(", ") + "." };
   } catch (e) {
     console.error("[gmail check]", e);
-    revalidatePath("/connections");
+    revalidatePath("/connections", "layout");
     return { ok: false, error: "The check failed. Try again in a moment." };
   }
 }
@@ -100,7 +100,7 @@ export async function chooseVilla(listingRef: string, listingName: string, villa
     .eq("organization_id", org.id).eq("listing_ref", listingRef).eq("result", "needs_villa");
   const svc = adminClient();
   for (const code of new Set((waiting ?? []).map((w) => w.code as string))) await applyCode(svc, org.id, code);
-  revalidatePath("/connections");
+  revalidatePath("/connections", "layout");
   revalidatePath("/overview");
   return { ok: true };
 }
@@ -129,7 +129,7 @@ export async function answerAlert(emailId: string, answer: "cancel" | "keep"): P
     if (r === "conflict") return { ok: false, error: "The stay touches a closed month: reopen it first." };
     await db.from("inbound_emails").update({ result: "updated", note: "Stay canceled" }).eq("id", alert.id);
   }
-  revalidatePath("/connections");
+  revalidatePath("/connections", "layout");
   revalidatePath("/overview");
   return { ok: true };
 }

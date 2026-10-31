@@ -1,10 +1,12 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { answerAlert, checkNow, chooseVilla, connectGmail, disconnectGmail, type Result } from "@/app/(app)/connections/actions";
 import { shortDate } from "@/lib/format/date";
+import { Status } from "./ConnectorGrid";
 
 const field = "h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-900";
 const primary = "h-10 rounded-lg bg-emerald-600 px-4 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50";
@@ -58,9 +60,9 @@ function useAction() {
 /** Today and the default start date (120 days back), worked out on the server. */
 export interface Dates { today: string; defaultFrom: string }
 
-export function ConnectionsView({ gmail, dates, returned, emails, waiting, villas, telegramBot }: {
-  gmail: GmailState; dates: Dates; returned: string | null; emails: EmailRow[]; waiting: WaitingListing[];
-  villas: { id: string; name: string }[]; telegramBot: string | null;
+export function GmailDetail({ gmail, dates, returned, emails, alerts, waiting, villas }: {
+  gmail: GmailState; dates: Dates; returned: string | null; emails: EmailRow[]; alerts: EmailRow[]; waiting: WaitingListing[];
+  villas: { id: string; name: string }[];
 }) {
   const notice = returned ? RETURNED[returned] : undefined;
   return (
@@ -70,14 +72,8 @@ export function ConnectionsView({ gmail, dates, returned, emails, waiting, villa
       )}
       <GmailCard gmail={gmail} dates={dates} />
       {waiting.map((l) => <ChooseVilla key={l.ref} listing={l} villas={villas} />)}
+      {alerts.map((a) => <Alert key={a.id} alert={a} />)}
       {gmail.status !== "none" && <EmailLog emails={emails} />}
-      <section className="card flex flex-col gap-2 p-5">
-        <h2 className="font-semibold">Telegram</h2>
-        <p className="text-sm text-zinc-500">
-          Sply, the assistant: receipts, expenses, stays and your morning brief in a chat.
-          {telegramBot && <> Open <a className="font-medium text-emerald-700 underline dark:text-emerald-400" href={`https://t.me/${telegramBot}`}>@{telegramBot}</a> and send /start.</>}
-        </p>
-      </section>
     </div>
   );
 }
@@ -88,14 +84,7 @@ function GmailCard({ gmail, dates }: { gmail: GmailState; dates: Dates }) {
   const [readFrom, setReadFrom] = useState(dates.defaultFrom);
   return (
     <section className="card flex flex-col gap-3 p-5">
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="flex-1 font-semibold">Gmail · Airbnb bookings</h2>
-        {gmail.status !== "none" && (
-          <span className={connected ? "text-sm text-emerald-700 dark:text-emerald-400" : "text-sm text-red-600"}>
-            {connected ? "Connected" : gmail.status === "pending" ? "Not finished" : "Needs reconnecting"}
-          </span>
-        )}
-      </div>
+      <div><Status status={connected ? "connected" : gmail.status === "none" ? "off" : "attention"} /></div>
       <p className="text-sm text-zinc-500">
         Once a day Splyce reads the e-mails Airbnb sends you (and only those): confirmed bookings become stays,
         payouts give the real rate, cancellations are marked. Requests, inquiries and messages are never booked.
@@ -174,11 +163,22 @@ function ChooseVilla({ listing, villas }: { listing: WaitingListing; villas: { i
   );
 }
 
+/** Airbnb Support wrote about a booking: cancel the stay or keep it. */
+function Alert({ alert }: { alert: EmailRow }) {
+  return (
+    <section className="card flex flex-col gap-2 border-amber-300 p-5 dark:border-amber-700">
+      <h2 className="font-semibold">Airbnb Support wrote about a stay</h2>
+      <p className="text-sm text-zinc-500">{alert.note}</p>
+      <AlertAnswer id={alert.id} />
+    </section>
+  );
+}
+
 function AlertAnswer({ id }: { id: string }) {
   const { error, pending, run } = useAction();
   const small = "h-8 rounded-lg px-3 text-xs font-medium disabled:opacity-50";
   return (
-    <div className="flex flex-wrap items-center gap-2 pt-1 pl-0 sm:pl-[4.75rem]">
+    <div className="flex flex-wrap items-center gap-2 pt-1">
       <button type="button" disabled={pending} className={`${small} bg-emerald-600 text-white hover:bg-emerald-700`}
         onClick={() => run(() => answerAlert(id, "cancel"))}>Cancel stay</button>
       <button type="button" disabled={pending} className={`${small} border border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800`}
@@ -194,9 +194,12 @@ function EmailLog({ emails }: { emails: EmailRow[] }) {
   }
   const tone = { ok: "text-emerald-700 dark:text-emerald-400", muted: "text-zinc-500", warn: "text-amber-700 dark:text-amber-400" };
   return (
-    <section className="card flex flex-col p-0">
-      <h2 className="px-5 pt-5 pb-3 font-semibold">E-mails read</h2>
-      <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+    <details className="card group p-0">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-4 text-sm font-medium [&::-webkit-details-marker]:hidden">
+        E-mails read <span className="text-zinc-400">· {emails.length}{emails.length === 50 ? "+" : ""}</span>
+        <ChevronDown className="ml-auto size-4 text-zinc-400 transition group-open:rotate-180" aria-hidden />
+      </summary>
+      <ul className="divide-y divide-zinc-100 border-t border-zinc-100 dark:divide-zinc-800 dark:border-zinc-800">
         {emails.map((e) => {
           const r = RESULT[e.result] ?? { label: e.result, tone: "muted" as const };
           return (
@@ -209,7 +212,6 @@ function EmailLog({ emails }: { emails: EmailRow[] }) {
               </div>
               <p className="truncate pl-0 text-zinc-500 sm:pl-[4.75rem]">{e.subject}</p>
               {e.note && <p className="pl-0 text-xs text-zinc-500 sm:pl-[4.75rem]">{e.note}</p>}
-              {e.result === "alert" && <AlertAnswer id={e.id} />}
               {e.stay_id && e.code && (
                 <Link href={`/transactions?q=${encodeURIComponent(e.code)}`} className="pl-0 text-xs font-medium text-emerald-700 underline sm:pl-[4.75rem] dark:text-emerald-400">
                   See the entries
@@ -219,6 +221,6 @@ function EmailLog({ emails }: { emails: EmailRow[] }) {
           );
         })}
       </ul>
-    </section>
+    </details>
   );
 }

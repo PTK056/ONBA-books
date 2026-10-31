@@ -11,7 +11,7 @@ export const maxDuration = 300;
 // Back from Google (through Composio). The query string is not proof of anything: the account
 // must be the one this organization started connecting, and Composio must say it is active.
 export async function GET(request: NextRequest) {
-  const back = (state: string) => NextResponse.redirect(new URL(`/connections?gmail=${state}`, APP_URL));
+  const back = (state: string) => NextResponse.redirect(new URL(`/connections/gmail?gmail=${state}`, APP_URL));
   const org = await getCurrentOrg();
   if (org.kind !== "member" || org.role !== "admin") return back("failed");
 
