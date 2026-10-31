@@ -140,9 +140,16 @@ RLS : admins de l'organisation. Les observateurs (propriétaires) voient les sé
 Une carte par connexion : **Telegram** (déplacé ici), **Gmail** (Connect / Disconnect, adresse, dernière relève,
 « Check now », 20 derniers e-mails avec leur type et le séjour créé), plus tard WhatsApp et la banque.
 
-## 8. Sply
-Le brief annonce les nouvelles réservations (« New booking: Beck, 30 Oct → 6 Nov, €425.15 »), les annulations,
-les versements, et les e-mails non reconnus. Outil `list_bookings` facultatif.
+## 8. Sply (décidé le 31/10/2026)
+Le brief ne répète pas l'app Airbnb (nouvelles réservations, annulations, versements envoyés : Pierre les voit déjà
+dans les notifications Airbnb). Il ne dit que ce qui concerne les comptes et la banque :
+- **Séjour complet dans les comptes**, une seule fois par séjour, quand son versement a été lu (taux réel) :
+  « ✅ Beck · 30 Oct → 6 Nov · in the books: Rp 8,596,060 net (€425.15 at 20,219) ». Groupé dans le brief du matin
+  (« In the books since yesterday: … »), jamais à la confirmation.
+- **Versement envoyé par Airbnb mais pas arrivé à la banque** plus de 5 jours après la date prévue.
+- **Relève Gmail en panne** (statut `error` ou dernière relève en échec) : « reconnect in Connections ».
+- **Alerte du support** qui nomme un séjour : réponse possible à Sply (« annule Emil ») par l'outil `answer_booking_alert`,
+  en plus du bouton Cancel stay / Keep de Connections.
 
 ## Étapes
 1. **V1 (codée)** : connexion Gmail via Composio, relève quotidienne (cron 22:00 UTC, avant le brief) et « Check now »,
@@ -156,8 +163,12 @@ les versements, et les e-mails non reconnus. Outil `list_bookings` facultatif.
    (`reservation/alteration/AlterationAcceptedTemplate`), alerte du support sur une réservation pas encore créée ;
    chaque relève relit les e-mails non reconnus ou de modèle inconnu.
    Migration appliquée sur Supabase le 31/10/2026. Reste : variables Composio sur Vercel, commit et mise en ligne.
-2. **V2** : brief de Sply (nouvelles réservations, alerte support avec Cancel stay / Keep, séjour sans versement 3 jours
-   après l'arrivée), lien des versements avec Bank, `listing_villas` réutilisé par l'import CSV, module activable.
+2. **V2 (resserrée le 31/10/2026, surtout Bank)** :
+   - **Bank** : rapprochement exact d'une ligne Danamon avec un versement lu (montant IDR au rupiah près, entre l'envoi
+     et quelques jours ouvrés après la date prévue) ; bloc **« versements attendus »** (envoyés, pas encore à la banque),
+     où apparaît aussi un séjour compté en revenu mais jamais payé.
+   - **Brief** : les trois lignes du §8 (séjour complet dans les comptes, versement en retard, relève en panne) + `answer_booking_alert`.
+   - Rangement : `listing_villas` réutilisé par l'import CSV, module activable (`gmail_bookings`), extrait du support effacé après 90 jours.
 3. **V3** : secours IA via Review, adresse de transfert pour les boîtes hors Gmail, propre app Google vérifiée (lecture seule, nom Splyce).
 
 ## À fournir par Pierre avant de coder
