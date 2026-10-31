@@ -7,7 +7,7 @@ import type { Statement, StatementLine } from "./data";
 
 const C = {
   ink: "#18181b", muted: "#71717a", faint: "#a1a1aa", line: "#e4e4e7", band: "#f4f4f5",
-  brand: "#23466E", amber: "#b45309", amberBg: "#fffbeb",
+  brand: "#2D4E9B", amber: "#b45309", amberBg: "#fffbeb",
 };
 
 const s = StyleSheet.create({

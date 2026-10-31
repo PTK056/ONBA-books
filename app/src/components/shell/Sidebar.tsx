@@ -41,13 +41,13 @@ export function SidebarView({ org, reviewBadge, user, path, admin, place, placeC
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r border-zinc-200 bg-white px-3 py-4 lg:flex dark:border-zinc-800 dark:bg-zinc-950">
+      <aside className="dark-surface fixed inset-y-0 left-0 hidden w-60 flex-col bg-sidebar px-3 py-4 text-white lg:flex">
         <Link href="/overview" className="px-2"><Logo /></Link>
-        <div className="mt-6 px-2 text-xs font-medium uppercase tracking-wide text-zinc-400">Organization</div>
+        <div className="mt-6 px-2 text-xs font-medium uppercase tracking-wide text-white/55">Organization</div>
         <div className="mt-1 truncate px-2 text-sm font-medium">{org}</div>
         {place && (
           <>
-            <div className="mt-4 px-2 text-xs font-medium uppercase tracking-wide text-zinc-400">Villa</div>
+            <div className="mt-4 px-2 text-xs font-medium uppercase tracking-wide text-white/55">Villa</div>
             <div className="mt-1 px-1">{place}</div>
           </>
         )}
@@ -55,25 +55,25 @@ export function SidebarView({ org, reviewBadge, user, path, admin, place, placeC
           {nav.map(({ href, label, icon: Icon, ...rest }) => (
             <Link
               key={href} href={href} aria-current={active(href) ? "page" : undefined}
-              className="group flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 aria-[current=page]:bg-brand-600/[0.06] aria-[current=page]:font-semibold aria-[current=page]:text-brand-600 aria-[current=page]:shadow-[inset_2px_0_0_var(--color-accent)] dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100 dark:aria-[current=page]:bg-zinc-900 dark:aria-[current=page]:text-zinc-100"
+              className="group flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-white/70 hover:bg-white/5 hover:text-white aria-[current=page]:bg-white/10 aria-[current=page]:font-semibold aria-[current=page]:text-white aria-[current=page]:shadow-[inset_2px_0_0_var(--color-accent)]"
             >
-              <Icon size={17} className="text-zinc-400 group-aria-[current=page]:text-accent-ink dark:group-aria-[current=page]:text-accent" />
+              <Icon size={17} className="text-white/50 group-aria-[current=page]:text-accent" />
               <span className="flex-1">{label}</span>
               {"badge" in rest && reviewBadge}
             </Link>
           ))}
         </nav>
-        <div className="mt-auto border-t border-zinc-200 pt-3 dark:border-zinc-800">{user}</div>
+        <div className="mt-auto border-t border-white/10 pt-3">{user}</div>
       </aside>
 
-      <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-zinc-200 bg-white/90 px-4 backdrop-blur lg:hidden dark:border-zinc-800 dark:bg-zinc-950/90">
+      <header className="dark-surface sticky top-0 z-20 flex h-14 items-center gap-3 bg-sidebar/95 px-4 text-white backdrop-blur lg:hidden">
         <Link href="/overview"><Logo className="text-xl" /></Link>
         {placeCompact}
         <nav className="ml-auto flex gap-1 overflow-x-auto">
           {nav.map(({ href, label, icon: Icon, ...rest }) => (
             <Link
               key={href} href={href} aria-label={label} aria-current={active(href) ? "page" : undefined}
-              className="relative flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm text-zinc-500 aria-[current=page]:bg-zinc-100 aria-[current=page]:text-zinc-900 dark:aria-[current=page]:bg-zinc-900 dark:aria-[current=page]:text-zinc-100"
+              className="relative flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm text-white/70 aria-[current=page]:bg-white/10 aria-[current=page]:text-white"
             >
               <Icon size={17} />
               <span className="hidden sm:inline">{label}</span>

@@ -20,13 +20,31 @@ interface Palette {
   buttonInk?: string;
   background?: string;
   foreground?: string;
+  /** Extra CSS for things the colour roles don't reach (e.g. a dark sidebar). */
+  extra?: string;
 }
 
 const PALETTES: Palette[] = [
-  { name: "Harbor · Navy + honey", hint: "today", swatches: ["#f6f7f9", "#23466e", "#d9a441"] },
+  { name: "Midnight · Navy, ice, blue + chartreuse", hint: "today", swatches: ["#1b1e4b", "#e4ecf0", "#2d4e9b", "#e2db4b"] },
+  {
+    name: "Harbor · Navy + honey",
+    hint: "the previous look, white sidebar",
+    swatches: ["#f6f7f9", "#23466e", "#d9a441"],
+    brand: ["#eef3f9", "#dce6f2", "#b9cce4", "#8daacf", "#5e84b5", "#3d6698", "#23466e", "#1c3a5c", "#172f4b", "#12253b", "#0b1726"],
+    neutral: ["#f6f7f9", "#eef0f4", "#e1e5ec", "#cbd2dd", "#98a2b3", "#667085", "#4f5a6e", "#3a4456", "#273041", "#142033", "#0b1220"],
+    accent: "#d9a441",
+    accentInk: "#8a6418",
+    background: "#f6f7f9",
+    foreground: "#142033",
+    extra: `aside, header.dark-surface { background: #fff !important; color: inherit; }
+aside .text-white\\/55, aside .text-white\\/50 { color: var(--color-zinc-400) !important; }
+aside nav a, header.dark-surface nav a { color: var(--color-zinc-600) !important; }
+aside nav a[aria-current=page] { background: var(--color-zinc-100) !important; color: var(--color-zinc-900) !important; }
+aside .border-white\\/10 { border-color: var(--color-zinc-200) !important; }`,
+  },
   {
     name: "Lagoon · Deep teal + sky",
-    hint: "sea blue, soft sky accent",
+    hint: "sea blue, white sidebar",
     swatches: ["#f5f8f8", "#0f4c5c", "#6ca8e0"],
     brand: ["#edf6f7", "#d6ecee", "#aed8dd", "#7ebdc5", "#4e9da8", "#2b7f8c", "#0f4c5c", "#0c3f4c", "#0a333e", "#082832", "#04181f"],
     neutral: ["#f5f8f8", "#edf2f2", "#dee6e7", "#c6d2d4", "#93a3a6", "#61737a", "#4b5b61", "#37454a", "#253136", "#12232a", "#0a161b"],
@@ -34,18 +52,11 @@ const PALETTES: Palette[] = [
     accentInk: "#2f6da8",
     background: "#f5f8f8",
     foreground: "#12232a",
-  },
-  {
-    name: "V3 · Emerald + gold",
-    hint: "the previous look",
-    swatches: ["#fafaf6", "#064e3b", "#b8893d"],
-    brand: ["#eef6f1", "#dcefe5", "#b9decb", "#8cc5a9", "#5aa683", "#2e8763", "#064e3b", "#043f30", "#033326", "#02281e", "#011a13"],
-    neutral: ["#fafaf6", "#f2f1ec", "#e6e3db", "#d2cec4", "#9c9b92", "#6b6f68", "#535851", "#3f453f", "#2b312d", "#1f2a25", "#121a16"],
-    accent: "#b8893d",
-    accentInk: "#8a6420",
-    buttonInk: "#f8e7c9",
-    background: "#fafaf6",
-    foreground: "#1f2a25",
+    extra: `aside, header.dark-surface { background: #fff !important; color: inherit; }
+aside .text-white\\/55, aside .text-white\\/50 { color: var(--color-zinc-400) !important; }
+aside nav a, header.dark-surface nav a { color: var(--color-zinc-600) !important; }
+aside nav a[aria-current=page] { background: var(--color-zinc-100) !important; color: var(--color-zinc-900) !important; }
+aside .border-white\\/10 { border-color: var(--color-zinc-200) !important; }`,
   },
 ];
 
@@ -60,6 +71,7 @@ function css(p: Palette) {
   if (p.accentInk) lines.push(`--color-accent-ink: ${p.accentInk};`);
   if (p.buttonInk) lines.push(`--color-on-brand: ${p.buttonInk};`);
   let out = lines.length ? `:root { ${lines.join(" ")} }` : "";
+  if (p.extra) out += ` ${p.extra}`;
   if (p.background) {
     out += ` @media (prefers-color-scheme: light) { :root { --background: ${p.background}; --foreground: ${p.foreground}; } }`;
   }

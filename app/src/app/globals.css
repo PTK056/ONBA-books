@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
-/* Splyce design tokens (Harbor): calm navy brand, honey accent, cool greys,
-   soft rounded shapes, Hanken Grotesk type. */
+/* Splyce design tokens (Midnight): midnight navy, ice blue, electric blue,
+   chartreuse; soft rounded shapes, Hanken Grotesk type. */
 :root {
-  --background: #f6f7f9;
-  --foreground: #142033;
+  --background: #e4ecf0;
+  --foreground: #1b1e4b;
 }
 
 @theme inline {
@@ -16,38 +16,40 @@
 }
 
 @theme {
-  /* Brand: calm navy. 600 is the button colour. */
-  --color-brand-50: #eef3f9;
-  --color-brand-100: #dce6f2;
-  --color-brand-200: #b9cce4;
-  --color-brand-300: #8daacf;
-  --color-brand-400: #5e84b5;
-  --color-brand-500: #3d6698;
-  --color-brand-600: #23466e;
-  --color-brand-700: #1c3a5c;
-  --color-brand-800: #172f4b;
-  --color-brand-900: #12253b;
-  --color-brand-950: #0b1726;
+  /* Brand: electric blue. 600 is the button colour. */
+  --color-brand-50: #eef2fa;
+  --color-brand-100: #dce4f4;
+  --color-brand-200: #b8c8e8;
+  --color-brand-300: #8ca5d6;
+  --color-brand-400: #5f80c0;
+  --color-brand-500: #4065ae;
+  --color-brand-600: #2d4e9b;
+  --color-brand-700: #243f7f;
+  --color-brand-800: #1e3466;
+  --color-brand-900: #1b2a52;
+  --color-brand-950: #121b36;
 
-  /* Accent: honey, used sparingly (logo dot, active tab, expenses). */
-  --color-accent: #d9a441;
-  /* Darker honey for text and small icons, readable on the light ground. */
-  --color-accent-ink: #8a6418;
+  /* Accent: chartreuse, for marks and bars only, never for text on white. */
+  --color-accent: #e2db4b;
+  /* Dark olive for text and small icons in the accent's place. */
+  --color-accent-ink: #6e6a12;
   /* Text on brand buttons. */
   --color-on-brand: #ffffff;
+  /* Midnight navy: the sidebar. */
+  --color-sidebar: #1b1e4b;
 
-  /* Neutrals: cool, slightly blue greys in place of Tailwind's zinc. */
-  --color-zinc-50: #f6f7f9;
-  --color-zinc-100: #eef0f4;
-  --color-zinc-200: #e1e5ec;
-  --color-zinc-300: #cbd2dd;
-  --color-zinc-400: #98a2b3;
-  --color-zinc-500: #667085;
-  --color-zinc-600: #4f5a6e;
-  --color-zinc-700: #3a4456;
-  --color-zinc-800: #273041;
-  --color-zinc-900: #142033;
-  --color-zinc-950: #0b1220;
+  /* Neutrals: ice-tinted greys in place of Tailwind's zinc; 900 is midnight navy. */
+  --color-zinc-50: #f3f7f9;
+  --color-zinc-100: #e4ecf0;
+  --color-zinc-200: #d4dfe5;
+  --color-zinc-300: #bccad3;
+  --color-zinc-400: #8d9daa;
+  --color-zinc-500: #5f6e7e;
+  --color-zinc-600: #4a5767;
+  --color-zinc-700: #36414f;
+  --color-zinc-800: #262e3d;
+  --color-zinc-900: #1b1e4b;
+  --color-zinc-950: #11132f;
 
   /* Soft shapes, a touch rounder than Tailwind's defaults. */
   --radius-xs: 4px;
@@ -61,8 +63,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0b1220;
-    --foreground: #eef0f4;
+    --background: #0d0f26;
+    --foreground: #e4ecf0;
   }
 }
 
@@ -72,10 +74,10 @@ body {
   font-family: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Focus: a honey outline on controls (keyboard), a soft brand halo around fields. */
+/* Focus: a brand outline on controls (keyboard), a soft brand halo around fields. */
 @layer base {
   a:focus-visible, button:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
-    outline: 2px solid var(--color-accent);
+    outline: 2px solid var(--color-brand-500);
     outline-offset: 2px;
   }
   input:focus, select:focus, textarea:focus {
@@ -123,3 +125,15 @@ body {
   font-size: 12px;
   font-weight: 600;
 }
+
+/* Children of the navy sidebar and mobile header (villa picker, user menu),
+   which are styled for light surfaces elsewhere. */
+.dark-surface select {
+  background-color: rgb(255 255 255 / 0.08);
+  border-color: rgb(255 255 255 / 0.14);
+  color: #fff;
+}
+.dark-surface select option { color: var(--color-zinc-900); }
+.dark-surface .text-zinc-400, .dark-surface .text-zinc-600 { color: rgb(255 255 255 / 0.6); }
+.dark-surface button:hover { background-color: rgb(255 255 255 / 0.08); color: #fff; }
+.dark-surface :focus-visible { outline-color: var(--color-accent); }
