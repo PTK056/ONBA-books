@@ -43,12 +43,12 @@ export function PeriodView({ data: p }: { data: PeriodOverview }) {
         </section>
       )}
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat label="Net result" icon={<Wallet size={16} />} tint="emerald" value={p.totals.net} previous={0} currency={cur} goodWhenUp hideChange featured
+          note={margin !== null ? `${Math.round(margin * 100)}% margin` : undefined} />
         <Stat label="Income" icon={<TrendingUp size={16} />} tint="blue" value={p.totals.income} previous={0} currency={cur} goodWhenUp hideChange />
         <Stat label="Expenses" icon={<TrendingDown size={16} />} tint="orange" value={p.totals.expenses} previous={0} currency={cur} goodWhenUp={false} hideChange
           note={p.totals.platformFees ? `incl. ${money(p.totals.platformFees, cur)} platform fees` : undefined} />
-        <Stat label="Net result" icon={<Wallet size={16} />} tint="emerald" value={p.totals.net} previous={0} currency={cur} goodWhenUp hideChange
-          note={margin !== null ? `${Math.round(margin * 100)}% margin` : undefined} />
         <div className="card p-5">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-zinc-500">Occupancy</p>

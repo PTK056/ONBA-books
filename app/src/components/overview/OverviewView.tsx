@@ -39,11 +39,11 @@ export function OverviewView({ data: o }: { data: Overview }) {
 
       {editor && <TodoBar o={o} monthName={monthName} />}
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat label="Net result" icon={<Wallet size={16} />} tint="emerald" value={o.totals.net} previous={o.previous.net} currency={cur} goodWhenUp featured
+          note={margin !== null ? `${Math.round(margin * 100)}% margin` : undefined} />
         <Stat label="Income" icon={<TrendingUp size={16} />} tint="blue" value={o.totals.income} previous={o.previous.income} currency={cur} goodWhenUp />
         <Stat label="Expenses" icon={<TrendingDown size={16} />} tint="orange" value={o.totals.expenses} previous={o.previous.expenses} currency={cur} goodWhenUp={false} />
-        <Stat label="Net result" icon={<Wallet size={16} />} tint="emerald" value={o.totals.net} previous={o.previous.net} currency={cur} goodWhenUp
-          note={margin !== null ? `${Math.round(margin * 100)}% margin` : undefined} />
         <OccupancyStat current={occ} previous={occPrev} />
         <Stat label="Nightly rate" icon={<Moon size={16} />} tint="violet" value={occ.adr ?? 0} previous={occPrev.adr ?? 0} currency={cur} goodWhenUp
           note={occ.booked ? `RevPAR ${money(occ.revpar, cur)}` : "No nights booked"} />
@@ -200,12 +200,50 @@ export const TINTS = {
   zinc: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300",
 } as const;
 
-export function Stat({ label, icon, tint, value, previous, currency, goodWhenUp, note, hideChange = false }: {
+export function Stat({ label, icon, tint, value, previous, currency, goodWhenUp, note, hideChange = false, featured = false }: {
   label: string; icon: React.ReactNode; tint: keyof typeof TINTS; value: number; previous: number;
   currency: string; goodWhenUp: boolean; note?: string; hideChange?: boolean;
+  /** The bento's lead tile: a large brand-coloured card spanning two columns and two rows. */
+  featured?: boolean;
 }) {
   const change = previous ? (value - previous) / Math.abs(previous) : null;
   const good = change !== null && change !== 0 && (change > 0) === goodWhenUp;
+  const chip = change === 0 ? (featured ? "bg-white/10 text-white" : TINTS.zinc)
+    : good ? (featured ? "bg-accent text-sidebar" : "bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300")
+    : (featured ? "bg-rose-400/20 text-rose-100" : "bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300");
+  const muted = featured ? "text-white/60" : "text-zinc-400";
+  const footer = (
+    <div className={`flex flex-wrap items-center gap-2 ${featured ? "mt-3 text-sm" : "mt-2 text-xs"}`}>
+      {hideChange ? null : change === null ? (
+        <span className={muted}>No figures last month</span>
+      ) : (
+        <span className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 font-medium ${chip}`}>
+          {change >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
+          {Math.abs(Math.round(change * 100))}%
+        </span>
+      )}
+      {!hideChange && change !== null && <span className={muted}>vs last month</span>}
+      {note && <span className={featured ? "text-white/70" : "text-zinc-500"}>{hideChange ? note : `· ${note}`}</span>}
+    </div>
+  );
+
+  if (featured) {
+    return (
+      <div className="relative flex flex-col justify-between overflow-hidden rounded-xl bg-brand-600 p-6 text-white sm:col-span-2 lg:row-span-2">
+        <span aria-hidden className="pointer-events-none absolute -right-14 -bottom-20 size-64 rounded-full border-[32px] border-white/[0.06]" />
+        <div className="relative flex items-center justify-between">
+          <p className="text-sm font-medium text-white/70">{label}</p>
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-accent">{icon}</span>
+        </div>
+        <div className="relative mt-8">
+          <p className="text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">
+            {money(value, currency)} <span className="whitespace-nowrap text-base font-normal text-white/60">{currency}</span>
+          </p>
+          {footer}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="card p-5">
       <div className="flex items-center justify-between">
@@ -215,21 +253,7 @@ export function Stat({ label, icon, tint, value, previous, currency, goodWhenUp,
       <p className="mt-3 text-2xl font-semibold tracking-tight tabular-nums">
         {money(value, currency)} <span className="whitespace-nowrap text-sm font-normal text-zinc-400">{currency}</span>
       </p>
-      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-        {hideChange ? null : change === null ? (
-          <span className="text-zinc-400">No figures last month</span>
-        ) : (
-          <span className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 font-medium ${
-            change === 0 ? TINTS.zinc
-              : good ? "bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300"
-              : "bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300"}`}>
-            {change >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
-            {Math.abs(Math.round(change * 100))}%
-          </span>
-        )}
-        {!hideChange && change !== null && <span className="text-zinc-400">vs last month</span>}
-        {note && <span className="text-zinc-500">{hideChange ? note : `· ${note}`}</span>}
-      </div>
+      {footer}
     </div>
   );
 }

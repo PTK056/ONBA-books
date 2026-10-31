@@ -55,9 +55,9 @@ export function SidebarView({ org, reviewBadge, user, path, admin, place, placeC
           {nav.map(({ href, label, icon: Icon, ...rest }) => (
             <Link
               key={href} href={href} aria-current={active(href) ? "page" : undefined}
-              className="group flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-white/70 hover:bg-white/5 hover:text-white aria-[current=page]:bg-white/10 aria-[current=page]:font-semibold aria-[current=page]:text-white aria-[current=page]:shadow-[inset_2px_0_0_var(--color-accent)]"
+              className="group flex items-center gap-2.5 rounded-full px-3 py-2 text-sm text-white/70 hover:bg-white/5 hover:text-white aria-[current=page]:bg-accent aria-[current=page]:font-semibold aria-[current=page]:text-sidebar"
             >
-              <Icon size={17} className="text-white/50 group-aria-[current=page]:text-accent" />
+              <Icon size={17} className="text-white/50 group-aria-[current=page]:text-sidebar" />
               <span className="flex-1">{label}</span>
               {"badge" in rest && reviewBadge}
             </Link>
@@ -73,7 +73,7 @@ export function SidebarView({ org, reviewBadge, user, path, admin, place, placeC
           {nav.map(({ href, label, icon: Icon, ...rest }) => (
             <Link
               key={href} href={href} aria-label={label} aria-current={active(href) ? "page" : undefined}
-              className="relative flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm text-white/70 aria-[current=page]:bg-white/10 aria-[current=page]:text-white"
+              className="relative flex h-9 items-center gap-1.5 rounded-full px-2.5 text-sm text-white/70 aria-[current=page]:bg-accent aria-[current=page]:font-semibold aria-[current=page]:text-sidebar"
             >
               <Icon size={17} />
               <span className="hidden sm:inline">{label}</span>
