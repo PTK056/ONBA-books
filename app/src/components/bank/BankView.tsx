@@ -10,8 +10,8 @@ import type { BankLineRow, BankStatementRow, ExpectedPayout, UnpaidStay } from "
 import { shortDate } from "@/lib/format/date";
 import { createClient } from "@/lib/supabase/client";
 
-const field = "h-9 rounded-lg border border-zinc-300 bg-white px-2.5 text-sm shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-900";
-const primary = "h-9 rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50";
+const field = "h-9 rounded-lg border-0 border-b border-zinc-300 bg-transparent px-0.5 text-sm outline-none focus:border-brand-600 dark:border-zinc-700 dark:bg-transparent";
+const primary = "h-9 rounded-lg bg-brand-600 px-3 btn-label shadow-sm hover:bg-brand-700 disabled:opacity-50";
 const secondary = "h-9 rounded-lg border border-zinc-300 px-3 text-sm hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-900";
 const small = "inline-flex h-8 items-center gap-1 rounded-md border border-zinc-300 px-2 text-xs hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-900";
 
@@ -166,7 +166,7 @@ function AddStatement({ organizationId }: { organizationId: string }) {
             : "A monthly PDF from your bank (unlocked), or a Wise export in CSV. Lines already added from another statement are skipped."}
         </p>
         {error && <p className="mt-1 text-red-600">{error}</p>}
-        {message && <p className="mt-1 text-emerald-700 dark:text-emerald-400">{message}</p>}
+        {message && <p className="mt-1 text-brand-700 dark:text-brand-400">{message}</p>}
       </div>
       <input ref={input} type="file" accept="application/pdf,.csv,text/csv" className="hidden"
         onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ""; }} />
@@ -186,7 +186,7 @@ function StatementRow({ s, chargesTo }: { s: BankStatementRow; chargesTo: string
           {s.account} · {s.periodStart && s.periodEnd ? `${shortDate(s.periodStart)} → ${shortDate(s.periodEnd)}` : "period unknown"}
         </p>
         <p className="flex items-center gap-1 text-zinc-500">
-          {s.balanced === true && <><Check size={14} className="text-emerald-600" /> Balances add up · </>}
+          {s.balanced === true && <><Check size={14} className="text-brand-600" /> Balances add up · </>}
           {s.balanced === false && <><AlertTriangle size={14} className="text-amber-600" /> Balances don&apos;t add up, check against the PDF · </>}
           {s.linesAdded} lines{s.linesSkipped ? `, ${s.linesSkipped} already known` : ""}
         </p>
@@ -212,7 +212,7 @@ const monthName = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateStri
 
 function Amount({ line }: { line: BankLineRow }) {
   return (
-    <span className={`tabular-nums ${line.direction === "in" ? "text-emerald-700 dark:text-emerald-400" : ""}`}>
+    <span className={`tabular-nums ${line.direction === "in" ? "text-brand-700 dark:text-brand-400" : ""}`}>
       {line.direction === "in" ? "+" : "−"}{money(line.amount, line.currency)} <span className="text-xs text-zinc-400">{line.currency}</span>
     </span>
   );

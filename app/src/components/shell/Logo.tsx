@@ -1,12 +1,8 @@
-import { BookOpenCheck } from "lucide-react";
-
-export function Logo({ className = "" }: { className?: string }) {
+/** The Splyce wordmark: Gloock, with the gold dot from the landing page. */
+export function Logo({ className = "text-2xl" }: { className?: string }) {
   return (
-    <span className={`flex items-center gap-2 font-semibold tracking-tight ${className}`}>
-      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
-        <BookOpenCheck size={16} strokeWidth={2.25} />
-      </span>
-      Splyce
+    <span className={`font-display leading-none ${className}`}>
+      Splyce<span className="text-accent">.</span>
     </span>
   );
 }

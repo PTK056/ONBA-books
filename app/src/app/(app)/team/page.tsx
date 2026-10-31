@@ -98,7 +98,7 @@ async function Content({ searchParams }: Pick<PageProps<"/team">, "searchParams"
                     <td className="py-3 pr-4 text-right font-medium tabular-nums">{money(run?.amount ?? computed.total, s.currency)}</td>
                     <td className="py-3 text-right">
                       {run?.status === "paid" ? (
-                        <Link href={`/transactions/${run.transaction_id}`} className="text-emerald-700 hover:underline dark:text-emerald-300">Paid {shortDate(run.paid_on!)}</Link>
+                        <Link href={`/transactions/${run.transaction_id}`} className="text-brand-700 hover:underline dark:text-brand-300">Paid {shortDate(run.paid_on!)}</Link>
                       ) : run ? (
                         run.amount !== computed.total
                           ? <span className="text-xs text-amber-700 dark:text-amber-300">Work changed: update drafts</span>
@@ -140,7 +140,7 @@ async function Content({ searchParams }: Pick<PageProps<"/team">, "searchParams"
                       const jobs = ls.reduce((n, l) => n + (l.jobs ?? 0), 0);
                       const extra = ls.some((l) => l.extra_amount);
                       const text = hours ? `${hours}h` : jobs > 1 ? `×${jobs}` : jobs ? "●" : extra ? "+" : "";
-                      return <td key={d} title={ls.map((l) => l.task).filter(Boolean).join(", ")} className={`h-7 w-7 rounded text-center ${text ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" : ""}`}>{text}</td>;
+                      return <td key={d} title={ls.map((l) => l.task).filter(Boolean).join(", ")} className={`h-7 w-7 rounded text-center ${text ? "bg-brand-50 text-brand-800 dark:bg-brand-950 dark:text-brand-200" : ""}`}>{text}</td>;
                     })}
                   </tr>
                 ))}
@@ -175,7 +175,7 @@ async function Content({ searchParams }: Pick<PageProps<"/team">, "searchParams"
             <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
               <div>
                 <span className="font-medium">{s.name}</span>
-                {!s.active && <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500 dark:bg-zinc-800">inactive</span>}
+                {!s.active && <span className="ml-2 bg-zinc-100 px-1.5 py-0.5 badge-label text-zinc-500 dark:bg-zinc-800">inactive</span>}
                 <div className="text-xs text-zinc-500">
                   {[s.role, s.kind === "freelance" ? "Freelance" : "Employee", MODE[s.pay_mode],
                     s.pay_mode === "monthly" ? money(s.monthly_amount ?? 0, s.currency) : s.pay_mode === "hourly" ? `${money(s.hourly_rate ?? 0, s.currency)}/h` : `${money(s.job_rate ?? 0, s.currency)}/job`,

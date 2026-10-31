@@ -61,17 +61,17 @@ function Card({ c }: { c: Connector }) {
   const box = "card group flex h-full flex-col gap-4 p-5 transition";
   if (!c.href || c.status === "soon") return <div className={`${box} ${c.status === "soon" ? "bg-zinc-50/60 dark:bg-zinc-900/40" : ""}`}>{body}</div>;
   return c.external
-    ? <a href={c.href} target="_blank" rel="noreferrer" className={`${box} hover:border-emerald-300 hover:shadow-md`}>{body}</a>
-    : <Link href={c.href} className={`${box} hover:border-emerald-300 hover:shadow-md`}>{body}</Link>;
+    ? <a href={c.href} target="_blank" rel="noreferrer" className={`${box} hover:border-brand-300 hover:shadow-md`}>{body}</a>
+    : <Link href={c.href} className={`${box} hover:border-brand-300 hover:shadow-md`}>{body}</Link>;
 }
 
 export function Status({ status }: { status: ConnectorStatus }) {
   if (status === "connected") {
     return (
-      <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
+      <span className="inline-flex items-center gap-2 bg-brand-50 px-2.5 py-1 badge-label text-brand-700 dark:bg-brand-950/60 dark:text-brand-400">
         <span className="relative flex size-2">
-          <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75 motion-reduce:hidden" />
-          <span className="relative inline-flex size-2 rounded-full bg-emerald-500 shadow-[0_0_6px_2px_rgba(16,185,129,0.6)]" />
+          <span className="absolute inline-flex size-full animate-ping rounded-full bg-brand-400 opacity-75 motion-reduce:hidden" />
+          <span className="relative inline-flex size-2 rounded-full bg-brand-500 shadow-[0_0_6px_2px_rgba(46,135,99,0.6)]" />
         </span>
         Connected
       </span>
@@ -83,7 +83,7 @@ export function Status({ status }: { status: ConnectorStatus }) {
     soon: { label: "Coming soon", cls: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500", dot: "bg-zinc-300 dark:bg-zinc-600" },
   }[status];
   return (
-    <span className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-medium ${look.cls}`}>
+    <span className={`inline-flex items-center gap-2 px-2.5 py-1 badge-label ${look.cls}`}>
       <span className={`size-2 rounded-full ${look.dot}`} />
       {look.label}
     </span>

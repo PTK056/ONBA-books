@@ -11,7 +11,7 @@ import { ConsentForm } from "./ConsentForm";
 export default function ConsentPage({ searchParams }: PageProps<"/oauth/consent">) {
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-4 py-12">
-      <Logo className="mb-8 text-lg" />
+      <Logo className="mb-8 text-3xl" />
       <div className="card w-full max-w-sm p-6">
         <Suspense fallback={<p className="text-sm text-zinc-500">Loading…</p>}>
           <Consent searchParams={searchParams} />

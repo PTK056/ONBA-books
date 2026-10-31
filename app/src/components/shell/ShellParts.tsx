@@ -38,7 +38,7 @@ export async function ReviewBadge() {
     .eq("organization_id", org.id).eq("status", "pending");
   if (!count) return null;
   return (
-    <span className="rounded-full bg-amber-100 px-1.5 text-[11px] font-semibold tabular-nums text-amber-800 dark:bg-amber-900/60 dark:text-amber-200">
+    <span className="bg-amber-100 px-1.5 text-[11px] font-semibold tabular-nums text-amber-800 dark:bg-amber-900/60 dark:text-amber-200">
       {count}
     </span>
   );
@@ -51,7 +51,7 @@ export async function UserMenu() {
   const email = (data?.claims?.email as string | undefined) ?? "";
   return (
     <div className="flex items-center gap-2 px-2">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold uppercase text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold uppercase text-brand-800 dark:bg-brand-900/50 dark:text-brand-200">
         {email.slice(0, 2)}
       </span>
       <span className="min-w-0 flex-1 truncate text-xs text-zinc-600 dark:text-zinc-400" title={email}>{email}</span>

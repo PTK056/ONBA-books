@@ -11,7 +11,7 @@ export function ConsentForm({ authorizationId }: { authorizationId: string }) {
       {state.error && <p role="alert" className="text-sm text-red-600">{state.error}</p>}
       <button
         name="decision" value="approve" disabled={pending}
-        className="h-10 rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+        className="h-10 rounded-lg bg-brand-600 px-3 btn-label shadow-sm hover:bg-brand-700 disabled:opacity-50"
       >
         Allow access
       </button>

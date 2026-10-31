@@ -7,7 +7,7 @@ const BOT = process.env.TELEGRAM_BOT_USERNAME ?? "";
 export default function ConnectTelegramPage({ searchParams }: PageProps<"/connect/telegram">) {
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-4 py-12">
-      <Logo className="mb-8 text-lg" />
+      <Logo className="mb-8 text-3xl" />
       <div className="card w-full max-w-sm p-6">
         <Suspense fallback={<p className="text-sm text-zinc-500">Loading…</p>}>
           <Step searchParams={searchParams} />
@@ -33,7 +33,7 @@ async function Step({ searchParams }: Pick<PageProps<"/connect/telegram">, "sear
           Tap the button, then <strong>Start</strong> in the chat with @{BOT}. The link works once, for 15 minutes,
           and only from your own Telegram.
         </p>
-        <a href={`https://t.me/${BOT}?start=${code}`} className="flex h-10 items-center justify-center rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white shadow-sm hover:bg-emerald-700">
+        <a href={`https://t.me/${BOT}?start=${code}`} className="flex h-10 items-center justify-center rounded-lg bg-brand-600 px-3 btn-label shadow-sm hover:bg-brand-700">
           Open Telegram
         </a>
         <p className="text-xs text-zinc-500">On a computer without Telegram, send this to @{BOT}: <code className="break-all">/start {code}</code></p>
@@ -47,7 +47,7 @@ async function Step({ searchParams }: Pick<PageProps<"/connect/telegram">, "sear
         Send receipts, expenses, stays and reminders to Splyce from a Telegram chat. The assistant works with your own access.
       </p>
       {typeof error === "string" && ERRORS[error] && <p role="alert" className="text-sm text-red-600">{ERRORS[error]}</p>}
-      <a href="/api/channels/link/start?channel=telegram" className="flex h-10 items-center justify-center rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white shadow-sm hover:bg-emerald-700">
+      <a href="/api/channels/link/start?channel=telegram" className="flex h-10 items-center justify-center rounded-lg bg-brand-600 px-3 btn-label shadow-sm hover:bg-brand-700">
         Connect Telegram
       </a>
     </div>

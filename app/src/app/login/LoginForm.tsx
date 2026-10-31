@@ -12,9 +12,9 @@ declare global {
 }
 
 const input =
-  "h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-900";
+  "h-10 rounded-lg border-0 border-b border-zinc-300 bg-transparent px-0.5 text-sm outline-none focus:border-brand-600 dark:border-zinc-700 dark:bg-transparent";
 const button =
-  "h-10 rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50";
+  "h-10 rounded-lg bg-brand-600 px-3 btn-label shadow-sm hover:bg-brand-700 disabled:opacity-50";
 
 export function LoginForm({ next }: { next: string }) {
   const [state, action, pending] = useActionState<LoginState, FormData>(sendMagicLink, {});

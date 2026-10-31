@@ -8,8 +8,8 @@ import { answerAlert, checkNow, chooseVilla, connectGmail, disconnectGmail, type
 import { shortDate } from "@/lib/format/date";
 import { Status } from "./ConnectorGrid";
 
-const field = "h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-900";
-const primary = "h-10 rounded-lg bg-emerald-600 px-4 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50";
+const field = "h-10 rounded-lg border-0 border-b border-zinc-300 bg-transparent px-0.5 text-sm outline-none focus:border-brand-600 dark:border-zinc-700 dark:bg-transparent";
+const primary = "h-10 rounded-lg bg-brand-600 px-4 btn-label shadow-sm hover:bg-brand-700 disabled:opacity-50";
 const secondary = "h-10 rounded-lg border border-zinc-300 px-4 text-sm font-medium hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800";
 
 export type GmailState =
@@ -68,7 +68,7 @@ export function GmailDetail({ gmail, dates, returned, emails, alerts, waiting, v
   return (
     <div className="flex flex-col gap-6">
       {notice && (
-        <p className={notice.ok ? "text-sm text-emerald-700 dark:text-emerald-400" : "text-sm text-red-600"}>{notice.text}</p>
+        <p className={notice.ok ? "text-sm text-brand-700 dark:text-brand-400" : "text-sm text-red-600"}>{notice.text}</p>
       )}
       <GmailCard gmail={gmail} dates={dates} />
       {waiting.map((l) => <ChooseVilla key={l.ref} listing={l} villas={villas} />)}
@@ -133,7 +133,7 @@ function GmailCard({ gmail, dates }: { gmail: GmailState; dates: Dates }) {
         </p>
       )}
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {message && <p className="text-sm text-emerald-700 dark:text-emerald-400">{message}</p>}
+      {message && <p className="text-sm text-brand-700 dark:text-brand-400">{message}</p>}
     </section>
   );
 }
@@ -179,7 +179,7 @@ function AlertAnswer({ id }: { id: string }) {
   const small = "h-8 rounded-lg px-3 text-xs font-medium disabled:opacity-50";
   return (
     <div className="flex flex-wrap items-center gap-2 pt-1">
-      <button type="button" disabled={pending} className={`${small} bg-emerald-600 text-white hover:bg-emerald-700`}
+      <button type="button" disabled={pending} className={`${small} bg-brand-600 btn-label hover:bg-brand-700`}
         onClick={() => run(() => answerAlert(id, "cancel"))}>Cancel stay</button>
       <button type="button" disabled={pending} className={`${small} border border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800`}
         onClick={() => run(() => answerAlert(id, "keep"))}>Keep</button>
@@ -192,7 +192,7 @@ function EmailLog({ emails }: { emails: EmailRow[] }) {
   if (!emails.length) {
     return <section className="card p-5 text-sm text-zinc-500">No e-mail from Airbnb read yet.</section>;
   }
-  const tone = { ok: "text-emerald-700 dark:text-emerald-400", muted: "text-zinc-500", warn: "text-amber-700 dark:text-amber-400" };
+  const tone = { ok: "text-brand-700 dark:text-brand-400", muted: "text-zinc-500", warn: "text-amber-700 dark:text-amber-400" };
   return (
     <details className="card group p-0">
       <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-4 text-sm font-medium [&::-webkit-details-marker]:hidden">
@@ -213,7 +213,7 @@ function EmailLog({ emails }: { emails: EmailRow[] }) {
               <p className="truncate pl-0 text-zinc-500 sm:pl-[4.75rem]">{e.subject}</p>
               {e.note && <p className="pl-0 text-xs text-zinc-500 sm:pl-[4.75rem]">{e.note}</p>}
               {e.stay_id && e.code && (
-                <Link href={`/transactions?q=${encodeURIComponent(e.code)}`} className="pl-0 text-xs font-medium text-emerald-700 underline sm:pl-[4.75rem] dark:text-emerald-400">
+                <Link href={`/transactions?q=${encodeURIComponent(e.code)}`} className="pl-0 text-xs font-medium text-brand-700 underline sm:pl-[4.75rem] dark:text-brand-400">
                   See the entries
                 </Link>
               )}

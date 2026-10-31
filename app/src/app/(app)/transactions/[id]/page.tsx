@@ -43,7 +43,7 @@ async function Content({ params, searchParams }: Pick<PageProps<"/transactions/[
           {tx.merchant && tx.merchant !== tx.description && <p className="text-sm text-zinc-500">{tx.merchant}</p>}
         </div>
         <div className="text-right">
-          <p className={`text-2xl font-semibold tabular-nums ${tx.direction === "in" ? "text-emerald-700 dark:text-emerald-400" : ""}`}>
+          <p className={`text-2xl font-semibold tabular-nums ${tx.direction === "in" ? "text-brand-700 dark:text-brand-400" : ""}`}>
             {tx.direction === "in" ? "+" : "−"}{money(tx.amount, tx.currency)} <span className="text-sm font-normal text-zinc-400">{tx.currency}</span>
           </p>
           {tx.currency !== cur && <p className="text-sm text-zinc-500 tabular-nums">{money(tx.amountReporting, cur)} {cur} at {tx.fxRate}</p>}

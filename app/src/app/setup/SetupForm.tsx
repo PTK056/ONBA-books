@@ -26,7 +26,7 @@ export function SetupForm({ hasOrg }: { hasOrg: boolean }) {
       {state.error && <p role="alert" className="text-sm text-red-600">{state.error}</p>}
       <button
         disabled={pending}
-        className="h-10 rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+        className="h-10 rounded-lg bg-brand-600 px-3 btn-label shadow-sm hover:bg-brand-700 disabled:opacity-50"
       >
         {pending ? "Saving…" : "Continue"}
       </button>
@@ -34,7 +34,7 @@ export function SetupForm({ hasOrg }: { hasOrg: boolean }) {
   );
 }
 
-const field = "h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-900";
+const field = "h-10 w-full rounded-lg border-0 border-b border-zinc-300 bg-transparent px-0.5 text-sm outline-none focus:border-brand-600 dark:border-zinc-700 dark:bg-transparent";
 
 function Text({ name, label, placeholder }: { name: string; label: string; placeholder: string }) {
   return (

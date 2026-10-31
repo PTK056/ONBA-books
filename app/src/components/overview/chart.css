@@ -1,15 +1,15 @@
-/* Chart colour roles (validated with the dataviz palette checker, light and dark). */
+/* Chart colour roles, from the V3 palette: emerald income, gold expenses. */
 .viz-root {
-  --series-income: #2a78d6;
-  --series-expenses: #eb6834;
-  --series-occupancy: #4a3aa7;
-  --grid: #e4e4e7;
+  --series-income: #064e3b;
+  --series-expenses: #b8893d;
+  --series-occupancy: #2e8763;
+  --grid: #e6e3db;
 }
 @media (prefers-color-scheme: dark) {
   .viz-root {
-    --series-income: #3987e5;
-    --series-expenses: #d95926;
-    --series-occupancy: #9085e9;
-    --grid: #27272a;
+    --series-income: #5aa683;
+    --series-expenses: #d4a657;
+    --series-occupancy: #8cc5a9;
+    --grid: #2b312d;
   }
 }

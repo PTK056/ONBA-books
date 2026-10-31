@@ -114,7 +114,7 @@ async function Content({ searchParams }: Pick<PageProps<"/transactions">, "searc
                     </td>
                     <td className="hidden px-3 py-3 text-zinc-600 md:table-cell dark:text-zinc-400">{t.category?.name ?? "—"}</td>
                     {showVilla && <td className="hidden px-3 py-3 text-zinc-600 lg:table-cell dark:text-zinc-400">{t.villa.name}</td>}
-                    <td className={`whitespace-nowrap px-3 py-3 text-right tabular-nums ${t.direction === "in" ? "text-emerald-700 dark:text-emerald-400" : ""}`}>
+                    <td className={`whitespace-nowrap px-3 py-3 text-right tabular-nums ${t.direction === "in" ? "text-brand-700 dark:text-brand-400" : ""}`}>
                       {t.direction === "in" ? "+" : "−"}{money(t.amountReporting, cur)}
                       {t.currency !== cur && <span className="block text-xs text-zinc-500">{money(t.amount, t.currency)} {t.currency}</span>}
                     </td>
@@ -122,7 +122,7 @@ async function Content({ searchParams }: Pick<PageProps<"/transactions">, "searc
                       {t.files.length > 0
                         ? <span className="inline-flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-300"><Paperclip size={12} />{t.files.length > 1 ? t.files.length : ""}</span>
                         : needsReceipt(t)
-                          ? <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-xs text-amber-700 dark:bg-amber-950 dark:text-amber-300">Missing</span>
+                          ? <span className="bg-amber-50 px-1.5 py-0.5 badge-label text-amber-700 dark:bg-amber-950 dark:text-amber-300">Missing</span>
                           : <span className="text-xs text-zinc-400">—</span>}
                     </td>
                   </tr>
@@ -136,4 +136,4 @@ async function Content({ searchParams }: Pick<PageProps<"/transactions">, "searc
   );
 }
 
-const input = "h-9 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900";
+const input = "h-9 w-full rounded-lg border-0 border-b border-zinc-300 bg-transparent px-0.5 text-sm dark:border-zinc-700 dark:bg-transparent";

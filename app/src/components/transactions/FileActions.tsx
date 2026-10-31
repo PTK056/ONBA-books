@@ -60,7 +60,7 @@ export function ShareDownload({ evidenceId, name, mime, downloadUrl, label }: { 
   return (
     <div className="flex flex-wrap gap-2">
       <a href={downloadUrl} className={secondary}><Download size={15} /> Download</a>
-      <button onClick={share} disabled={busy} className={`${button} bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50`}>
+      <button onClick={share} disabled={busy} className={`${button} bg-brand-600 btn-label shadow-sm hover:bg-brand-700 disabled:opacity-50`}>
         <Share2 size={15} /> {busy ? "Preparing…" : "Share"}
       </button>
       <button onClick={whatsapp} className={secondary} title="Send a download link on WhatsApp (valid 7 days)">

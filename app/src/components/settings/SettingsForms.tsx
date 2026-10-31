@@ -5,8 +5,8 @@ import { useState, useTransition } from "react";
 import { addVilla, renameCompany, renameVilla, saveBankSettings, type Result } from "@/app/(app)/settings/actions";
 import type { BankSettings, Bearer } from "@/lib/settings";
 
-const field = "h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-900";
-const primary = "h-10 rounded-lg bg-emerald-600 px-4 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50";
+const field = "h-10 rounded-lg border-0 border-b border-zinc-300 bg-transparent px-0.5 text-sm outline-none focus:border-brand-600 dark:border-zinc-700 dark:bg-transparent";
+const primary = "h-10 rounded-lg bg-brand-600 px-4 btn-label shadow-sm hover:bg-brand-700 disabled:opacity-50";
 
 function useSave() {
   const router = useRouter();
@@ -97,7 +97,7 @@ function CompanyName({ name }: { name: string }) {
         </div>
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {saved && !error && <p className="text-sm text-emerald-700 dark:text-emerald-400">Saved.</p>}
+      {saved && !error && <p className="text-sm text-brand-700 dark:text-brand-400">Saved.</p>}
     </section>
   );
 }
@@ -136,7 +136,7 @@ function BankForm({ bank, villaCount, company }: { bank: BankSettings; villaCoun
         <div className="flex items-center gap-3">
           <button className={primary} disabled={pending || !changed}>Save</button>
           {error && <p className="text-sm text-red-600">{error}</p>}
-          {saved && !error && !changed && <p className="text-sm text-emerald-700 dark:text-emerald-400">Saved.</p>}
+          {saved && !error && !changed && <p className="text-sm text-brand-700 dark:text-brand-400">Saved.</p>}
         </div>
       </form>
     </section>

@@ -108,7 +108,7 @@ export function Uploader({ organizationId, villas, defaultVilla }: Props) {
           </p>
         )}
         <div className="flex gap-2">
-          <Link href="/review" className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">
+          <Link href="/review" className="rounded-md bg-brand-600 px-3 py-2 btn-label hover:bg-brand-700">
             Review them
           </Link>
           <button
@@ -129,7 +129,7 @@ export function Uploader({ organizationId, villas, defaultVilla }: Props) {
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => { e.preventDefault(); setDragging(false); if (!busy) add(e.dataTransfer.files); }}
         className={`flex flex-col items-center gap-2 rounded-lg border-2 border-dashed px-4 py-10 text-center ${
-          dragging ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30" : "border-zinc-300 dark:border-zinc-700"
+          dragging ? "border-brand-500 bg-brand-50 dark:bg-brand-950/30" : "border-zinc-300 dark:border-zinc-700"
         }`}
       >
         <p className="text-sm font-medium">Photos or PDFs of receipts, invoices and transfer slips</p>
@@ -185,7 +185,7 @@ export function Uploader({ organizationId, villas, defaultVilla }: Props) {
 
       <button
         onClick={start} disabled={busy || pending === 0}
-        className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+        className="rounded-md bg-brand-600 px-3 py-2 btn-label hover:bg-brand-700 disabled:opacity-50"
       >
         {phase === "uploading" ? "Uploading…"
           : phase === "reading" ? "Reading receipts… about 10 seconds each, 4 at a time"
@@ -199,7 +199,7 @@ function StatusLabel({ entry }: { entry: Entry }) {
   switch (entry.status) {
     case "waiting": return <span className="text-zinc-400">{(entry.file.size / 1e6).toFixed(1)} MB</span>;
     case "uploading": return <span className="text-zinc-500">Uploading…</span>;
-    case "uploaded": return <span className="text-emerald-600">Uploaded</span>;
+    case "uploaded": return <span className="text-brand-600">Uploaded</span>;
     case "failed": return <span className="text-red-600" title={entry.message}>{entry.message ?? "Failed"}</span>;
   }
 }

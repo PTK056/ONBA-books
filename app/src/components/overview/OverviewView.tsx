@@ -51,7 +51,7 @@ export function OverviewView({ data: o }: { data: Overview }) {
 
       {empty ? (
         <div className="card flex flex-col items-center p-12 text-center">
-          <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950"><ReceiptText size={20} /></span>
+          <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-brand-600 dark:bg-brand-950"><ReceiptText size={20} /></span>
           <p className="font-medium">No validated entries yet</p>
           <p className="mt-1 text-sm text-zinc-500">Scan receipts, add expenses by hand or import your Airbnb stays, and your months fill in here.</p>
           <div className="mt-5"><NewMenu /></div>
@@ -121,7 +121,7 @@ function TodoBar({ o, monthName }: { o: Overview; monthName: string }) {
     <section className={`card flex flex-col gap-3 p-4 ${items.length || (monthOver && !allClosed) ? "ring-amber-300/60" : ""}`}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
         <span className="flex items-center gap-1.5 font-medium">
-          {items.length === 0 ? <CheckCircle2 size={16} className="text-emerald-600" /> : <CircleAlert size={16} className="text-amber-500" />}
+          {items.length === 0 ? <CheckCircle2 size={16} className="text-brand-600" /> : <CircleAlert size={16} className="text-amber-500" />}
           {items.length === 0 ? `Nothing to do for ${monthName}` : "To do"}
         </span>
         {items}
@@ -145,7 +145,7 @@ function TodoBar({ o, monthName }: { o: Overview; monthName: string }) {
 
 function TodoLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link href={href} className="inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-200 dark:ring-amber-900">
+    <Link href={href} className="inline-flex items-center gap-0.5 bg-amber-50 px-2.5 py-0.5 text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-200 dark:ring-amber-900">
       {children} <ChevronRight size={13} />
     </Link>
   );
@@ -162,7 +162,7 @@ function StaysList({ stays, currency, showVilla }: { stays: Overview["stays"]; c
         <ul className="divide-y divide-zinc-100 text-sm dark:divide-zinc-800">
           {stays.map((x) => (
             <li key={x.key} className={`flex items-center gap-3 py-2.5 ${x.upcoming ? "text-zinc-400" : ""}`}>
-              <BedDouble size={16} className={x.upcoming ? "text-zinc-300" : "text-violet-600 dark:text-violet-400"} />
+              <BedDouble size={16} className={x.upcoming ? "text-zinc-300" : "text-brand-500 dark:text-brand-300"} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium">{x.guest ?? x.code}{x.upcoming && <span className="ml-2 text-xs font-normal">upcoming</span>}</span>
                 <span className="block text-xs text-zinc-500">{shortDate(x.checkIn)} – {shortDate(x.checkOut)} · {x.nightsInMonth} night{x.nightsInMonth === 1 ? "" : "s"} this month{showVilla && ` · ${x.villa}`}</span>
@@ -193,10 +193,10 @@ function MonthNav({ month }: { month: string }) {
 }
 
 export const TINTS = {
-  blue: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-300",
-  orange: "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-300",
-  emerald: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300",
-  violet: "bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
+  blue: "bg-brand-50 text-brand-600 dark:bg-brand-950 dark:text-brand-300",
+  orange: "bg-accent/10 text-accent",
+  emerald: "bg-brand-50 text-brand-600 dark:bg-brand-950 dark:text-brand-300",
+  violet: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300",
   zinc: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300",
 } as const;
 
@@ -221,7 +221,7 @@ export function Stat({ label, icon, tint, value, previous, currency, goodWhenUp,
         ) : (
           <span className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 font-medium ${
             change === 0 ? TINTS.zinc
-              : good ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+              : good ? "bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300"
               : "bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300"}`}>
             {change >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
             {Math.abs(Math.round(change * 100))}%
@@ -308,7 +308,7 @@ function EntriesTable({ entries, currency, showVilla }: { entries: Overview["ent
       <td className="py-2 pl-3 text-right">
         {e.receiptUrl
           ? <a href={e.receiptUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-50 dark:text-zinc-300 dark:ring-zinc-700 dark:hover:bg-zinc-800"><ReceiptText size={12} /> View</a>
-          : <span className="inline-flex rounded-md bg-amber-50 px-1.5 py-0.5 text-xs text-amber-700 dark:bg-amber-950 dark:text-amber-300">Missing</span>}
+          : <span className="inline-flex bg-amber-50 px-1.5 py-0.5 badge-label text-amber-700 dark:bg-amber-950 dark:text-amber-300">Missing</span>}
       </td>
     </tr>
   );

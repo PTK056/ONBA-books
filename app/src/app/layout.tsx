@@ -1,9 +1,17 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Gloock, Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
+import ColorLab from "@/components/dev/ColorLab";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const hanken = Hanken_Grotesk({
+  variable: "--font-hanken",
+  subsets: ["latin"],
+});
+
+// Display face, used for the wordmark only.
+const gloock = Gloock({
+  variable: "--font-gloock",
+  weight: "400",
   subsets: ["latin"],
 });
 
@@ -21,9 +29,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${hanken.variable} ${gloock.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        {process.env.NODE_ENV === "development" && <ColorLab />}
+      </body>
     </html>
   );
 }

@@ -31,7 +31,7 @@ export function MonthClose({ villaId, villaName, month, monthName, closed, canEd
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm">{villaName}</span>
         <span className="flex items-center gap-2">
-          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${closed
+          <span className={`px-2 py-0.5 badge-label ${closed
             ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
             : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"}`}>
             {closed ? "🔒 Closed" : "Open"}

@@ -1,38 +1,97 @@
 @import "tailwindcss";
 
-/* Splyce design tokens: zinc neutrals, emerald brand, Geist type. */
+/* Splyce design tokens (direction V3): porcelain ground, warm neutrals,
+   emerald brand, gold accent, square shapes, Hanken Grotesk type. */
 :root {
-  --background: #f7f7f8;
-  --foreground: #18181b;
+  --background: #fafaf6;
+  --foreground: #1f2a25;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-hanken);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-gloock);
+}
+
+@theme {
+  /* Brand: deep emerald. 600 is the button colour. */
+  --color-brand-50: #eef6f1;
+  --color-brand-100: #dcefe5;
+  --color-brand-200: #b9decb;
+  --color-brand-300: #8cc5a9;
+  --color-brand-400: #5aa683;
+  --color-brand-500: #2e8763;
+  --color-brand-600: #064e3b;
+  --color-brand-700: #043f30;
+  --color-brand-800: #033326;
+  --color-brand-900: #02281e;
+  --color-brand-950: #011a13;
+
+  /* Accent: gold, used sparingly (logo dot, active tab, highlights). */
+  --color-accent: #b8893d;
+  --color-champagne: #f8e7c9;
+
+  /* Neutrals: warm, slightly green greys in place of Tailwind's zinc. */
+  --color-zinc-50: #fafaf6;
+  --color-zinc-100: #f2f1ec;
+  --color-zinc-200: #e6e3db;
+  --color-zinc-300: #d2cec4;
+  --color-zinc-400: #9c9b92;
+  --color-zinc-500: #6b6f68;
+  --color-zinc-600: #535851;
+  --color-zinc-700: #3f453f;
+  --color-zinc-800: #2b312d;
+  --color-zinc-900: #1f2a25;
+  --color-zinc-950: #121a16;
+
+  /* Square shapes; rounded-full (dots, avatars) is unchanged. */
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #09090b;
-    --foreground: #f4f4f5;
+    --background: #121a16;
+    --foreground: #f2f1ec;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  font-feature-settings: "cv11", "ss01";
+  font-family: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
 }
 
 @utility card {
   border-radius: var(--radius-xl);
   background-color: var(--color-white);
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.04), 0 0 0 1px rgb(24 24 27 / 0.06);
+  box-shadow: 0 0 0 1px var(--color-zinc-200);
   @media (prefers-color-scheme: dark) {
     background-color: var(--color-zinc-900);
     box-shadow: 0 0 0 1px rgb(255 255 255 / 0.08);
   }
+}
+
+/* Primary button label: small capitals, spaced, like the landing page. */
+@utility btn-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-champagne);
+}
+
+/* Status badge label: tiny spaced capitals, like the landing page's labels. */
+@utility badge-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }

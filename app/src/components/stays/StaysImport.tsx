@@ -47,7 +47,7 @@ export function StaysImport({ villas, reportingCurrency, initialFile }: Props) {
         onDrop={(e) => { e.preventDefault(); pick(e.dataTransfer.files[0]); }}
         className="card flex flex-col items-center gap-3 p-8 text-center"
       >
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950"><FileSpreadsheet size={20} /></span>
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-brand-600 dark:bg-brand-950"><FileSpreadsheet size={20} /></span>
         {file ? (
           <p className="text-sm"><span className="font-medium">{file.name}</span> <button onClick={() => input.current?.click()} className="ml-2 text-zinc-500 underline-offset-2 hover:underline">Choose another file</button></p>
         ) : (
@@ -142,7 +142,7 @@ export function StaysImport({ villas, reportingCurrency, initialFile }: Props) {
                 <button
                   disabled={!ready || pending}
                   onClick={() => start(async () => setResult(await importAirbnb(file!.text, mapping)))}
-                  className="inline-flex h-10 items-center rounded-lg bg-emerald-600 px-4 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                  className="inline-flex h-10 items-center rounded-lg bg-brand-600 px-4 btn-label shadow-sm hover:bg-brand-700 disabled:opacity-50"
                 >
                   {pending ? "Importing…" : `Import ${parsed.stays.length} stays`}
                 </button>
@@ -198,7 +198,7 @@ function Done({ summary, onAgain }: { summary: ImportSummary; onAgain: () => voi
   const problems = [...summary.conflicts, ...summary.skipped];
   return (
     <div className="card flex flex-col gap-4 p-6">
-      <p className="flex items-center gap-2 text-lg font-semibold"><CheckCircle2 className="text-emerald-600" size={22} /> Import finished</p>
+      <p className="flex items-center gap-2 text-lg font-semibold"><CheckCircle2 className="text-brand-600" size={22} /> Import finished</p>
       <div className="grid grid-cols-3 gap-3 text-sm">
         {([["New stays", summary.created], ["Updated", summary.updated], ["Already up to date", summary.unchanged]] as const).map(([k, v]) => (
           <div key={k} className="rounded-lg bg-zinc-50 p-3 dark:bg-zinc-800/50"><p className="text-xs text-zinc-500">{k}</p><p className="text-xl font-semibold tabular-nums">{v}</p></div>
@@ -213,7 +213,7 @@ function Done({ summary, onAgain }: { summary: ImportSummary; onAgain: () => voi
         </div>
       )}
       <div className="flex gap-2">
-        <Link href="/overview" className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">See the overview</Link>
+        <Link href="/overview" className="rounded-lg bg-brand-600 px-3 py-2 btn-label hover:bg-brand-700">See the overview</Link>
         <button onClick={onAgain} className="rounded-lg border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800">Import another file</button>
       </div>
     </div>

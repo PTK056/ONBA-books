@@ -55,9 +55,9 @@ export function SidebarView({ org, reviewBadge, user, path, admin, place, placeC
           {nav.map(({ href, label, icon: Icon, ...rest }) => (
             <Link
               key={href} href={href} aria-current={active(href) ? "page" : undefined}
-              className="group flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 aria-[current=page]:bg-zinc-100 aria-[current=page]:font-medium aria-[current=page]:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100 dark:aria-[current=page]:bg-zinc-900 dark:aria-[current=page]:text-zinc-100"
+              className="group flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 aria-[current=page]:bg-brand-600/[0.06] aria-[current=page]:font-semibold aria-[current=page]:text-brand-600 aria-[current=page]:shadow-[inset_2px_0_0_var(--color-accent)] dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100 dark:aria-[current=page]:bg-zinc-900 dark:aria-[current=page]:text-zinc-100"
             >
-              <Icon size={17} className="text-zinc-400 group-aria-[current=page]:text-emerald-600" />
+              <Icon size={17} className="text-zinc-400 group-aria-[current=page]:text-accent" />
               <span className="flex-1">{label}</span>
               {"badge" in rest && reviewBadge}
             </Link>
@@ -67,7 +67,7 @@ export function SidebarView({ org, reviewBadge, user, path, admin, place, placeC
       </aside>
 
       <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-zinc-200 bg-white/90 px-4 backdrop-blur lg:hidden dark:border-zinc-800 dark:bg-zinc-950/90">
-        <Link href="/overview"><Logo className="text-sm" /></Link>
+        <Link href="/overview"><Logo className="text-xl" /></Link>
         {placeCompact}
         <nav className="ml-auto flex gap-1 overflow-x-auto">
           {nav.map(({ href, label, icon: Icon, ...rest }) => (

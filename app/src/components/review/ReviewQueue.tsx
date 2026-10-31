@@ -311,7 +311,7 @@ function EntryForm({
         {!unreadable && (
           <button
             type="submit" disabled={pending}
-            className="flex-1 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+            className="flex-1 rounded-md bg-brand-600 px-3 py-2 btn-label hover:bg-brand-700 disabled:opacity-50"
           >
             {pending ? "Saving…" : "Accept"} <kbd className="ml-1 hidden text-xs opacity-70 lg:inline">⌘↵</kbd>
           </button>
@@ -344,7 +344,7 @@ function Field({ label, flagged = false, children }: { label: string; flagged?: 
 }
 
 const input = (flagged: boolean) =>
-  `w-full rounded-md border bg-white px-3 py-2 text-sm dark:bg-zinc-900 ${
+  `w-full border-0 border-b bg-transparent px-0.5 py-2 text-sm ${
     flagged ? "border-amber-400 ring-2 ring-amber-200 dark:ring-amber-900" : "border-zinc-300 dark:border-zinc-700"
   }`;
 
@@ -363,10 +363,10 @@ function Callout({ tone, title, children }: { tone: "amber" | "red"; title: stri
 function ConfidenceBadge({ value }: { value?: number }) {
   const { label, cls } = useMemo(() => {
     if (value == null) return { label: "Unread", cls: "bg-zinc-100 text-zinc-600" };
-    if (value >= 0.9) return { label: "Clear", cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200" };
+    if (value >= 0.9) return { label: "Clear", cls: "bg-brand-100 text-brand-800 dark:bg-brand-900/50 dark:text-brand-200" };
     if (value >= 0.6) return { label: "Check", cls: "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200" };
     return { label: "Doubtful", cls: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200" };
   }, [value]);
-  return <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{label}</span>;
+  return <span className={`shrink-0 px-2 py-0.5 badge-label ${cls}`}>{label}</span>;
 }
 

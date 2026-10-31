@@ -7,8 +7,8 @@ import { addWork, pay, prepare, removeWork, saveStaff, type Result } from "@/app
 import { parseAmount } from "@/components/review/amount";
 import type { Staff } from "@/lib/staff/ops";
 
-const field = "h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-900";
-const primary = "h-10 rounded-lg bg-emerald-600 px-4 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50";
+const field = "h-10 w-full rounded-lg border-0 border-b border-zinc-300 bg-transparent px-0.5 text-sm outline-none focus:border-brand-600 dark:border-zinc-700 dark:bg-transparent";
+const primary = "h-10 rounded-lg bg-brand-600 px-4 btn-label shadow-sm hover:bg-brand-700 disabled:opacity-50";
 const secondary = "h-10 rounded-lg border border-zinc-300 px-4 text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900";
 const label = "flex flex-col gap-1 text-sm font-medium";
 
@@ -79,7 +79,7 @@ export function StaffForm({ person, villas, categories, currency, onDone }: {
         <div className="flex flex-wrap gap-2">
           {([["monthly", "Monthly"], ["hourly", "Per hour"], ["per_job", "Per job"]] as const).map(([v, l]) => (
             <button key={v} type="button" onClick={() => setMode(v)}
-              className={`h-9 rounded-lg border px-3 text-sm ${mode === v ? "border-emerald-600 bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" : "border-zinc-300 dark:border-zinc-700"}`}>{l}</button>
+              className={`h-9 rounded-lg border px-3 text-sm ${mode === v ? "border-brand-600 bg-brand-50 text-brand-800 dark:bg-brand-950 dark:text-brand-200" : "border-zinc-300 dark:border-zinc-700"}`}>{l}</button>
           ))}
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -135,7 +135,7 @@ export function AddStaff(props: { villas: Option[]; categories: Option[]; curren
 
 export function EditStaff({ person, ...props }: { person: Staff; villas: Option[]; categories: Option[]; currency: string }) {
   const [open, setOpen] = useState(false);
-  if (!open) return <button onClick={() => setOpen(true)} className="text-sm text-emerald-700 hover:underline dark:text-emerald-300">Edit</button>;
+  if (!open) return <button onClick={() => setOpen(true)} className="text-sm text-brand-700 hover:underline dark:text-brand-300">Edit</button>;
   return <div className="mt-3 w-full"><StaffForm person={person} {...props} onDone={() => setOpen(false)} /></div>;
 }
 

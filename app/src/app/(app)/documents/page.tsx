@@ -76,11 +76,11 @@ async function Content({ searchParams }: Pick<PageProps<"/documents">, "searchPa
             return (
               <Link
                 key={c.id || "all"} role="listitem" href={`/documents${keep ? `?${keep}` : ""}`}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-sm ring-1 ${active
-                  ? "bg-emerald-600 text-white ring-emerald-600"
+                className={`shrink-0 px-3 py-1.5 text-sm ring-1 ${active
+                  ? "bg-brand-600 text-white ring-brand-600"
                   : "bg-white text-zinc-700 ring-zinc-950/10 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-white/10"}`}
               >
-                {c.name} <span className={active ? "text-emerald-100" : "text-zinc-400"}>{c.n}</span>
+                {c.name} <span className={active ? "text-brand-100" : "text-zinc-400"}>{c.n}</span>
               </Link>
             );
           })}
@@ -101,7 +101,7 @@ async function Content({ searchParams }: Pick<PageProps<"/documents">, "searchPa
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm text-zinc-500">{count(rows)} document{count(rows) === 1 ? "" : "s"} in {categoryName}, all time</p>
             {rows.length > 0 && (
-              <a href={zipFor()} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white shadow-sm hover:bg-emerald-700">
+              <a href={zipFor()} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand-600 px-3 btn-label shadow-sm hover:bg-brand-700">
                 <Archive size={15} /> Download all (ZIP)
               </a>
             )}
@@ -118,7 +118,7 @@ async function Content({ searchParams }: Pick<PageProps<"/documents">, "searchPa
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm text-zinc-500">{count(inMonth(month))} document{count(inMonth(month)) === 1 ? "" : "s"}</p>
             {inMonth(month).length > 0 && (
-              <a href={zipFor(month)} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white shadow-sm hover:bg-emerald-700">
+              <a href={zipFor(month)} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand-600 px-3 btn-label shadow-sm hover:bg-brand-700">
                 <Archive size={15} /> Download month (ZIP)
               </a>
             )}
@@ -154,7 +154,7 @@ function FolderCard({ href, title, count, note, zip }: { href: string; title: st
   return (
     <div className={`card relative flex flex-col gap-3 p-4 ${count ? "" : "opacity-50"}`}>
       <Link href={href} className="absolute inset-0 rounded-xl" aria-label={`Open ${title}`} />
-      <Folder size={22} className={count ? "text-emerald-600" : "text-zinc-400"} />
+      <Folder size={22} className={count ? "text-brand-600" : "text-zinc-400"} />
       <div>
         <p className="font-medium">{title}</p>
         <p className="text-xs text-zinc-500">{count} document{count === 1 ? "" : "s"}{note && ` · ${note}`}</p>
