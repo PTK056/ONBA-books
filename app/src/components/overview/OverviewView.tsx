@@ -194,7 +194,7 @@ function MonthNav({ month }: { month: string }) {
 
 export const TINTS = {
   blue: "bg-brand-50 text-brand-600 dark:bg-brand-950 dark:text-brand-300",
-  orange: "bg-accent/10 text-accent",
+  orange: "bg-accent/10 text-accent-ink dark:text-accent",
   emerald: "bg-brand-50 text-brand-600 dark:bg-brand-950 dark:text-brand-300",
   violet: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300",
   zinc: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300",
