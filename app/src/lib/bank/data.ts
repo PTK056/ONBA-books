@@ -153,7 +153,7 @@ export async function bankPage(db: SupabaseClient, orgId: string) {
 }
 
 /** What Airbnb sent and the bank hasn't shown yet, and stays booked from e-mails with no payout at all. */
-async function payoutsPage(db: SupabaseClient, orgId: string, lastLineDate: string | null) {
+export async function payoutsPage(db: SupabaseClient, orgId: string, lastLineDate: string | null) {
   const today = new Date().toISOString().slice(0, 10);
   const states = await payoutStates(db, orgId, shift(today, -PAYOUTS_SINCE_DAYS));
   const expected: ExpectedPayout[] = states.filter((p) => p.stayId && !p.lineId).map((p) => {

@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { toolDefs } from "@/lib/mcp/tools";
 import type { Session } from "@/lib/mcp/session";
 import { APP_URL } from "@/lib/app-url";
+import { airbnbBrief } from "@/lib/mail/brief";
 
 // Morning brief: what is left to do, from get_todo, trimmed to what needs the user soon.
 // Returns null when nothing does: then no message is sent.
@@ -35,8 +36,10 @@ export async function briefItems(s: Session) {
     month_to_close: Number(todo.today.slice(8, 10)) <= CLOSE_REMINDER_UNTIL_DAY ? todo.month_to_close : null,
     review_link: todo.receipts_to_review ? todo.review : null,
     missing_receipts_link: todo.expenses_missing_receipt.count ? `${APP_URL}/transactions?receipt=missing` : null,
+    airbnb: await airbnbBrief(s).catch(() => null),
   };
-  const empty = !items.payroll_due && !items.tasks_due.length && !items.receipts_to_review && !items.expenses_missing_receipt.count && !items.month_to_close;
+  const empty = !items.payroll_due && !items.tasks_due.length && !items.receipts_to_review && !items.expenses_missing_receipt.count && !items.month_to_close
+    && !items.airbnb;
   return empty ? null : items;
 }
 
@@ -54,7 +57,12 @@ export async function writeBrief(items: object, recentUserText: string[]): Promi
       + "From the JSON, write a short message: a one-line greeting, then only what needs them (staff pay due first, then overdue items), a few short bullets, "
       + "for staff pay: who, how much, the total, and offer to prepare it or mark people as paid; "
       + "amounts with thousand separators and currency. Links: review_link for receipts waiting for review, missing_receipts_link for "
-      + "expenses without a receipt (they can be attached by sending the photo in this chat); never mix them up. End with one short offer to help. "
+      + "expenses without a receipt (they can be attached by sending the photo in this chat); never mix them up. "
+      + "airbnb.in_books: one short line per stay starting with ✅: first name, dates, \"in the books\", net in the reporting currency "
+      + "(net_listing in listing_currency in brackets); several stays: one line \"In the books since yesterday:\" then a bullet each. "
+      + "airbnb.late_payouts: Airbnb payouts not at the bank after their due date: guest, amount, due date, and bank_link. "
+      + "airbnb.gmail_problem: one line with connections_link to reconnect. Never announce new bookings, cancellations or payouts sent: "
+      + "the Airbnb app already does. End with one short offer to help. "
       + "No headings, no tables, **bold** at most once. Write in the language of the language sample; English if there is none. Mention only what the JSON contains.",
     messages: [{
       role: "user",

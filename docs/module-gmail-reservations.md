@@ -167,7 +167,7 @@ dans les notifications Airbnb). Il ne dit que ce qui concerne les comptes et la 
    - **Bank (codé le 31/10/2026)** : rapprochement exact d'une ligne Danamon avec un versement lu (montant IDR au rupiah près, entre l'envoi
      et quelques jours ouvrés après la date prévue) ; bloc **« versements attendus »** (envoyés, pas encore à la banque),
      où apparaît aussi un séjour compté en revenu mais jamais payé.
-   - **Brief** : les trois lignes du §8 (séjour complet dans les comptes, versement en retard, relève en panne) + `answer_booking_alert`.
+   - **Brief (codé le 31/10/2026, `lib/mail/brief.ts`)** : les trois lignes du §8 (séjour complet dans les comptes, versement en retard, relève en panne) + `answer_booking_alert`.
    - Rangement : `listing_villas` réutilisé par l'import CSV, module activable (`gmail_bookings`), extrait du support effacé après 90 jours.
 3. **V3** : secours IA via Review, adresse de transfert pour les boîtes hors Gmail, propre app Google vérifiée (lecture seule, nom Splyce).
 
