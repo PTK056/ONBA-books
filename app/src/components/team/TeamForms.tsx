@@ -7,7 +7,7 @@ import { addWork, pay, prepare, removeWork, saveStaff, type Result } from "@/app
 import { parseAmount } from "@/components/review/amount";
 import type { Staff } from "@/lib/staff/ops";
 
-const field = "h-10 w-full rounded-lg border-0 border-b border-zinc-300 bg-transparent px-0.5 text-sm outline-none focus:border-brand-600 dark:border-zinc-700 dark:bg-transparent";
+const field = "h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-brand-600 dark:border-zinc-700 dark:bg-zinc-900";
 const primary = "h-10 rounded-lg bg-brand-600 px-4 btn-label shadow-sm hover:bg-brand-700 disabled:opacity-50";
 const secondary = "h-10 rounded-lg border border-zinc-300 px-4 text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900";
 const label = "flex flex-col gap-1 text-sm font-medium";

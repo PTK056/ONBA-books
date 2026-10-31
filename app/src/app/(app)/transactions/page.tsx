@@ -136,4 +136,4 @@ async function Content({ searchParams }: Pick<PageProps<"/transactions">, "searc
   );
 }
 
-const input = "h-9 w-full rounded-lg border-0 border-b border-zinc-300 bg-transparent px-0.5 text-sm dark:border-zinc-700 dark:bg-transparent";
+const input = "h-9 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900";

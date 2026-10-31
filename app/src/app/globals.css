@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
-/* Splyce design tokens (look V3): porcelain ground, warm neutrals,
-   emerald brand, gold accent, square shapes, Hanken Grotesk type. */
+/* Splyce design tokens (Harbor): calm navy brand, honey accent, cool greys,
+   soft rounded shapes, Hanken Grotesk type. */
 :root {
-  --background: #fafaf6;
-  --foreground: #1f2a25;
+  --background: #f6f7f9;
+  --foreground: #142033;
 }
 
 @theme inline {
@@ -16,52 +16,53 @@
 }
 
 @theme {
-  /* Brand: deep emerald. 600 is the button colour. */
-  --color-brand-50: #eef6f1;
-  --color-brand-100: #dcefe5;
-  --color-brand-200: #b9decb;
-  --color-brand-300: #8cc5a9;
-  --color-brand-400: #5aa683;
-  --color-brand-500: #2e8763;
-  --color-brand-600: #064e3b;
-  --color-brand-700: #043f30;
-  --color-brand-800: #033326;
-  --color-brand-900: #02281e;
-  --color-brand-950: #011a13;
+  /* Brand: calm navy. 600 is the button colour. */
+  --color-brand-50: #eef3f9;
+  --color-brand-100: #dce6f2;
+  --color-brand-200: #b9cce4;
+  --color-brand-300: #8daacf;
+  --color-brand-400: #5e84b5;
+  --color-brand-500: #3d6698;
+  --color-brand-600: #23466e;
+  --color-brand-700: #1c3a5c;
+  --color-brand-800: #172f4b;
+  --color-brand-900: #12253b;
+  --color-brand-950: #0b1726;
 
-  /* Accent: gold, used sparingly (logo dot, active tab, highlights). */
-  --color-accent: #b8893d;
-  /* Darker gold for text and small icons, readable on porcelain. */
-  --color-accent-ink: #8a6420;
-  --color-champagne: #f8e7c9;
+  /* Accent: honey, used sparingly (logo dot, active tab, expenses). */
+  --color-accent: #d9a441;
+  /* Darker honey for text and small icons, readable on the light ground. */
+  --color-accent-ink: #8a6418;
+  /* Text on brand buttons. */
+  --color-on-brand: #ffffff;
 
-  /* Neutrals: warm, slightly green greys in place of Tailwind's zinc. */
-  --color-zinc-50: #fafaf6;
-  --color-zinc-100: #f2f1ec;
-  --color-zinc-200: #e6e3db;
-  --color-zinc-300: #d2cec4;
-  --color-zinc-400: #9c9b92;
-  --color-zinc-500: #6b6f68;
-  --color-zinc-600: #535851;
-  --color-zinc-700: #3f453f;
-  --color-zinc-800: #2b312d;
-  --color-zinc-900: #1f2a25;
-  --color-zinc-950: #121a16;
+  /* Neutrals: cool, slightly blue greys in place of Tailwind's zinc. */
+  --color-zinc-50: #f6f7f9;
+  --color-zinc-100: #eef0f4;
+  --color-zinc-200: #e1e5ec;
+  --color-zinc-300: #cbd2dd;
+  --color-zinc-400: #98a2b3;
+  --color-zinc-500: #667085;
+  --color-zinc-600: #4f5a6e;
+  --color-zinc-700: #3a4456;
+  --color-zinc-800: #273041;
+  --color-zinc-900: #142033;
+  --color-zinc-950: #0b1220;
 
-  /* Square shapes; rounded-full (dots, avatars) is unchanged. */
-  --radius-xs: 0;
-  --radius-sm: 0;
-  --radius-md: 0;
-  --radius-lg: 0;
-  --radius-xl: 0;
-  --radius-2xl: 0;
-  --radius-3xl: 0;
+  /* Soft shapes, a touch rounder than Tailwind's defaults. */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
+  --radius-3xl: 24px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #121a16;
-    --foreground: #f2f1ec;
+    --background: #0b1220;
+    --foreground: #eef0f4;
   }
 }
 
@@ -71,7 +72,7 @@ body {
   font-family: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Focus: a gold outline on controls (keyboard), a thicker emerald line under fields. */
+/* Focus: a honey outline on controls (keyboard), a soft brand halo around fields. */
 @layer base {
   a:focus-visible, button:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
     outline: 2px solid var(--color-accent);
@@ -79,7 +80,8 @@ body {
   }
   input:focus, select:focus, textarea:focus {
     outline: none;
-    box-shadow: 0 2px 0 0 var(--color-brand-500);
+    border-color: var(--color-brand-500);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-brand-500) 22%, transparent);
   }
   button, a, summary {
     transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
@@ -101,24 +103,23 @@ body {
 @utility card {
   border-radius: var(--radius-xl);
   background-color: var(--color-white);
-  box-shadow: 0 0 0 1px var(--color-zinc-200);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.04), 0 1px 2px rgb(0 0 0 / 0.04), 0 12px 32px -16px rgb(0 0 0 / 0.14);
   @media (prefers-color-scheme: dark) {
     background-color: var(--color-zinc-900);
     box-shadow: 0 0 0 1px rgb(255 255 255 / 0.08);
   }
 }
 
-/* Primary button label: small capitals, spaced, like the landing page. */
+/* Primary button label, in the on-brand colour. */
 @utility btn-label {
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--color-champagne);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-on-brand);
 }
 
 /* Status badge label: small and firm, in sentence case so it reads at a glance. */
 @utility badge-label {
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 600;
 }

@@ -344,7 +344,7 @@ function Field({ label, flagged = false, children }: { label: string; flagged?: 
 }
 
 const input = (flagged: boolean) =>
-  `w-full border-0 border-b bg-transparent px-0.5 py-2 text-sm ${
+  `w-full rounded-lg border bg-white px-3 py-2 text-sm dark:bg-zinc-900 ${
     flagged ? "border-amber-400 ring-2 ring-amber-200 dark:ring-amber-900" : "border-zinc-300 dark:border-zinc-700"
   }`;
 

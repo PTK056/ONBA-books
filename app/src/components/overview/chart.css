@@ -1,15 +1,15 @@
-/* Chart colour roles, from the V3 palette: emerald income, gold expenses. */
+/* Chart colour roles follow the theme: brand for income, accent for expenses. */
 .viz-root {
-  --series-income: #064e3b;
-  --series-expenses: #b8893d;
-  --series-occupancy: #2e8763;
-  --grid: #e6e3db;
+  --series-income: var(--color-brand-600);
+  --series-expenses: var(--color-accent);
+  --series-occupancy: var(--color-brand-500);
+  --grid: var(--color-zinc-200);
 }
 @media (prefers-color-scheme: dark) {
   .viz-root {
-    --series-income: #5aa683;
-    --series-expenses: #d4a657;
-    --series-occupancy: #8cc5a9;
-    --grid: #2b312d;
+    --series-income: var(--color-brand-400);
+    --series-expenses: var(--color-accent);
+    --series-occupancy: var(--color-brand-300);
+    --grid: var(--color-zinc-800);
   }
 }

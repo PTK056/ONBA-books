@@ -38,7 +38,7 @@ export async function ReviewBadge() {
     .eq("organization_id", org.id).eq("status", "pending");
   if (!count) return null;
   return (
-    <span className="bg-amber-100 px-1.5 text-[11px] font-semibold tabular-nums text-amber-800 dark:bg-amber-900/60 dark:text-amber-200">
+    <span className="rounded-full bg-amber-100 px-1.5 text-[11px] font-semibold tabular-nums text-amber-800 dark:bg-amber-900/60 dark:text-amber-200">
       {count}
     </span>
   );

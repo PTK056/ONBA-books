@@ -23,7 +23,7 @@ interface Props {
   splitVillas?: { id: string; name: string }[];
 }
 
-const field = "h-10 w-full rounded-lg border-0 border-b border-zinc-300 bg-transparent px-0.5 text-sm outline-none focus:border-brand-600 dark:border-zinc-700 dark:bg-transparent";
+const field = "h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-brand-600 dark:border-zinc-700 dark:bg-zinc-900";
 
 /** Add an expense or income by hand (optionally with its receipt), or correct an existing entry. */
 export function TxForm({ mode, id, organizationId, reportingCurrency, villas, categories, initial, splitVillas = [] }: Props) {

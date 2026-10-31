@@ -76,7 +76,7 @@ async function Content({ searchParams }: Pick<PageProps<"/documents">, "searchPa
             return (
               <Link
                 key={c.id || "all"} role="listitem" href={`/documents${keep ? `?${keep}` : ""}`}
-                className={`shrink-0 px-3 py-1.5 text-sm ring-1 ${active
+                className={`shrink-0 rounded-full px-3 py-1.5 text-sm ring-1 ${active
                   ? "bg-brand-600 text-white ring-brand-600"
                   : "bg-white text-zinc-700 ring-zinc-950/10 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-white/10"}`}
               >

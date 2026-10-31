@@ -34,7 +34,7 @@ export function SetupForm({ hasOrg }: { hasOrg: boolean }) {
   );
 }
 
-const field = "h-10 w-full rounded-lg border-0 border-b border-zinc-300 bg-transparent px-0.5 text-sm outline-none focus:border-brand-600 dark:border-zinc-700 dark:bg-transparent";
+const field = "h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-brand-600 dark:border-zinc-700 dark:bg-zinc-900";
 
 function Text({ name, label, placeholder }: { name: string; label: string; placeholder: string }) {
   return (

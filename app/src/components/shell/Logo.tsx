@@ -1,4 +1,4 @@
-/** The Splyce wordmark: Gloock, with the gold dot from the landing page. */
+/** The Splyce wordmark: Gloock, with the honey dot. */
 export function Logo({ className = "text-2xl" }: { className?: string }) {
   return (
     <span className={`font-display leading-none ${className}`}>

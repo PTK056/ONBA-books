@@ -164,7 +164,7 @@ function StaysSummary({ p, currency }: { p: PeriodOverview; currency: string }) 
 
 function Chip({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link href={href} className="inline-flex items-center gap-0.5 bg-amber-50 px-2.5 py-0.5 text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-200 dark:ring-amber-900">
+    <Link href={href} className="inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-200 dark:ring-amber-900">
       {children} <ChevronRight size={13} />
     </Link>
   );
