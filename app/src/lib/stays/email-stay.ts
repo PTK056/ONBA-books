@@ -26,6 +26,8 @@ export interface EmailStay {
 }
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
+/** Payout and confirmation can differ by a few cents of rounding; an added night is never that small. */
+const ROUNDING = 1;
 
 export function stayFromEmails(confirmed: Confirmed, payouts: PaidLine[], canceled: Canceled | null): EmailStay {
   const own = payouts.filter((p) => p.currency === confirmed.currency);
@@ -44,7 +46,10 @@ export function stayFromEmails(confirmed: Confirmed, payouts: PaidLine[], cancel
     gross = net > 0 ? grossFor(net) : 0;
     fees = round2(gross - net);
     feesEstimated = net > 0;
-  } else if (paidNet > confirmed.net + 0.01) {
+  } else if (own.length && Math.abs(paidNet - confirmed.net) < ROUNDING) {
+    // Paid what was booked, give or take Airbnb's rounding: the payout is the exact net, the fee absorbs the cents.
+    fees = round2(confirmed.gross - paidNet);
+  } else if (paidNet > confirmed.net) {
     // Paid more than booked: nights added after the booking. The payout gives the extra, net.
     gross = round2(confirmed.gross + grossFor(paidNet - confirmed.net));
     fees = round2(gross - paidNet);

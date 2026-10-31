@@ -28,6 +28,12 @@ test("paid: the payout gives the real rate", () => {
   assert.equal(r.stay.gross, 512.55);
 });
 
+test("a cent of rounding between booking and payout is not an added night", () => {
+  // Real case: booked €425.15, paid €425.16.
+  const r = stayFromEmails(booking(), [paid(425.16, 8_643_874)], null);
+  assert.deepEqual([r.stay.gross, r.stay.fees, r.stay.net, r.stay.checkOut, r.paid, r.feesEstimated], [512.55, 87.39, 425.16, "2026-11-06", true, false]);
+});
+
 test("a night added after booking: second payout, new checkout, extra fee estimated", () => {
   // Real case: 12 nights booked (890.87 net), one more night accepted, paid 74.26 net separately.
   const b = booking({ checkIn: "2026-09-29", checkOut: "2026-10-11", nights: 12, gross: 1074.05, fees: 183.18, net: 890.87 });
