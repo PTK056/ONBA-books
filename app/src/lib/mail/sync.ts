@@ -62,6 +62,14 @@ export async function syncOrganization(db: Db, orgId: string): Promise<SyncSumma
       else if (r === "updated") summary.updated++;
       else if (r === "needs_villa" || r === "conflict") summary.attention++;
     }
+    // Bookings still waiting (e.g. for a rate) get another try: a payout read today may give it.
+    const { data: waiting } = await db.from("inbound_emails").select("code")
+      .eq("organization_id", orgId).eq("kind", "confirmed").eq("result", "waiting");
+    for (const code of new Set((waiting ?? []).map((w) => w.code as string))) {
+      if (codes.has(code)) continue;
+      const r = await applyCode(db, orgId, code);
+      if (r === "booked") summary.booked++;
+    }
     await refreshSupportAlerts(db, orgId);
     const { count } = await db.from("inbound_emails").select("id", { count: "exact", head: true })
       .eq("organization_id", orgId).in("result", ["unrecognised", "alert"]).gte("created_at", startedAt.toISOString());
@@ -187,6 +195,13 @@ export async function applyCode(db: Db, orgId: string, code: string): Promise<Re
     const { data: last } = await db.from("transactions").select("fx_rate").eq("organization_id", orgId)
       .eq("currency", built.stay.currency).order("date", { ascending: false }).limit(1).maybeSingle();
     rate = last?.fx_rate ? Number(last.fx_rate) : undefined;
+  }
+  if (rate === undefined) {
+    // Books kept in the reporting currency only (e.g. migrated): the rate of the latest payout read.
+    const { data: payout } = await db.from("stay_payouts").select("amount, received").eq("organization_id", orgId)
+      .eq("currency", built.stay.currency).eq("received_currency", reporting).gt("amount", 0)
+      .order("sent_on", { ascending: false }).limit(1).maybeSingle();
+    rate = payout ? Number(payout.received) / Number(payout.amount) : undefined;
   }
   if (!rate) return mark("waiting", `No ${built.stay.currency} → ${reporting} rate yet: waiting for the payout`);
 
