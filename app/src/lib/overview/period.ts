@@ -77,7 +77,7 @@ export async function loadPeriod(kind: "year" | "all", requestedYear?: string): 
     .eq("organization_id", org.id).eq("status", "validated").gte("date", from).lt("date", to).limit(MAX_ROWS);
   if (scope) txQuery = txQuery.in("villa_id", scope);
   let staysQuery = db.from("stays").select("check_in, check_out, gross_amount, net_amount")
-    .eq("organization_id", org.id).lt("check_in", to).gt("check_out", from).limit(MAX_ROWS);
+    .eq("organization_id", org.id).neq("status", "canceled").lt("check_in", to).gt("check_out", from).limit(MAX_ROWS);
   if (scope) staysQuery = staysQuery.in("villa_id", scope);
   let missingQuery = db.from("expenses_missing_evidence").select("id", { count: "exact", head: true })
     .eq("organization_id", org.id).gte("date", from).lt("date", to);

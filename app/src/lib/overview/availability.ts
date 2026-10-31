@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  */
 export async function openingDays(db: SupabaseClient, organizationId: string): Promise<Map<string, string>> {
   const { data } = await db.from("stays").select("villa_id, check_in")
-    .eq("organization_id", organizationId).order("check_in").limit(5000);
+    .eq("organization_id", organizationId).neq("status", "canceled").order("check_in").limit(5000);
   const first = new Map<string, string>();
   for (const s of data ?? []) if (!first.has(s.villa_id)) first.set(s.villa_id, s.check_in);
   return first;

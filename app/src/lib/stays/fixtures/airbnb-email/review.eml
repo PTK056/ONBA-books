@@ -1,0 +1,34 @@
+Authentication-Results: mx.google.com;       dkim=pass header.i=@automated.airbnb.com header.s=s1 header.b=x;       dkim=pass header.i=@sendgrid.info header.s=smtpapi header.b=x;       spf=pass (google.com: domain of bounces@em5923.automated.airbnb.com designates 50.31.32.60 as permitted sender) smtp.mailfrom="bounces@em5923.automated.airbnb.com";       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=airbnb.com
+From: Airbnb <automated@airbnb.com>
+To: host@example.com
+Subject: Write a review for Max
+Date: Tue, 27 Oct 2026 02:32:24 +0000
+Message-ID: <review.eml@example>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 8bit
+
+%opentrack%
+https://www.airbnb.com.au/?c=.pi80.pkaG9tZV9yZXZpZXdzL3JlbWluZGVycy9sZWF2ZV9hX3Jldmlld19maXJzdF9yZW1pbmRlcl90b19ob3N0
+
+   Rate your experience with Max
+
+You can leave a review for your guest even though the trip
+was cancelled. We won’t share your review until after Max
+leaves feedback for you.
+
+Read more about these reviews in our Help Center
+[https://www.airbnb.com.au/help/article/368?c=.pi80.pkaG9tZV9yZXZpZXdzL3JlbWluZGVycy9sZWF2ZV9hX3Jldmlld19maXJzdF9yZW1pbmRlcl90b19ob3N0]
+
+Write a review
+[https://www.airbnb.com.au/hosting/reviews/1805493044939909847/edit?c=.pi80.pkaG9tZV9yZXZpZXdzL3JlbWluZGVycy9sZWF2ZV9hX3Jldmlld19maXJzdF9yZW1pbmRlcl90b19ob3N0]
+
+
+
+   https://www.airbnb.com.au/interstitial?c=.pi80.pkaG9tZV9yZXZpZXdzL3JlbWluZGVycy9sZWF2ZV9hX3Jldmlld19maXJzdF9yZW1pbmRlcl90b19ob3N0   https://www.airbnb.com.au/interstitial?c=.pi80.pkaG9tZV9yZXZpZXdzL3JlbWluZGVycy9sZWF2ZV9hX3Jldmlld19maXJzdF9yZW1pbmRlcl90b19ob3N0   https://www.airbnb.com.au/interstitial?c=.pi80.pkaG9tZV9yZXZpZXdzL3JlbWluZGVycy9sZWF2ZV9hX3Jldmlld19maXJzdF9yZW1pbmRlcl90b19ob3N0   https://www.airbnb.com.au/interstitial?c=.pi80.pkaG9tZV9yZXZpZXdzL3JlbWluZGVycy9sZWF2ZV9hX3Jldmlld19maXJzdF9yZW1pbmRlcl90b19ob3N0
+
+Airbnb Ireland UC
+
+8 Hanover Quay
+
+Dublin 2, Ireland

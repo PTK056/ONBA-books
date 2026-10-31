@@ -1,0 +1,42 @@
+Authentication-Results: mx.google.com;       dkim=pass header.i=@automated.airbnb.com header.s=s1 header.b=x;       dkim=pass header.i=@sendgrid.info header.s=smtpapi header.b=x;       spf=pass (google.com: domain of bounces@em5923.automated.airbnb.com designates 50.31.32.60 as permitted sender) smtp.mailfrom="bounces@em5923.automated.airbnb.com";       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=airbnb.com
+From: Airbnb <automated@airbnb.com>
+To: host@example.com
+Subject: Reservation updated
+Date: Tue, 06 Oct 2026 07:26:16 +0000
+Message-ID: <alteration-accepted.eml@example>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 8bit
+
+%opentrack%
+https://www.airbnb.com.au/?c=.pi80.pkQUxURVJBVElPTl9BQ0NFUFRFRA%3D%3D
+
+
+YOUR RESERVATION WITH ANNA HAS BEEN UPDATED
+
+https://www.airbnb.com.au/hosting/reservations/details/HMAAAA0004?c=.pi80.pkQUxURVJBVElPTl9BQ0NFUFRFRA%3D%3D   Anna
+                                                                                                                                                         
+                                                                                                                                                         London, United Kingdom
+                                                                                                                                                         
+                                                                                                                                                         Villa Example - 2 BDR near the beach
+                                                                                                                                                         
+                                                                                                                                                         [https://www.airbnb.com.au/hosting/reservations/details/HMAAAA0004?c=.pi80.pkQUxURVJBVElPTl9BQ0NFUFRFRA%3D%3D]
+
+We’ve already updated the reservation itinerary. If you have questions, send Anna a message.
+
+Go to itinerary
+[https://www.airbnb.com.au/hosting/reservations/details/HMAAAA0004?c=.pi80.pkQUxURVJBVElPTl9BQ0NFUFRFRA%3D%3D]
+
+Message guest
+[https://www.airbnb.com.au/messaging/thread/1?c=.pi80.pkQUxURVJBVElPTl9BQ0NFUFRFRA%3D%3D]
+
+Get the app.
+
+The fastest, easiest way to Airbnb.
+
+   https://www.airbnb.com.au/interstitial?c=.pi80.pkQUxURVJBVElPTl9BQ0NFUFRFRA%3D%3D   https://www.airbnb.com.au/interstitial?c=.pi80.pkQUxURVJBVElPTl9BQ0NFUFRFRA%3D%3D   
+
+Airbnb Ireland UC,
+8 Hanover Quay, Dublin 2, Ireland
+
+   https://www.airbnb.com.au/interstitial?c=.pi80.pkQUxURVJBVElPTl9BQ0NFUFRFRA%3D%3D   https://www.airbnb.com.au/interstitial?c=.pi80.pkQUxURVJBVElPTl9BQ0NFUFRFRA%3D%3D   https://www.airbnb.com.au/interstitial?c=.pi80.pkQUxURVJBVElPTl9BQ0NFUFRFRA%3D%3D   https://www.airbnb.com.au/interstitial?c=.pi80.pkQUxURVJBVElPTl9BQ0NFUFRFRA%3D%3D

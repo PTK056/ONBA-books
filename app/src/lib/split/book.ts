@@ -33,7 +33,7 @@ export async function nightsInMonth(db: SupabaseClient, orgId: string, villaIds:
   const from = `${month}-01`;
   const to = new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7), 1)).toISOString().slice(0, 10);
   const { data } = await db.from("stays").select("villa_id, check_in, check_out")
-    .eq("organization_id", orgId).in("villa_id", villaIds).lt("check_in", to).gt("check_out", from);
+    .eq("organization_id", orgId).neq("status", "canceled").in("villa_id", villaIds).lt("check_in", to).gt("check_out", from);
   const day = 86_400_000;
   return villaIds.map((id) => (data ?? []).filter((s) => s.villa_id === id).reduce((n, s) => {
     const start = Math.max(Date.parse(s.check_in), Date.parse(from));

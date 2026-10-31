@@ -1,0 +1,55 @@
+Authentication-Results: mx.google.com;       dkim=pass header.i=@automated.airbnb.com header.s=s1 header.b=x;       dkim=pass header.i=@sendgrid.info header.s=smtpapi header.b=x;       spf=pass (google.com: domain of bounces@em5923.automated.airbnb.com designates 50.31.32.60 as permitted sender) smtp.mailfrom="bounces@em5923.automated.airbnb.com";       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=airbnb.com
+From: Airbnb <automated@airbnb.com>
+To: host@example.com
+Subject: Canceled: Reservation HMAAAA0005 for September 18 – 21
+Date: Thu, 17 Sep 2026 09:03:46 +0000
+Message-ID: <canceled.eml@example>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 8bit
+
+These dates are now open for other guests
+ ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏
+ ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏
+ ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏
+ ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏
+ ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏  ͏ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­
+­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­
+­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­ ­  
+%opentrack%
+https://www.airbnb.com.au/?c=.pi80.pkQ0FOQ0VMTEFUSU9OU19SRVNFUlZBVElPTl9DQU5DRUxFRF9CWV9HVUVTVF9UT19IT1NU
+
+
+RESERVATION CANCELED
+
+https://www.airbnb.com.au/hosting/reservations/details/HMAAAA0005?c=.pi80.pkQ0FOQ0VMTEFUSU9OU19SRVNFUlZBVElPTl9DQU5DRUxFRF9CWV9HVUVTVF9UT19IT1NU   Villa Example - 2 BDR near the beach
+                                                                                                                                                                                                                                          
+                                                                                                                                                                                                                                          Listing #1000000000000000001
+                                                                                                                                                                                                                                          
+                                                                                                                                                                                                                                          Sep 18 – 21, 2 guests
+                                                                                                                                                                                                                                          
+                                                                                                                                                                                                                                          [https://www.airbnb.com.au/hosting/reservations/details/HMAAAA0005?c=.pi80.pkQ0FOQ0VMTEFUSU9OU19SRVNFUlZBVElPTl9DQU5DRUxFRF9CWV9HVUVTVF9UT19IT1NU]
+
+Unfortunately, your guest Li had to cancel reservation HMAAAA0005 for Sep 18 – 21. Your calendar has
+been updated to show that these dates are now available.
+According to your cancellation policy, your payout has been updated to €191.78.
+This payout will be released 24 hours after the check-in date. You can review the updated payout in
+your Transaction History.
+You can also refund the full amount to the user by clicking the button below.
+Issue full refund
+[https://www.airbnb.com.au/resolutions/create/reservation/HMAAAA0005?c=.pi80.pkQ0FOQ0VMTEFUSU9OU19SRVNFUlZBVElPTl9DQU5DRUxFRF9CWV9HVUVTVF9UT19IT1NU]
+Have questions? Get more info on how it works when a guest cancels
+[https://www.airbnb.com.au/help/question/43?c=.pi80.pkQ0FOQ0VMTEFUSU9OU19SRVNFUlZBVElPTl9DQU5DRUxFRF9CWV9HVUVTVF9UT19IT1NU].
+We know your first cancellation can be disappointing, but it's completely normal. As you continue to
+host, your number of successful bookings will far outweigh the cancellations.
+
+Get the app.
+
+The fastest, easiest way to Airbnb.
+
+   https://www.airbnb.com.au/interstitial?c=.pi80.pkQ0FOQ0VMTEFUSU9OU19SRVNFUlZBVElPTl9DQU5DRUxFRF9CWV9HVUVTVF9UT19IT1NU   https://www.airbnb.com.au/interstitial?c=.pi80.pkQ0FOQ0VMTEFUSU9OU19SRVNFUlZBVElPTl9DQU5DRUxFRF9CWV9HVUVTVF9UT19IT1NU   
+
+Airbnb Ireland UC,
+8 Hanover Quay, Dublin 2, Ireland
+
+   https://www.airbnb.com.au/interstitial?c=.pi80.pkQ0FOQ0VMTEFUSU9OU19SRVNFUlZBVElPTl9DQU5DRUxFRF9CWV9HVUVTVF9UT19IT1NU   https://www.airbnb.com.au/interstitial?c=.pi80.pkQ0FOQ0VMTEFUSU9OU19SRVNFUlZBVElPTl9DQU5DRUxFRF9CWV9HVUVTVF9UT19IT1NU   https://www.airbnb.com.au/interstitial?c=.pi80.pkQ0FOQ0VMTEFUSU9OU19SRVNFUlZBVElPTl9DQU5DRUxFRF9CWV9HVUVTVF9UT19IT1NU   https://www.airbnb.com.au/interstitial?c=.pi80.pkQ0FOQ0VMTEFUSU9OU19SRVNFUlZBVElPTl9DQU5DRUxFRF9CWV9HVUVTVF9UT19IT1NU

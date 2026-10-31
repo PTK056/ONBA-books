@@ -148,7 +148,7 @@ export async function loadOverview(requested?: string): Promise<OverviewResult> 
     .eq("organization_id", org.id).gte("date", from).lt("date", to).order("date");
   if (scope) missingQuery = missingQuery.in("villa_id", scope);
   let staysQuery = db.from("stays").select("villa_id, check_in, check_out, gross_amount, net_amount")
-    .eq("organization_id", org.id).lt("check_in", to).gt("check_out", windowFrom).limit(MAX_ENTRIES);
+    .eq("organization_id", org.id).neq("status", "canceled").lt("check_in", to).gt("check_out", windowFrom).limit(MAX_ENTRIES);
   if (scope) staysQuery = staysQuery.in("villa_id", scope);
   const [orgRow, txs, missing, closes, toReview, toRead, stays] = await Promise.all([
     db.from("organizations").select("fiscal_year_start").eq("id", org.id).single(),

@@ -74,7 +74,7 @@ export async function loadStatement(villaId: string, month: string): Promise<Sta
       .eq("villa_id", villaId).eq("status", "validated").gte("date", month).lt("date", to).order("date"),
     db.from("month_closes").select("status").eq("villa_id", villaId).eq("month", month).maybeSingle(),
     db.from("stays").select("check_in, check_out, gross_amount, net_amount")
-      .eq("villa_id", villaId).lt("check_in", to).gt("check_out", month),
+      .eq("villa_id", villaId).neq("status", "canceled").lt("check_in", to).gt("check_out", month),
   ]);
   const rows = (txs.data ?? []) as unknown as Row[];
 

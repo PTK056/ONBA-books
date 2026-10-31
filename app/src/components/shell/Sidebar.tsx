@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftRight, BedDouble, FolderOpen, Landmark, LayoutDashboard, ScanLine, Settings, Upload, Users } from "lucide-react";
+import { ArrowLeftRight, BedDouble, FolderOpen, Landmark, LayoutDashboard, Plug, ScanLine, Settings, Upload, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "./Logo";
@@ -14,6 +14,7 @@ const NAV = [
   { href: "/import", label: "Import stays", icon: BedDouble },
   { href: "/team", label: "Team", icon: Users },
   { href: "/bank", label: "Bank", icon: Landmark, adminOnly: true },
+  { href: "/connections", label: "Connections", icon: Plug, adminOnly: true },
   { href: "/settings", label: "Settings", icon: Settings, adminOnly: true },
 ] as const;
 

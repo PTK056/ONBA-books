@@ -1,0 +1,53 @@
+Authentication-Results: mx.google.com;       dkim=pass header.i=@automated.airbnb.com header.s=s1 header.b=x;       dkim=pass header.i=@sendgrid.info header.s=smtpapi header.b=x;       spf=pass (google.com: domain of bounces@em5923.automated.airbnb.com designates 167.89.102.173 as permitted sender) smtp.mailfrom="bounces@em5923.automated.airbnb.com";       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=airbnb.com
+From: Airbnb <automated@airbnb.com>
+To: host@example.com
+Subject: Anna wants to change their reservation
+Date: Tue, 06 Oct 2026 07:23:48 +0000
+Message-ID: <alteration-request.eml@example>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 8bit
+
+%opentrack%
+https://www.airbnb.com.au/?c=.pi80.pkcmVzZXJ2YXRpb24vYWx0ZXJhdGlvbi9hbHRlcmF0aW9uX3JlcXVlc3RlZA%3D%3D
+
+
+ANNA WANTS TO CHANGE THEIR RESERVATION
+
+   ANNA
+   
+   Canggu
+   
+   · Villa Example - 2 BDR near the beach
+
+
+
+
+ORIGINAL DATES
+
+Sep 29, 2026 - Oct 11, 2026
+
+
+REQUESTED DATES
+
+Sep 29, 2026 - Oct 12, 2026
+
+
+
+If you accept Anna’s request, we’ll immediately update the reservation. If you choose to decline,
+the reservation will remain unchanged.
+
+Go to request
+[https://www.airbnb.com.au/reservation/alteration/1?c=.pi80.pkcmVzZXJ2YXRpb24vYWx0ZXJhdGlvbi9hbHRlcmF0aW9uX3JlcXVlc3RlZA%3D%3D]
+
+   https://www.airbnb.com.au/interstitial?c=.pi80.pkcmVzZXJ2YXRpb24vYWx0ZXJhdGlvbi9hbHRlcmF0aW9uX3JlcXVlc3RlZA%3D%3D   https://www.airbnb.com.au/interstitial?c=.pi80.pkcmVzZXJ2YXRpb24vYWx0ZXJhdGlvbi9hbHRlcmF0aW9uX3JlcXVlc3RlZA%3D%3D   https://www.airbnb.com.au/interstitial?c=.pi80.pkcmVzZXJ2YXRpb24vYWx0ZXJhdGlvbi9hbHRlcmF0aW9uX3JlcXVlc3RlZA%3D%3D   https://www.airbnb.com.au/interstitial?c=.pi80.pkcmVzZXJ2YXRpb24vYWx0ZXJhdGlvbi9hbHRlcmF0aW9uX3JlcXVlc3RlZA%3D%3D
+
+Airbnb Ireland UC
+
+8 Hanover Quay
+
+Dublin 2, Ireland
+
+Get the Airbnb app
+
+https://www.airbnb.com.au/interstitial?c=.pi80.pkcmVzZXJ2YXRpb24vYWx0ZXJhdGlvbi9hbHRlcmF0aW9uX3JlcXVlc3RlZA%3D%3D   https://www.airbnb.com.au/interstitial?c=.pi80.pkcmVzZXJ2YXRpb24vYWx0ZXJhdGlvbi9hbHRlcmF0aW9uX3JlcXVlc3RlZA%3D%3D
