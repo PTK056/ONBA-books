@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { importAirbnb, type ImportSummary } from "@/app/(app)/import/actions";
 import { money } from "@/components/overview/format";
+import { Highlight, MiniStat } from "@/components/shell/Highlight";
 import { shortDate } from "@/lib/format/date";
 import { allocateByNights, parseAirbnbCsv, type AirbnbStay } from "@/lib/stays/airbnb";
 
@@ -163,20 +164,19 @@ function Totals({ stays }: { stays: AirbnbStay[] }) {
     byCurrency.set(s.currency, t);
   }
   const nights = stays.reduce((n, s) => n + s.nights, 0);
-  const tiles: [string, string][] = [
-    ["Stays", String(stays.length)],
-    ["Nights", String(nights)],
-    ["Period", `${shortDate(stays[0].checkIn)} – ${shortDate(stays.at(-1)!.checkOut)}`],
-    ...[...byCurrency].map(([c, t]): [string, string] => [`Net ${c}`, money(t.net, c)]),
-  ];
+  // The first currency leads; any other currency gets a small tile of its own.
+  const [[lead, leadTotals], ...others] = [...byCurrency];
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      {tiles.map(([k, v]) => (
-        <div key={k} className="card p-4">
-          <p className="text-xs text-zinc-500">{k}</p>
-          <p className="mt-1 text-lg font-semibold tabular-nums">{v}</p>
-        </div>
-      ))}
+      <Highlight
+        className="col-span-2 sm:row-span-2" label="Net payout" value={money(leadTotals.net, lead)} unit={lead}
+        note={`${stays.length} stays · ${nights} nights`}
+      />
+      <MiniStat label="Stays" value={String(stays.length)} />
+      <MiniStat label="Nights" value={String(nights)} />
+      <MiniStat label="Period" value={`${shortDate(stays[0].checkIn)} – ${shortDate(stays.at(-1)!.checkOut)}`} />
+      <MiniStat label="Airbnb fees" value={money(leadTotals.fees, lead)} unit={lead} />
+      {others.map(([c, t]) => <MiniStat key={c} label={`Net ${c}`} value={money(t.net, c)} unit={c} />)}
     </div>
   );
 }

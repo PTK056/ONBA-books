@@ -1,9 +1,10 @@
-import { Paperclip, Search } from "lucide-react";
+import { Paperclip, Search, Wallet } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { money } from "@/components/overview/format";
 import { shortDate } from "@/lib/format/date";
+import { Highlight, MiniStat } from "@/components/shell/Highlight";
 import { NewMenu } from "@/components/shell/NewMenu";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { places } from "@/lib/org";
@@ -78,13 +79,17 @@ async function Content({ searchParams }: Pick<PageProps<"/transactions">, "searc
         )}
       </form>
 
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-zinc-600 dark:text-zinc-400">
-        <span><b className="tabular-nums text-zinc-900 dark:text-zinc-100">{rows.length}</b> entries{truncated && " (latest shown, narrow the filters)"}</span>
-        <span>Income <b className="tabular-nums text-zinc-900 dark:text-zinc-100">{money(income, cur)}</b></span>
-        <span>Expenses <b className="tabular-nums text-zinc-900 dark:text-zinc-100">{money(expenses, cur)}</b></span>
-        {missing > 0 && <Link href="/transactions?receipt=missing" className="text-amber-700 hover:underline dark:text-amber-300">{missing} without a receipt</Link>}
-        <span className="ml-auto text-xs">{cur}</span>
-      </div>
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Highlight
+          className="col-span-2" label={filtered ? "Net for these filters" : "Net result"} icon={<Wallet size={16} />}
+          value={money(income - expenses, cur)} unit={cur}
+          note={`${rows.length} entries${truncated ? " (latest shown, narrow the filters)" : ""}`}
+        />
+        <MiniStat label="Income" value={money(income, cur)} unit={cur} />
+        <MiniStat label="Expenses" value={money(expenses, cur)} unit={cur}>
+          {missing > 0 && <Link href="/transactions?receipt=missing" className="text-amber-700 hover:underline dark:text-amber-300">{missing} without a receipt</Link>}
+        </MiniStat>
+      </section>
 
       <section className="card overflow-hidden">
         {rows.length === 0 ? (

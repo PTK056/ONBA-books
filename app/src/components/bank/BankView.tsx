@@ -1,11 +1,12 @@
 "use client";
 
-import { AlertTriangle, BedDouble, Check, Copy, FileText, Link2, Search, Undo2, UserRound } from "lucide-react";
+import { AlertTriangle, BedDouble, Check, Copy, FileText, Landmark, Link2, Search, Undo2, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { addStatement, bookCharges, createFromLine, findEntries, linkLine, linkStay, markPersonal, matchAgain, resetLine, type EntryCandidate, type Result } from "@/app/(app)/bank/actions";
 import { money } from "@/components/overview/format";
+import { Highlight, MiniStat } from "@/components/shell/Highlight";
 import type { BankLineRow, BankStatementRow, ExpectedPayout, UnpaidStay } from "@/lib/bank/data";
 import { shortDate } from "@/lib/format/date";
 import { createClient } from "@/lib/supabase/client";
@@ -54,6 +55,18 @@ export function BankView(props: Props) {
 
   return (
     <div className="flex flex-col gap-6">
+      {lines.length > 0 && (
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Highlight
+            className="col-span-2" label="At the bank, not in your books" icon={<Landmark size={16} />}
+            value={String(todo.length)} unit={todo.length === 1 ? "line" : "lines"}
+            note={`${matched.length} matched · ${personal.length} personal`}
+          />
+          <MiniStat label="Statements" value={String(statements.length)} />
+          <MiniStat label="Airbnb payouts on their way" value={String(props.expected.length + props.unpaid.length)} />
+        </section>
+      )}
+
       <AddStatement organizationId={props.organizationId} />
 
       {statements.length > 0 && (

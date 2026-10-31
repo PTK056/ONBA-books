@@ -1,8 +1,9 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Wallet } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { money } from "@/components/overview/format";
+import { Highlight, MiniStat } from "@/components/shell/Highlight";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { AddStaff, DeleteLog, EditStaff, LogForm, PayButton, PrepareButton } from "@/components/team/TeamForms";
 import { shortDate, todayIn } from "@/lib/format/date";
@@ -53,6 +54,8 @@ async function Content({ searchParams }: Pick<PageProps<"/team">, "searchParams"
   const name = new Map(staff.map((s) => [s.id, s.name]));
   const toPrepare = lines.some((l) => l.staff.active && l.run?.status !== "paid");
   const total = lines.reduce((s, l) => s + (l.run?.amount ?? l.computed.total), 0);
+  const unpaid = lines.filter((l) => l.run?.status !== "paid");
+  const toPay = unpaid.reduce((s, l) => s + (l.run?.amount ?? l.computed.total), 0);
 
   return (
     <>
@@ -67,6 +70,18 @@ async function Content({ searchParams }: Pick<PageProps<"/team">, "searchParams"
           </div>
         }
       />
+
+      {lines.length > 0 && (
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Highlight
+            className="col-span-2" label={`Pay for ${monthLabel(month)}`} icon={<Wallet size={16} />}
+            value={money(total, org.reportingCurrency)} unit={org.reportingCurrency}
+            note={`${lines.length - unpaid.length} of ${lines.length} paid`}
+          />
+          <MiniStat label="Still to pay" value={money(toPay, org.reportingCurrency)} unit={org.reportingCurrency} />
+          <MiniStat label="Team" value={String(staff.filter((s) => s.active).length)} unit="active" />
+        </section>
+      )}
 
       {/* Pay */}
       <section className="card p-5">

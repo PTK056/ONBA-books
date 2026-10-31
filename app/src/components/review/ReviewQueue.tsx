@@ -70,7 +70,7 @@ export function ReviewQueue({ items: initial, options, accept, reject }: Props) 
           >
             ←
           </button>
-          <span className="tabular-nums text-zinc-600 dark:text-zinc-400">
+          <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-semibold tabular-nums text-sidebar">
             {index + 1} of {items.length}
           </span>
           <button
