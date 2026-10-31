@@ -34,6 +34,9 @@ même source. Jeton alors chiffré chez nous (AES-256-GCM, `lib/channels/crypto.
 - Requête : `from:(airbnb.com) newer_than:3d` + curseur (`historyId` ou date du dernier message traité). La marge de 3 jours
   rattrape un cron manqué ; l'identifiant du message Gmail empêche tout double traitement.
 - Bouton **« Check now »** dans Connections pour forcer une relève.
+- **Date de départ** choisie à la connexion (`read_from`, par défaut 120 jours) : rien d'antérieur n'est jamais lu.
+  Pour une organisation migrée, la date de la migration (Onba Property Management : 26/10/2026), sinon des séjours
+  migrés sans code Airbnb (`AT-rec…`) pourraient être recréés en double.
 
 ## 3. Barrière stricte et classement
 Établi le 30/10/2026 sur 10 vrais e-mails de la villa (`private/*.eml`, hors dépôt), dont **la même réservation vue

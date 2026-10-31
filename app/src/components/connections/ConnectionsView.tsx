@@ -12,7 +12,7 @@ const secondary = "h-10 rounded-lg border border-zinc-300 px-4 text-sm font-medi
 
 export type GmailState =
   | { status: "none" }
-  | { status: "pending" | "active" | "error"; account: string | null; lastChecked: string | null; error: string | null };
+  | { status: "pending" | "active" | "error"; account: string | null; lastChecked: string | null; error: string | null; readFrom: string | null };
 
 export interface EmailRow {
   id: string; received_at: string | null; subject: string; kind: string; code: string | null;
@@ -55,8 +55,11 @@ function useAction() {
   return { ...state, pending, run };
 }
 
-export function ConnectionsView({ gmail, returned, emails, waiting, villas, telegramBot }: {
-  gmail: GmailState; returned: string | null; emails: EmailRow[]; waiting: WaitingListing[];
+/** Today and the default start date (120 days back), worked out on the server. */
+export interface Dates { today: string; defaultFrom: string }
+
+export function ConnectionsView({ gmail, dates, returned, emails, waiting, villas, telegramBot }: {
+  gmail: GmailState; dates: Dates; returned: string | null; emails: EmailRow[]; waiting: WaitingListing[];
   villas: { id: string; name: string }[]; telegramBot: string | null;
 }) {
   const notice = returned ? RETURNED[returned] : undefined;
@@ -65,7 +68,7 @@ export function ConnectionsView({ gmail, returned, emails, waiting, villas, tele
       {notice && (
         <p className={notice.ok ? "text-sm text-emerald-700 dark:text-emerald-400" : "text-sm text-red-600"}>{notice.text}</p>
       )}
-      <GmailCard gmail={gmail} />
+      <GmailCard gmail={gmail} dates={dates} />
       {waiting.map((l) => <ChooseVilla key={l.ref} listing={l} villas={villas} />)}
       {gmail.status !== "none" && <EmailLog emails={emails} />}
       <section className="card flex flex-col gap-2 p-5">
@@ -79,9 +82,10 @@ export function ConnectionsView({ gmail, returned, emails, waiting, villas, tele
   );
 }
 
-function GmailCard({ gmail }: { gmail: GmailState }) {
+function GmailCard({ gmail, dates }: { gmail: GmailState; dates: Dates }) {
   const { error, message, pending, run } = useAction();
   const connected = gmail.status === "active";
+  const [readFrom, setReadFrom] = useState(dates.defaultFrom);
   return (
     <section className="card flex flex-col gap-3 p-5">
       <div className="flex flex-wrap items-center gap-3">
@@ -99,6 +103,7 @@ function GmailCard({ gmail }: { gmail: GmailState }) {
       {gmail.status !== "none" && (
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
           <dt className="text-zinc-500">Mailbox</dt><dd>{gmail.account ?? "—"}</dd>
+          <dt className="text-zinc-500">Reads from</dt><dd>{gmail.readFrom ? shortDate(gmail.readFrom.slice(0, 10)) : "the last 120 days"}</dd>
           <dt className="text-zinc-500">Last check</dt>
           <dd>{gmail.lastChecked ? `${shortDate(gmail.lastChecked.slice(0, 10))} ${gmail.lastChecked.slice(11, 16)} UTC` : "Not yet"}</dd>
           {gmail.error && <><dt className="text-zinc-500">Problem</dt><dd className="text-red-600">{gmail.error}</dd></>}
@@ -117,7 +122,14 @@ function GmailCard({ gmail }: { gmail: GmailState }) {
           </>
         ) : (
           <>
-            <button type="button" className={primary} disabled={pending} onClick={() => run(connectGmail)}>
+            <label className="flex w-full flex-col gap-1 text-sm font-medium sm:w-auto">
+              Read e-mails from
+              <input type="date" className={field} value={readFrom} max={dates.today} onChange={(e) => setReadFrom(e.target.value)} />
+            </label>
+            <p className="w-full text-xs text-zinc-500">
+              Nothing older is read. If your books are already up to date until a day (an import, a migration), start that day.
+            </p>
+            <button type="button" className={primary} disabled={pending || !readFrom} onClick={() => run(() => connectGmail(readFrom))}>
               {gmail.status === "none" ? "Connect Gmail" : "Connect again"}
             </button>
             {gmail.status !== "none" && (

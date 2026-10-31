@@ -16,10 +16,17 @@ async function admin() {
   return org.kind === "member" && org.role === "admin" ? org : null;
 }
 
-/** Sends the admin to Google (through Composio) to allow Splyce to read the mailbox. */
-export async function connectGmail(): Promise<Result> {
+/**
+ * Sends the admin to Google (through Composio) to allow Splyce to read the mailbox.
+ * `readFrom` (YYYY-MM-DD): nothing older is ever read, e.g. the day the books were last brought up to date.
+ */
+export async function connectGmail(readFrom: string): Promise<Result> {
   const org = await admin();
   if (!org) return { ok: false, error: "Only admins can connect Gmail." };
+  const earliest = new Date(Date.now() - 365 * 86_400_000).toISOString().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(readFrom) || readFrom < earliest || readFrom > new Date().toISOString().slice(0, 10)) {
+    return { ok: false, error: "Choose a start date within the last 12 months." };
+  }
   let link: { redirectUrl: string; accountId: string };
   try {
     link = await createGmailLink(org.id, `${APP_URL}/api/connections/gmail/callback`);
@@ -29,7 +36,7 @@ export async function connectGmail(): Promise<Result> {
   }
   const db = await createClient();
   const { error } = await db.from("mail_connections").upsert(
-    { organization_id: org.id, external_id: link.accountId, status: "pending", last_error: null, last_checked_at: null },
+    { organization_id: org.id, external_id: link.accountId, status: "pending", last_error: null, last_checked_at: null, read_from: `${readFrom}T00:00:00Z` },
     { onConflict: "organization_id" },
   );
   if (error) return { ok: false, error: "Could not start. Try again." };

@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ConnectionsView, type EmailRow, type GmailState, type WaitingListing } from "@/components/connections/ConnectionsView";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { daysBefore, todayIn } from "@/lib/format/date";
 import { getCurrentOrg } from "@/lib/org";
 import { createClient } from "@/lib/supabase/server";
 
@@ -22,17 +23,18 @@ async function Content({ searchParams }: Pick<PageProps<"/connections">, "search
   if (org.kind === "none") redirect("/setup");
   if (org.role !== "admin") notFound();
   const { gmail: returned } = await searchParams;
+  const today = todayIn("UTC");
 
   const db = await createClient();
   const [{ data: conn }, { data: emails }, { data: waiting }] = await Promise.all([
-    db.from("mail_connections").select("status, account_label, last_checked_at, last_error").eq("organization_id", org.id).maybeSingle(),
+    db.from("mail_connections").select("status, account_label, last_checked_at, last_error, read_from").eq("organization_id", org.id).maybeSingle(),
     db.from("inbound_emails").select("id, received_at, subject, kind, code, result, note, stay_id")
       .eq("organization_id", org.id).order("received_at", { ascending: false }).limit(30),
     db.from("inbound_emails").select("listing_ref, parsed").eq("organization_id", org.id).eq("result", "needs_villa"),
   ]);
 
   const gmail: GmailState = conn
-    ? { status: conn.status as GmailState["status"], account: conn.account_label, lastChecked: conn.last_checked_at, error: conn.last_error }
+    ? { status: conn.status as GmailState["status"], account: conn.account_label, lastChecked: conn.last_checked_at, error: conn.last_error, readFrom: conn.read_from }
     : { status: "none" };
   const listings = new Map<string, WaitingListing>();
   for (const w of waiting ?? []) {
@@ -46,6 +48,7 @@ async function Content({ searchParams }: Pick<PageProps<"/connections">, "search
   return (
     <ConnectionsView
       gmail={gmail}
+      dates={{ today, defaultFrom: daysBefore(today, 120) }}
       returned={typeof returned === "string" ? returned : null}
       emails={(emails ?? []) as EmailRow[]}
       waiting={[...listings.values()]}

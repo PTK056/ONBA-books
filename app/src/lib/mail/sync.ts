@@ -21,14 +21,17 @@ export interface SyncSummary { read: number; booked: number; updated: number; at
 type Db = SupabaseClient;
 
 export async function syncOrganization(db: Db, orgId: string): Promise<SyncSummary> {
-  const { data: conn } = await db.from("mail_connections").select("external_id, status, last_checked_at")
+  const { data: conn } = await db.from("mail_connections").select("external_id, status, last_checked_at, read_from")
     .eq("organization_id", orgId).maybeSingle();
   if (!conn || conn.status !== "active") throw new Error("Gmail is not connected");
 
   const startedAt = new Date();
-  const since = conn.last_checked_at
-    ? Date.parse(conn.last_checked_at) - OVERLAP_DAYS * 86_400_000
-    : startedAt.getTime() - FIRST_RUN_DAYS * 86_400_000;
+  const since = Math.max(
+    conn.last_checked_at
+      ? Date.parse(conn.last_checked_at) - OVERLAP_DAYS * 86_400_000
+      : startedAt.getTime() - FIRST_RUN_DAYS * 86_400_000,
+    conn.read_from ? Date.parse(conn.read_from) : 0, // never before the date chosen when connecting
+  );
 
   try {
     const ids: string[] = [];
