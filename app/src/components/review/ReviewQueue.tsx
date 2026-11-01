@@ -168,6 +168,7 @@ function EntryForm({
   const [villaId, setVillaId] = useState(defaultVilla);
   const [description, setDescription] = useState(p.description ?? "");
   const [rateText, setRateText] = useState("");
+  const [editRate, setEditRate] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -229,7 +230,7 @@ function EntryForm({
           {p.notes ?? "Nothing to book from this file."}
         </Callout>
       )}
-      {!unreadable && p.notes && <Callout tone="amber" title="To check">{p.notes}</Callout>}
+      {!unreadable && p.notes && <Callout tone="amber" title="To check"><Folded text={p.notes} /></Callout>}
       {p.possible_duplicate_of && (
         <Callout tone="amber" title="Possible duplicate">
           A transaction with the same date, currency and amount is already in the books.
@@ -268,7 +269,14 @@ function EntryForm({
             </p>
           )}
 
-          {needsRate && (
+          {/* With a rate already used for this currency, the conversion is enough; the field waits behind "Change rate". */}
+          {needsRate && lastRate && !editRate && (
+            <p className="-mt-2 text-xs text-zinc-500 tabular-nums">
+              {converted != null && <>= {formatAmount(converted, options.reportingCurrency)} {options.reportingCurrency} at the last rate · </>}
+              <button type="button" className="underline" onClick={() => setEditRate(true)}>Change rate</button>
+            </p>
+          )}
+          {needsRate && (!lastRate || editRate) && (
             <Field label={`Rate ${currency} → ${options.reportingCurrency}`}>
               <input
                 inputMode="decimal" value={rateText}
@@ -355,8 +363,24 @@ function Callout({ tone, title, children }: { tone: "amber" | "red"; title: stri
   return (
     <div className={`rounded-md border px-3 py-2 text-sm ${colors}`}>
       <p className="font-medium">{title}</p>
-      <p className="mt-0.5">{children}</p>
+      <div className="mt-0.5">{children}</div>
     </div>
+  );
+}
+
+/** A long note shows two lines, the rest on "Read more". */
+function Folded({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const long = text.length > 120;
+  return (
+    <>
+      <p className={long && !open ? "line-clamp-2" : ""}>{text}</p>
+      {long && (
+        <button type="button" onClick={() => setOpen((o) => !o)} className="mt-0.5 text-xs font-medium underline">
+          {open ? "Show less" : "Read more"}
+        </button>
+      )}
+    </>
   );
 }
 
