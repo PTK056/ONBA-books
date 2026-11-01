@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, BedDouble, Check, Copy, FileText, Landmark, Link2, Search, Undo2, UserRound } from "lucide-react";
+import { AlertTriangle, BedDouble, Check, ChevronDown, Copy, FileText, Landmark, Link2, Search, Undo2, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 const field = "h-9 rounded-lg border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-brand-600 dark:border-zinc-700 dark:bg-zinc-900";
 const primary = "h-9 rounded-lg bg-brand-600 px-3 btn-label shadow-sm hover:bg-brand-700 disabled:opacity-50";
 const secondary = "h-9 rounded-lg border border-zinc-300 px-3 text-sm hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-900";
+const main = "inline-flex h-8 items-center gap-1 rounded-md bg-brand-50 px-2.5 text-xs font-medium text-brand-800 ring-1 ring-brand-200 hover:bg-brand-100 disabled:opacity-50 dark:bg-brand-950 dark:text-brand-200 dark:ring-brand-800";
 const small = "inline-flex h-8 items-center gap-1 rounded-md border border-zinc-300 px-2 text-xs hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-900";
 
 type Option = { id: string; name: string };
@@ -67,16 +68,6 @@ export function BankView(props: Props) {
         </section>
       )}
 
-      <AddStatement organizationId={props.organizationId} />
-
-      {statements.length > 0 && (
-        <section className="card divide-y divide-zinc-100 dark:divide-zinc-800">
-          {statements.map((s) => <StatementRow key={s.id} s={s} chargesTo={props.chargesTo} />)}
-        </section>
-      )}
-
-      <Payouts expected={props.expected} unpaid={props.unpaid} />
-
       {lines.length > 0 && (
         <section className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -90,6 +81,10 @@ export function BankView(props: Props) {
             : <div className="card divide-y divide-zinc-100 dark:divide-zinc-800">{todo.map((l) => <TodoLine key={l.id} line={l} {...props} />)}</div>}
         </section>
       )}
+
+      <Payouts expected={props.expected} unpaid={props.unpaid} />
+
+      <Statements organizationId={props.organizationId} statements={statements} chargesTo={props.chargesTo} />
 
       {matched.length > 0 && <Done title="In your books" lines={matched} />}
       {personal.length > 0 && <Done title="Personal, not in the books" lines={personal} />}
@@ -106,12 +101,14 @@ const PAYOUT_STATE: Record<ExpectedPayout["state"], { label: string; tone: strin
 /** Airbnb payouts read from e-mails that no bank line has brought yet, and booked stays with no payout at all. */
 function Payouts({ expected, unpaid }: { expected: ExpectedPayout[]; unpaid: UnpaidStay[] }) {
   if (!expected.length && !unpaid.length) return null;
+  // Folded like the done lists, unless one needs a look.
+  const alert = unpaid.length > 0 || expected.some((p) => p.state === "late");
   return (
-    <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold">
+    <details className="group" open={alert}>
+      <summary className="cursor-pointer text-lg font-semibold marker:text-zinc-400">
         Airbnb payouts on their way <span className="text-zinc-400">· {expected.length + unpaid.length}</span>
-      </h2>
-      <div className="card divide-y divide-zinc-100 dark:divide-zinc-800">
+      </summary>
+      <div className="card mt-3 divide-y divide-zinc-100 dark:divide-zinc-800">
         {expected.map((p) => {
           const s = PAYOUT_STATE[p.state];
           return (
@@ -133,7 +130,7 @@ function Payouts({ expected, unpaid }: { expected: ExpectedPayout[]; unpaid: Unp
           </div>
         ))}
       </div>
-    </section>
+    </details>
   );
 }
 
@@ -149,8 +146,29 @@ function MatchAgain() {
   );
 }
 
+const RECENT_STATEMENTS = 2;
+
+/** The statements read so far, latest first, with the button to add one; older ones stay folded. */
+function Statements({ organizationId, statements, chargesTo }: { organizationId: string; statements: BankStatementRow[]; chargesTo: string }) {
+  const older = statements.slice(RECENT_STATEMENTS);
+  return (
+    <section className="card">
+      <AddStatement organizationId={organizationId} count={statements.length} />
+      {statements.slice(0, RECENT_STATEMENTS).map((s) => <StatementRow key={s.id} s={s} chargesTo={chargesTo} />)}
+      {older.length > 0 && (
+        <details className="border-t border-zinc-100 dark:border-zinc-800">
+          <summary className="cursor-pointer px-4 py-3 text-sm text-zinc-500 marker:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">
+            {older.length} earlier statement{older.length === 1 ? "" : "s"}
+          </summary>
+          {older.map((s) => <StatementRow key={s.id} s={s} chargesTo={chargesTo} />)}
+        </details>
+      )}
+    </section>
+  );
+}
+
 /** Upload straight to the private bank bucket, then have the server read it. */
-function AddStatement({ organizationId }: { organizationId: string }) {
+function AddStatement({ organizationId, count }: { organizationId: string; count: number }) {
   const input = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<"idle" | "uploading" | "reading">("idle");
   const { error, message, go } = useAction();
@@ -170,13 +188,13 @@ function AddStatement({ organizationId }: { organizationId: string }) {
   const busy = step !== "idle" && !error && !message;
 
   return (
-    <section className="card flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+    <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
       <FileText size={20} className="hidden shrink-0 text-zinc-400 sm:block" />
       <div className="flex-1 text-sm">
-        <p className="font-medium">Add a bank statement</p>
+        <p className="font-medium">Statements {count > 0 && <span className="font-normal text-zinc-400">· {count}</span>}</p>
         <p className="text-zinc-500">
           {busy && step === "reading" ? "Reading the statement… a PDF takes about 30 seconds."
-            : "A monthly PDF from your bank (unlocked), or a Wise export in CSV. Lines already added from another statement are skipped."}
+            : "Your bank's monthly PDF (unlocked) or a Wise CSV. Lines already read are skipped."}
         </p>
         {error && <p className="mt-1 text-red-600">{error}</p>}
         {message && <p className="mt-1 text-brand-700 dark:text-brand-400">{message}</p>}
@@ -184,16 +202,16 @@ function AddStatement({ organizationId }: { organizationId: string }) {
       <input ref={input} type="file" accept="application/pdf,.csv,text/csv" className="hidden"
         onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ""; }} />
       <button className={primary} disabled={busy} onClick={() => input.current?.click()}>
-        {busy ? (step === "uploading" ? "Uploading…" : "Reading…") : "Choose a file"}
+        {busy ? (step === "uploading" ? "Uploading…" : "Reading…") : "Add a statement"}
       </button>
-    </section>
+    </div>
   );
 }
 
 function StatementRow({ s, chargesTo }: { s: BankStatementRow; chargesTo: string }) {
   const { error, pending, go } = useAction();
   return (
-    <div className="flex flex-col gap-2 p-4 text-sm sm:flex-row sm:items-center">
+    <div className="flex flex-col gap-2 border-t border-zinc-100 p-4 text-sm sm:flex-row sm:items-center dark:border-zinc-800">
       <div className="flex-1">
         <p className="font-medium">
           {s.account} · {s.periodStart && s.periodEnd ? `${shortDate(s.periodStart)} → ${shortDate(s.periodEnd)}` : "period unknown"}
@@ -233,6 +251,7 @@ function Amount({ line }: { line: BankLineRow }) {
 
 function TodoLine({ line, villas, categories, reportingCurrency }: { line: BankLineRow } & Props) {
   const [open, setOpen] = useState<"add" | "find" | null>(null);
+  const [more, setMore] = useState(false);
   const { error, pending, go } = useAction();
   const kind = line.direction === "in" ? "income" : "expense";
 
@@ -243,6 +262,37 @@ function TodoLine({ line, villas, categories, reportingCurrency }: { line: BankL
       description: get("description"), fxRate: Number(get("fx")) || null,
     }), () => setOpen(null));
   }
+
+  const toggle = (what: "add" | "find") => setOpen((o) => (o === what ? null : what));
+  // What the line most likely is, best guess first: only that one shows, the rest wait behind "More".
+  const suggested: { key: string; title: string; run: () => void; label: React.ReactNode }[] = [
+    ...line.suggestions.map((s) => ({
+      key: s.id, title: "This line is that entry", run: () => go(() => linkLine(line.id, s.id)),
+      label: <><Link2 size={13} /> {shortDate(s.date)} {s.category ?? ""} {s.description && `· ${s.description}`}</>,
+    })),
+    ...line.stays.map((x) => ({
+      key: x.id, title: "This transfer pays this stay (deposit, balance or extension); its income is already in the books",
+      run: () => go(() => linkStay(line.id, x.id)),
+      label: <><BedDouble size={13} /> Pays the stay of {x.guest ?? x.platform}, {shortDate(x.checkIn)} → {shortDate(x.checkOut)}</>,
+    })),
+    ...(line.known ? [{
+      key: "known", title: `Booked like the last ${line.known.uses > 1 ? `${line.known.uses} payments` : "payment"} to this payee`,
+      run: () => go(() => createFromLine(line.id, {
+        villaId: line.known!.villaId, categoryId: line.known!.categoryId, description: line.known!.description ?? "", fxRate: null,
+      })),
+      label: <><Copy size={13} /> Like last time: {[line.known.category, line.known.villa, line.known.description].filter(Boolean).join(" · ")}</>,
+    }] : []),
+    ...(line.template && !line.known ? [{
+      key: "template", title: `Same villa, category and description as the entry of ${shortDate(line.template.fromDate)}`,
+      run: () => go(() => createFromLine(line.id, {
+        villaId: line.template!.villaId, categoryId: line.template!.categoryId, description: line.template!.description, fxRate: null,
+      })),
+      label: <><Copy size={13} /> Like {monthName(line.template.fromDate)}: {[line.template.category, line.template.description].filter(Boolean).join(" · ")}</>,
+    }] : []),
+  ];
+  const suggestion = (x: (typeof suggested)[number], className: string) => (
+    <button key={x.key} className={className} disabled={pending} onClick={x.run} title={x.title}>{x.label}</button>
+  );
 
   return (
     <div className="flex flex-col gap-2 p-4 text-sm">
@@ -255,42 +305,23 @@ function TodoLine({ line, villas, categories, reportingCurrency }: { line: BankL
         <p className="truncate pl-20 text-xs text-zinc-500 max-sm:pl-0">{line.description}</p>
       )}
       <div className="flex flex-wrap gap-2 pl-20 max-sm:pl-0">
-        {line.suggestions.map((s) => (
-          <button key={s.id} className={small} disabled={pending} onClick={() => go(() => linkLine(line.id, s.id))}
-            title="This line is that entry">
-            <Link2 size={13} /> {shortDate(s.date)} {s.category ?? ""} {s.description && `· ${s.description}`}
-          </button>
-        ))}
-        {line.stays.map((x) => (
-          <button key={x.id} className={small} disabled={pending} onClick={() => go(() => linkStay(line.id, x.id))}
-            title="This transfer pays this stay (deposit, balance or extension); its income is already in the books">
-            <BedDouble size={13} /> Pays the stay of {x.guest ?? x.platform}, {shortDate(x.checkIn)} → {shortDate(x.checkOut)}
-          </button>
-        ))}
-        {line.known && (
-          <button className={small} disabled={pending}
-            title={`Booked like the last ${line.known.uses > 1 ? `${line.known.uses} payments` : "payment"} to this payee`}
-            onClick={() => go(() => createFromLine(line.id, {
-              villaId: line.known!.villaId, categoryId: line.known!.categoryId, description: line.known!.description ?? "", fxRate: null,
-            }))}>
-            <Copy size={13} /> Like last time: {[line.known.category, line.known.villa, line.known.description].filter(Boolean).join(" · ")}
-          </button>
+        {suggested[0] && suggestion(suggested[0], main)}
+        {!suggested.length && <button className={main} disabled={pending} onClick={() => toggle("add")}>Add to the books</button>}
+        {more && suggested.slice(1).map((x) => suggestion(x, small))}
+        {more && (
+          <>
+            <button className={small} disabled={pending} onClick={() => toggle("find")}
+              title="Already in the books with another amount or date: link this line to it instead of adding it twice">
+              <Search size={13} /> Already in the books
+            </button>
+            {suggested.length > 0 && <button className={small} disabled={pending} onClick={() => toggle("add")}>Add to the books</button>}
+            <button className={small} disabled={pending} onClick={() => go(() => markPersonal(line.id))}>
+              <UserRound size={13} /> Personal
+            </button>
+          </>
         )}
-        {line.template && !line.known && (
-          <button className={small} disabled={pending} title={`Same villa, category and description as the entry of ${shortDate(line.template.fromDate)}`}
-            onClick={() => go(() => createFromLine(line.id, {
-              villaId: line.template!.villaId, categoryId: line.template!.categoryId, description: line.template!.description, fxRate: null,
-            }))}>
-            <Copy size={13} /> Like {monthName(line.template.fromDate)}: {[line.template.category, line.template.description].filter(Boolean).join(" · ")}
-          </button>
-        )}
-        <button className={small} disabled={pending} onClick={() => setOpen((o) => (o === "find" ? null : "find"))}
-          title="Already in the books with another amount or date: link this line to it instead of adding it twice">
-          <Search size={13} /> Already in the books
-        </button>
-        <button className={small} disabled={pending} onClick={() => setOpen((o) => (o === "add" ? null : "add"))}>Add to the books</button>
-        <button className={small} disabled={pending} onClick={() => go(() => markPersonal(line.id))}>
-          <UserRound size={13} /> Personal
+        <button className={`${small} border-transparent text-zinc-500`} onClick={() => setMore((m) => !m)} aria-expanded={more}>
+          {more ? "Less" : "More"} <ChevronDown size={13} className={more ? "rotate-180" : ""} />
         </button>
       </div>
       {open === "find" && <FindEntry line={line} />}
