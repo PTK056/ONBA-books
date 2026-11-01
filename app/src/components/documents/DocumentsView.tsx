@@ -28,6 +28,11 @@ export function DocumentsView({ q, month, year, category, all, categories, admin
   const inYear = (y: string) => rows.filter((t) => t.date.startsWith(y));
   const inMonth = (m: string) => rows.filter((t) => t.date.startsWith(m));
   const years = [...new Set(rows.map((t) => t.date.slice(0, 4)))].sort().reverse();
+  // Where an opened file's "back" leads: this very folder or search.
+  const here = `/documents${(() => {
+    const p = [q && `q=${encodeURIComponent(q)}`, month ? `month=${month}` : year && `year=${year}`, category && `category=${category}`].filter(Boolean).join("&");
+    return p ? `?${p}` : "";
+  })()}`;
 
   return (
     <>
@@ -75,7 +80,7 @@ export function DocumentsView({ q, month, year, category, all, categories, admin
       )}
 
       {q ? (
-        <FileList txs={rows.slice(0, MAX_LISTED)} villas={villas} sign={sign} empty="No document matches this search." />
+        <FileList txs={rows.slice(0, MAX_LISTED)} villas={villas} here={here} sign={sign} empty="No document matches this search." />
       ) : category && !month && !year ? (
         <>
           <div className="flex items-center justify-between gap-3">
@@ -89,7 +94,7 @@ export function DocumentsView({ q, month, year, category, all, categories, admin
           {years.map((y) => (
             <section key={y} className="flex flex-col gap-2">
               <h2 className="text-sm font-semibold">{y}</h2>
-              <FileList txs={inYear(y)} villas={villas} sign={sign} empty="" />
+              <FileList txs={inYear(y)} villas={villas} here={here} sign={sign} empty="" />
             </section>
           ))}
         </>
@@ -103,7 +108,7 @@ export function DocumentsView({ q, month, year, category, all, categories, admin
               </a>
             )}
           </div>
-          <FileList txs={inMonth(month)} villas={villas} sign={sign} empty="No documents this month." />
+          <FileList txs={inMonth(month)} villas={villas} here={here} sign={sign} empty="No documents this month." />
         </>
       ) : year ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -149,7 +154,7 @@ function FolderCard({ href, title, count, note, zip }: { href: string; title: st
 }
 
 /** A light list (no previews): the file opens on its entry's page. */
-async function FileList({ txs, villas, sign, empty }: { txs: Tx[]; villas: number; sign: Sign; empty: string }) {
+async function FileList({ txs, villas, here, sign, empty }: { txs: Tx[]; villas: number; here: string; sign: Sign; empty: string }) {
   if (!txs.length) return <div className="card p-10 text-center text-sm text-zinc-500">{empty}</div>;
   const signed = await Promise.all(txs.map(async (tx) => ({ tx, files: await sign(tx) })));
   return (
@@ -159,7 +164,7 @@ async function FileList({ txs, villas, sign, empty }: { txs: Tx[]; villas: numbe
           {f.mime === "application/pdf"
             ? <FileText size={18} className="shrink-0 text-red-500" />
             : <ImageIcon size={18} className="shrink-0 text-sky-500" />}
-          <Link href={`/transactions/${tx.id}`} className="min-w-0 flex-1">
+          <Link href={`/transactions/${tx.id}?from=${encodeURIComponent(here)}`} className="min-w-0 flex-1">
             <span className="block truncate font-medium hover:underline">{tx.merchant ?? tx.description ?? "Receipt"}</span>
             <span className="block truncate text-xs text-zinc-500">
               {[tx.merchant && tx.description !== tx.merchant ? tx.description : null, tx.category?.name, villas > 1 ? tx.villa.name : null].filter(Boolean).join(" · ")}

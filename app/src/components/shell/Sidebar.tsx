@@ -2,7 +2,7 @@
 
 import { ArrowLeftRight, BedDouble, FolderOpen, Landmark, LayoutDashboard, Plug, ScanLine, Settings, Upload, Users } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Logo } from "./Logo";
 
 const NAV = [
@@ -31,7 +31,11 @@ interface Props {
 
 /** Fixed sidebar on large screens; a compact top bar with tabs below that. */
 export function Sidebar(props: Props) {
-  return <SidebarView {...props} path={usePathname()} />;
+  const path = usePathname();
+  const from = useSearchParams().get("from") ?? "";
+  // An entry opened from Documents stays under Documents.
+  const fromDocuments = path.startsWith("/transactions/") && /^\/documents(\?|$)/.test(from);
+  return <SidebarView {...props} path={fromDocuments ? "/documents" : path} />;
 }
 
 /** The same sidebar with no current page highlighted, shown while the path is resolved. */

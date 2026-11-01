@@ -23,7 +23,10 @@ export default function TransactionPage({ params, searchParams }: PageProps<"/tr
 
 async function Content({ params, searchParams }: Pick<PageProps<"/transactions/[id]">, "params" | "searchParams">) {
   const { id } = await params;
-  const { edit } = await searchParams;
+  const { edit, from: rawFrom } = await searchParams;
+  // Opened from a Documents folder: the way back leads there (only a Documents path, never another site).
+  const from = typeof rawFrom === "string" && /^\/documents(\?|$)/.test(rawFrom) ? rawFrom : null;
+  const keep = from ? `from=${encodeURIComponent(from)}` : "";
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const data = await getTransaction(id);
   if (!data) redirect("/transactions");
@@ -34,7 +37,7 @@ async function Content({ params, searchParams }: Pick<PageProps<"/transactions/[
 
   return (
     <>
-      <Link href="/transactions" className="inline-flex w-fit items-center gap-1 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"><ArrowLeft size={15} /> Transactions</Link>
+      <Link href={from ?? "/transactions"} className="inline-flex w-fit items-center gap-1 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"><ArrowLeft size={15} /> {from ? "Documents" : "Transactions"}</Link>
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -113,7 +116,7 @@ async function Content({ params, searchParams }: Pick<PageProps<"/transactions/[
         <section className="card p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-semibold">Details</h2>
-            {edit !== "1" && <Link href={`/transactions/${tx.id}?edit=1`} className="text-sm text-zinc-600 hover:underline dark:text-zinc-300">Edit</Link>}
+            {edit !== "1" && <Link href={`/transactions/${tx.id}?${[keep, "edit=1"].filter(Boolean).join("&")}`} className="text-sm text-zinc-600 hover:underline dark:text-zinc-300">Edit</Link>}
           </div>
           {edit === "1" ? (
             <TxForm
