@@ -39,9 +39,10 @@ export function OverviewView({ data: o }: { data: Overview }) {
 
       {editor && <TodoBar o={o} monthName={monthName} />}
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Net result" icon={<Wallet size={16} />} tint="emerald" value={o.totals.net} previous={o.previous.net} currency={cur} goodWhenUp featured
-          note={margin !== null ? `${Math.round(margin * 100)}% margin` : undefined} />
+      <Stat label="Net result" icon={<Wallet size={16} />} tint="emerald" value={o.totals.net} previous={o.previous.net} currency={cur} goodWhenUp featured
+        note={margin !== null ? `${Math.round(margin * 100)}% margin` : undefined} />
+
+      <section className="-mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Income" icon={<TrendingUp size={16} />} tint="blue" value={o.totals.income} previous={o.previous.income} currency={cur} goodWhenUp />
         <Stat label="Expenses" icon={<TrendingDown size={16} />} tint="orange" value={o.totals.expenses} previous={o.previous.expenses} currency={cur} goodWhenUp={false} />
         <OccupancyStat current={occ} previous={occPrev} />
@@ -68,10 +69,12 @@ export function OverviewView({ data: o }: { data: Overview }) {
             <Panel title="Where the money went">
               <CategoryBars categories={o.categories} currency={cur} />
               {o.merchants.length > 0 && (
-                <div className="mt-6 border-t border-zinc-100 pt-4 dark:border-zinc-800">
-                  <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-zinc-400">Top suppliers</h3>
-                  <Suppliers merchants={o.merchants} currency={cur} />
-                </div>
+                <details className="mt-6 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+                  <summary className="cursor-pointer text-sm text-zinc-500 marker:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">
+                    Top suppliers <span className="text-zinc-400">· {o.merchants.length}</span>
+                  </summary>
+                  <div className="mt-3"><Suppliers merchants={o.merchants} currency={cur} /></div>
+                </details>
               )}
             </Panel>
             <StaysList stays={o.stays} currency={cur} showVilla={o.villas.length > 1} />
@@ -86,7 +89,9 @@ export function OverviewView({ data: o }: { data: Overview }) {
         </>
       )}
 
-      {(o.villas.length > 1 || companyUsed(o)) && <VillaTable villas={o.villas} company={companyUsed(o) ? o.company : null} currency={cur} />}
+      {o.villas.length > 1
+        ? <VillaTable villas={o.villas} company={companyUsed(o)} currency={cur} />
+        : <CompanyLine company={companyUsed(o)} villaNet={o.villas[0]?.net ?? 0} currency={cur} />}
     </div>
   );
 }
@@ -203,15 +208,15 @@ export const TINTS = {
 export function Stat({ label, icon, tint, value, previous, currency, goodWhenUp, note, hideChange = false, featured = false }: {
   label: string; icon: React.ReactNode; tint: keyof typeof TINTS; value: number; previous: number;
   currency: string; goodWhenUp: boolean; note?: string; hideChange?: boolean;
-  /** The bento's lead tile: a large brand-coloured card spanning two columns and two rows. */
+  /** The page's lead figure: large and blue, straight on the page rather than in a card. */
   featured?: boolean;
 }) {
   const change = previous ? (value - previous) / Math.abs(previous) : null;
   const good = change !== null && change !== 0 && (change > 0) === goodWhenUp;
-  const chip = change === 0 ? (featured ? "bg-white/10 text-white" : TINTS.zinc)
+  const chip = change === 0 ? TINTS.zinc
     : good ? (featured ? "bg-accent text-sidebar" : "bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300")
-    : (featured ? "bg-rose-400/20 text-rose-100" : "bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300");
-  const muted = featured ? "text-white/60" : "text-zinc-400";
+    : "bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300";
+  const muted = "text-zinc-400";
   const footer = (
     <div className={`flex flex-wrap items-center gap-2 ${featured ? "mt-3 text-sm" : "mt-2 text-xs"}`}>
       {hideChange ? null : change === null ? (
@@ -223,24 +228,18 @@ export function Stat({ label, icon, tint, value, previous, currency, goodWhenUp,
         </span>
       )}
       {!hideChange && change !== null && <span className={muted}>vs last month</span>}
-      {note && <span className={featured ? "text-white/70" : "text-zinc-500"}>{hideChange ? note : `· ${note}`}</span>}
+      {note && <span className="text-zinc-500">{hideChange ? note : `· ${note}`}</span>}
     </div>
   );
 
   if (featured) {
     return (
-      <div className="relative flex flex-col justify-between overflow-hidden rounded-xl bg-brand-600 p-6 text-white sm:col-span-2 lg:row-span-2">
-        <span aria-hidden className="pointer-events-none absolute -right-14 -bottom-20 size-64 rounded-full border-[32px] border-white/[0.06]" />
-        <div className="relative flex items-center justify-between">
-          <p className="text-sm font-medium text-white/70">{label}</p>
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-accent">{icon}</span>
-        </div>
-        <div className="relative mt-8">
-          <p className="text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">
-            {money(value, currency)} <span className="whitespace-nowrap text-base font-normal text-white/60">{currency}</span>
-          </p>
-          {footer}
-        </div>
+      <div>
+        <p className="flex items-center gap-2 text-sm font-medium text-zinc-500"><span className="text-brand-600 dark:text-brand-400">{icon}</span>{label}</p>
+        <p className="mt-1 text-4xl font-semibold tracking-tight text-brand-700 tabular-nums sm:text-5xl dark:text-brand-300">
+          {money(value, currency)} <span className="whitespace-nowrap text-base font-normal text-zinc-400">{currency}</span>
+        </p>
+        {footer}
       </div>
     );
   }
@@ -370,6 +369,17 @@ export function Panel({ title, children, action }: { title: string; children: Re
 
 /** The company's line is worth showing once it has entries this month. */
 const companyUsed = (o: Overview) => o.company && (o.company.income || o.company.expenses) ? o.company : null;
+
+/** With a single villa a table would repeat the tiles: only the company's own entries are worth a line. */
+function CompanyLine({ company, villaNet, currency }: { company: Overview["company"] | null; villaNet: number; currency: string }) {
+  if (!company) return null;
+  return (
+    <p className="text-sm text-zinc-500">
+      {company.name}, outside the villa: <span className="tabular-nums text-zinc-700 dark:text-zinc-300">{company.net >= 0 ? "+" : "−"}{money(Math.abs(company.net), currency)}</span>
+      {" · "}net with the company <span className="tabular-nums font-medium text-zinc-700 dark:text-zinc-300">{money(villaNet + company.net, currency)} {currency}</span>
+    </p>
+  );
+}
 
 export function VillaTable({ villas, company, currency }: { villas: Overview["villas"]; company?: Overview["company"]; currency: string }) {
   const total = [...villas, ...(company ? [company] : [])].reduce(
