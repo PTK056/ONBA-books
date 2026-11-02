@@ -1,21 +1,21 @@
 "use client";
 
-import { ArrowLeftRight, BedDouble, FolderOpen, Landmark, LayoutDashboard, Plug, ScanLine, Settings, Upload, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Logo } from "./Logo";
+import { NAV_ICONS as I } from "./NavIcons";
 
 const NAV = [
-  { href: "/overview", label: "Overview", icon: LayoutDashboard },
-  { href: "/transactions", label: "Transactions", icon: ArrowLeftRight },
-  { href: "/documents", label: "Documents", icon: FolderOpen },
-  { href: "/upload", label: "Scan receipts", icon: Upload },
-  { href: "/review", label: "Review", icon: ScanLine, badge: true },
-  { href: "/import", label: "Import stays", icon: BedDouble },
-  { href: "/team", label: "Team", icon: Users },
-  { href: "/bank", label: "Bank", icon: Landmark, adminOnly: true },
-  { href: "/connections", label: "Connections", icon: Plug, adminOnly: true },
-  { href: "/settings", label: "Settings", icon: Settings, adminOnly: true },
+  { href: "/overview", label: "Overview", icon: I.overview },
+  { href: "/transactions", label: "Transactions", icon: I.transactions },
+  { href: "/documents", label: "Documents", icon: I.documents },
+  { href: "/upload", label: "Scan receipts", icon: I.scan },
+  { href: "/review", label: "Review", icon: I.review, badge: true },
+  { href: "/import", label: "Import stays", icon: I.stays },
+  { href: "/team", label: "Team", icon: I.team },
+  { href: "/bank", label: "Bank", icon: I.bank, adminOnly: true },
+  { href: "/connections", label: "Connections", icon: I.connections, adminOnly: true },
+  { href: "/settings", label: "Settings", icon: I.settings, adminOnly: true },
 ] as const;
 
 interface Props {
@@ -59,7 +59,7 @@ export function SidebarView({ org, reviewBadge, user, path, admin, place, placeC
           {nav.map(({ href, label, icon: Icon, ...rest }) => (
             <Link
               key={href} href={href} aria-current={active(href) ? "page" : undefined}
-              className="group flex items-center gap-2.5 rounded-full px-3 py-2 text-sm text-white/70 hover:bg-white/5 hover:text-white aria-[current=page]:bg-accent aria-[current=page]:font-semibold aria-[current=page]:text-sidebar"
+              className="group flex items-center gap-2.5 rounded-full px-3 py-2 text-sm text-white/70 [--icon-dot:var(--color-accent)] aria-[current=page]:[--icon-dot:currentColor] hover:bg-white/5 hover:text-white aria-[current=page]:bg-accent aria-[current=page]:font-semibold aria-[current=page]:text-sidebar"
             >
               <Icon size={17} className="text-white/50 group-aria-[current=page]:text-sidebar" />
               <span className="flex-1">{label}</span>
@@ -77,7 +77,7 @@ export function SidebarView({ org, reviewBadge, user, path, admin, place, placeC
           {nav.map(({ href, label, icon: Icon, ...rest }) => (
             <Link
               key={href} href={href} aria-label={label} aria-current={active(href) ? "page" : undefined}
-              className="relative flex h-9 items-center gap-1.5 rounded-full px-2.5 text-sm text-white/70 aria-[current=page]:bg-accent aria-[current=page]:font-semibold aria-[current=page]:text-sidebar"
+              className="relative flex h-9 items-center gap-1.5 rounded-full px-2.5 text-sm text-white/70 [--icon-dot:var(--color-accent)] aria-[current=page]:[--icon-dot:currentColor] aria-[current=page]:bg-accent aria-[current=page]:font-semibold aria-[current=page]:text-sidebar"
             >
               <Icon size={17} />
               <span className="hidden sm:inline">{label}</span>
