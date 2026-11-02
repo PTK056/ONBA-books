@@ -68,10 +68,11 @@ function Card({ c }: { c: Connector }) {
 export function Status({ status }: { status: ConnectorStatus }) {
   if (status === "connected") {
     return (
-      <span className="inline-flex items-center gap-2 bg-brand-50 px-2.5 py-1 badge-label text-brand-700 dark:bg-brand-950/60 dark:text-brand-400">
+      // Chartreuse with navy, like the active tab: the one live signal on the page.
+      <span className="inline-flex items-center gap-2 bg-accent px-2.5 py-1 badge-label font-semibold text-sidebar">
         <span className="relative flex size-2">
-          <span className="absolute inline-flex size-full animate-ping rounded-full bg-brand-400 opacity-75 motion-reduce:hidden" />
-          <span className="relative inline-flex size-2 rounded-full bg-brand-500 shadow-[0_0_6px_2px_rgba(46,135,99,0.6)]" />
+          <span className="absolute inline-flex size-full animate-ping rounded-full bg-sidebar opacity-50 motion-reduce:hidden" />
+          <span className="relative inline-flex size-2 rounded-full bg-sidebar" />
         </span>
         Connected
       </span>
