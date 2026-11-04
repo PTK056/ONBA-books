@@ -10,7 +10,7 @@ import path from "node:path";
 
 const root = path.join(import.meta.dirname, "..");
 const SUPABASE_STANDIN = `
-  create role anon nologin; create role authenticated nologin;
+  create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
   create schema auth;
   create table auth.users (id uuid primary key, email text);
   create function auth.uid() returns uuid language sql stable as
@@ -25,9 +25,10 @@ const SUPABASE_STANDIN = `
   grant usage on schema auth, storage to anon, authenticated;
   grant all on storage.objects to authenticated;
   grant select on storage.buckets to authenticated;
-  grant usage on schema public to anon, authenticated;
-  alter default privileges in schema public grant all on tables to anon, authenticated;
-  alter default privileges in schema public grant all on sequences to anon, authenticated;
+  grant usage on schema public to anon, authenticated, service_role;
+  grant usage on schema auth to service_role;
+  alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+  alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
   alter default privileges in schema public grant execute on functions to anon, authenticated;
 `;
 

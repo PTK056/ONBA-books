@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import type { AuthInfo, McpServer } from "@modelcontextprotocol/server";
 import { allocateByNights, nightsBetween } from "@/lib/stays/airbnb";
+import { defineBank } from "./bank";
 import { storeEvidence } from "./files";
 import {
   createStaff, describePay, listStaff, logWork, markPaid, monthLabel, payroll, preparePayroll, StaffError, updateStaff,
@@ -51,10 +52,10 @@ export async function runTool(t: ToolDef, s: Session, args: unknown): Promise<{ 
   }
 }
 
-const friendly = (message = "") =>
+export const friendly = (message = "") =>
   message.includes("closed") ? "That month is closed for this villa. Use a date in an open month, or reopen the month in the app." : null;
 
-type Registrar = { registerTool(name: string, config: Omit<ToolDef, "name" | "handler">, handler: (s: Session, args: never) => Promise<object>): void };
+export type Registrar = { registerTool(name: string, config: Omit<ToolDef, "name" | "handler">, handler: (s: Session, args: never) => Promise<object>): void };
 
 /** The tools, with file fields for the given channel. */
 export function toolDefs(channel: Channel): ToolDef[] {
@@ -638,6 +639,8 @@ function define(server: Registrar, channel: Channel) {
       how: describePay(paid.run.breakdown), proof, link: `${APP}/transactions/${paid.transactionId}`,
     };
   }));
+
+  defineBank(server);
 }
 
 /** Pay of this month that is due (someone's payday has come) and not yet paid. */

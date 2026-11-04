@@ -2,12 +2,12 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
-import { autoMatch, CHARGE, ingestStatement, INTEREST, learnPayees, shift, WITHHELD_TAX } from "@/lib/bank/ops";
+import { bookStatementCharges } from "@/lib/bank/book-charges";
+import { BankError, bookLine, linkEntry, linkStays, markLinePersonal, resetLine as reset } from "@/lib/bank/handle";
+import { autoMatch, ingestStatement, learnPayees, shift } from "@/lib/bank/ops";
 import { readStatementPdf, StatementError } from "@/lib/bank/statement-pdf";
 import { parseWiseCsv, WiseCsvError } from "@/lib/bank/wise-csv";
-import { equalShares } from "@/lib/split/shares";
 import { getCurrentOrg, places } from "@/lib/org";
-import { bankSettings, type Bearer } from "@/lib/settings";
 import { createClient } from "@/lib/supabase/server";
 
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
@@ -17,6 +17,21 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 async function admin() {
   const org = await getCurrentOrg();
   return org.kind === "member" && org.role === "admin" ? org : null;
+}
+
+/** The message to show for a failed bank action. */
+function failure(e: unknown): string {
+  if (!(e instanceof BankError)) {
+    console.error("[bank]", e);
+    return "Could not save. Try again.";
+  }
+  return e.code === "already_handled" ? "This line was already handled." : e.message;
+}
+
+/** Whether the line belongs to the organization the user is working in (an admin of two must act in the right one). */
+async function ours(db: Awaited<ReturnType<typeof createClient>>, orgId: string, lineId: string): Promise<boolean> {
+  const { data } = await db.from("bank_lines").select("id").eq("id", lineId).eq("organization_id", orgId).maybeSingle();
+  return !!data;
 }
 
 function done(message?: string): Result {
@@ -93,92 +108,31 @@ export async function createFromLine(lineId: string, input: { villaId: string; c
   const fx = line.currency === org.reportingCurrency ? 1 : input.fxRate;
   if (!fx || !(fx > 0)) return { ok: false, error: `Enter the ${line.currency} → ${org.reportingCurrency} rate.` };
 
-  const { data: tx, error } = await db.from("transactions").insert({
-    organization_id: org.id, villa_id: input.villaId, date: line.date, direction: line.direction,
-    category_id: input.categoryId, description: input.description.trim() || null,
-    currency: line.currency, amount: line.amount, fx_rate: fx, status: "validated", source: "module",
-  }).select("id").single();
-  if (error || !tx) return { ok: false, error: error?.message.includes("closed") ? "That month is closed for this villa." : "Could not save. Try again." };
-  await db.from("bank_lines").update({ status: "matched", transaction_id: tx.id, matched_by: "created" }).eq("id", lineId);
+  try {
+    await bookLine(db, lineId, { villaId: input.villaId, categoryId: input.categoryId, description: input.description, fxRate: fx, via: "app" });
+  } catch (e) {
+    return { ok: false, error: failure(e) };
+  }
   await learnPayees(db, org.id);
   revalidatePath("/transactions");
   revalidatePath("/overview");
   return done();
 }
 
-/**
- * One expense for the statement's bank fees, and one income for its interest net of the tax the bank withheld
- * (in Indonesia a 20% final tax: not a bank fee, and not a deductible expense).
- */
+/** Books the statement's bank fees and interest, per month (see lib/bank/book-charges). */
 export async function bookCharges(statementId: string): Promise<Result> {
   const org = await admin();
   if (!org || !UUID.test(statementId)) return { ok: false, error: "Not allowed." };
   const db = await createClient();
-  const [{ data: lines }, { data: cats }, settings] = await Promise.all([
-    db.from("bank_lines").select("id, date, direction, amount, currency, description")
-      .eq("statement_id", statementId).eq("organization_id", org.id).eq("status", "unmatched"),
-    db.from("categories").select("id, name, kind").eq("organization_id", org.id).is("archived_at", null),
-    bankSettings(db, org.id),
-  ]);
-  // Where each kind goes, as set in Settings: the company, or every villa in equal shares.
-  const targets = (to: Bearer) => (to === "company" && org.company ? [org.company] : org.villas);
-  const charges = (lines ?? []).filter((l) => CHARGE.test(l.description));
-  if (!charges.length) return { ok: false, error: "No bank charges left on this statement." };
-  if (charges.some((l) => l.currency !== org.reportingCurrency)) {
-    return { ok: false, error: "Book these one by one: they are not in your reporting currency." };
-  }
-  const category = (kind: "income" | "expense", re: RegExp) => (cats ?? []).find((c) => c.kind === kind && re.test(c.name))?.id ?? null;
-  const total = (xs: typeof charges) => Math.round(xs.reduce((s, l) => s + Number(l.amount), 0) * 100) / 100;
-  const fmt = (n: number) => n.toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-  // One entry per place; split in equal shares when it goes to several villas. The lines link to the first share.
-  const book = async (group: typeof charges, to: Bearer, entry: { direction: "in" | "out"; amount: number; category_id: string | null; description: string }) => {
-    if (!group.length || !(entry.amount > 0)) return null;
-    const where = targets(to);
-    const shares = equalShares(entry.amount, where.length);
-    const { data: txs, error } = await db.from("transactions").insert(where.map((v, i) => ({
-      organization_id: org.id, villa_id: v.id, date: group.map((l) => l.date).sort().at(-1), currency: org.reportingCurrency,
-      fx_rate: 1, status: "validated", source: "module", ...entry, amount: shares[i],
-      description: where.length > 1 ? `${entry.description} (share ${i + 1}/${where.length})` : entry.description,
-    }))).select("id");
-    if (error || !txs?.length) return error?.message.includes("closed") ? "That month is closed." : "Could not save. Try again.";
-    await db.from("bank_lines").update({ status: "matched", transaction_id: txs[0].id, matched_by: "created" }).in("id", group.map((l) => l.id));
-    return null;
-  };
-
-  // One booking per month: an export can cover many months (a Wise CSV), and each month's charges belong to it.
-  const problems: (string | null)[] = [];
-  for (const month of [...new Set(charges.map((l) => l.date.slice(0, 7)))].sort()) {
-    const monthCharges = charges.filter((l) => l.date.startsWith(month));
-    const interest = monthCharges.filter((l) => l.direction === "in" && INTEREST.test(l.description));
-    const tax = monthCharges.filter((l) => l.direction === "out" && WITHHELD_TAX.test(l.description));
-    const fees = monthCharges.filter((l) => !interest.includes(l) && !tax.includes(l) && l.direction === "out");
-    problems.push(await book(fees, settings.feesTo, {
-      direction: "out", amount: total(fees), category_id: category("expense", /bank/i),
-      description: `Bank fees, ${month} (${fees.length} line${fees.length === 1 ? "" : "s"})`,
-    }));
-    const gross = total(interest), withheld = total(tax);
-    if (interest.length) {
-      problems.push(await book([...interest, ...tax], settings.interestTo, {
-        direction: "in", amount: Math.round((gross - withheld) * 100) / 100, category_id: category("income", /interest|other income/i),
-        description: withheld ? `Bank interest, ${month}: ${fmt(gross)} less ${fmt(withheld)} tax withheld` : `Bank interest, ${month}`,
-      }));
-    } else if (tax.length) {
-      // Tax without interest on this statement: book it on its own, as a tax.
-      problems.push(await book(tax, settings.interestTo, {
-        direction: "out", amount: withheld, category_id: category("expense", /tax/i), description: `Tax withheld by the bank, ${month}`,
-      }));
-    }
-  }
-  // A closed month keeps its lines in the list; the other months are booked.
-  const problem = problems.find(Boolean);
-  if (problem) {
+  try {
+    const r = await bookStatementCharges(db, org, statementId, "app");
     revalidatePath("/transactions");
-    return { ok: false, error: `${problem} Months that could be booked were.` };
+    if (r.problem) return { ok: false, error: `${r.problem} Months that could be booked were.` };
+    revalidatePath("/overview");
+    return done();
+  } catch (e) {
+    return { ok: false, error: failure(e) };
   }
-  revalidatePath("/transactions");
-  revalidatePath("/overview");
-  return done();
 }
 
 /** Links a line to an entry already in the books, chosen by the user. */
@@ -186,16 +140,12 @@ export async function linkLine(lineId: string, transactionId: string): Promise<R
   const org = await admin();
   if (!org || !UUID.test(lineId) || !UUID.test(transactionId)) return { ok: false, error: "Not allowed." };
   const db = await createClient();
-  const [{ data: line }, { data: tx }, { count }] = await Promise.all([
-    db.from("bank_lines").select("direction").eq("id", lineId).eq("organization_id", org.id).single(),
-    db.from("transactions").select("direction").eq("id", transactionId).eq("organization_id", org.id).single(),
-    db.from("bank_lines").select("id", { count: "exact", head: true }).eq("organization_id", org.id).eq("transaction_id", transactionId),
-  ]);
-  if (!line || !tx || line.direction !== tx.direction) return { ok: false, error: "Not allowed." };
-  if (count) return { ok: false, error: "That entry is already linked to another bank line." };
-  const { error } = await db.from("bank_lines").update({ status: "matched", transaction_id: transactionId, matched_by: "manual" })
-    .eq("id", lineId).eq("organization_id", org.id).eq("status", "unmatched");
-  if (error) return { ok: false, error: "Could not link. Try again." };
+  if (!(await ours(db, org.id, lineId))) return { ok: false, error: "Not allowed." };
+  try {
+    await linkEntry(db, lineId, transactionId, "app");
+  } catch (e) {
+    return { ok: false, error: failure(e) };
+  }
   await learnPayees(db, org.id);
   return done();
 }
@@ -251,11 +201,12 @@ export async function linkStay(lineId: string, stayId: string): Promise<Result> 
   const org = await admin();
   if (!org || !UUID.test(lineId) || !UUID.test(stayId)) return { ok: false, error: "Not allowed." };
   const db = await createClient();
-  const { data: line } = await db.from("bank_lines").select("status, direction").eq("id", lineId).eq("organization_id", org.id).single();
-  if (!line || line.status !== "unmatched" || line.direction !== "in") return { ok: false, error: "This line was already handled." };
-  const { error } = await db.from("bank_line_stays").insert({ organization_id: org.id, line_id: lineId, stay_id: stayId });
-  if (error) return { ok: false, error: "Could not link. Try again." };
-  await db.from("bank_lines").update({ status: "matched", matched_by: "manual" }).eq("id", lineId);
+  if (!(await ours(db, org.id, lineId))) return { ok: false, error: "Not allowed." };
+  try {
+    await linkStays(db, lineId, [stayId], "app");
+  } catch (e) {
+    return { ok: false, error: failure(e) };
+  }
   return done();
 }
 
@@ -263,7 +214,12 @@ export async function markPersonal(lineId: string): Promise<Result> {
   const org = await admin();
   if (!org || !UUID.test(lineId)) return { ok: false, error: "Not allowed." };
   const db = await createClient();
-  await db.from("bank_lines").update({ status: "personal" }).eq("id", lineId).eq("organization_id", org.id).eq("status", "unmatched");
+  if (!(await ours(db, org.id, lineId))) return { ok: false, error: "Not allowed." };
+  try {
+    await markLinePersonal(db, lineId, null, "app");
+  } catch (e) {
+    return { ok: false, error: failure(e) };
+  }
   return done();
 }
 
@@ -272,7 +228,12 @@ export async function resetLine(lineId: string): Promise<Result> {
   const org = await admin();
   if (!org || !UUID.test(lineId)) return { ok: false, error: "Not allowed." };
   const db = await createClient();
-  await db.from("bank_line_stays").delete().eq("line_id", lineId).eq("organization_id", org.id);
-  await db.from("bank_lines").update({ status: "unmatched", transaction_id: null, matched_by: null }).eq("id", lineId).eq("organization_id", org.id);
+  if (!(await ours(db, org.id, lineId))) return { ok: false, error: "Not allowed." };
+  try {
+    await reset(db, lineId);
+  } catch (e) {
+    if (!(e instanceof BankError && e.code === "not_handled")) return { ok: false, error: failure(e) };
+  }
+  await learnPayees(db, org.id);
   return done();
 }

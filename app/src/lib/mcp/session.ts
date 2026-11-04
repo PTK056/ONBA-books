@@ -94,6 +94,11 @@ export function requireEditor(s: Session) {
   if (s.role === "owner_viewer") throw new ToolError("This account can only read. Ask an admin of the organization for staff access.");
 }
 
+/** The bank module is admins only (as in the app): statements show balances, staff accounts and personal spending. */
+export function requireAdmin(s: Session) {
+  if (s.role !== "admin") throw new ToolError("not_admin: Only admins of the organization can see and handle bank lines.");
+}
+
 /** Today in the organization's time zone, YYYY-MM-DD. */
 export function today(s: Session): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: s.org.timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());

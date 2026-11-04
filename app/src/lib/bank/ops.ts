@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { matchLines, type BookEntry, type PayoutIn, type StayNet } from "./match";
 import { payoutStates } from "./payouts";
+import { BankError, isRace, linkEntry, linkStays } from "./handle";
 import { payeeKey } from "./payees";
 import type { Statement } from "./statement-pdf";
 
@@ -101,15 +102,20 @@ export async function autoMatch(db: SupabaseClient, orgId: string, reportingCurr
     lines.map((l) => ({ ...l, amount: Number(l.amount), text: [l.counterparty, l.description].filter(Boolean).join(" · ") })), entries, nets, reportingCurrency,
     payouts,
   );
+  // Each link is one atomic call: a line handled meanwhile (in the app, by the assistant) is skipped, never relinked.
+  let linked = 0;
   for (const m of matches) {
-    if (m.kind === "transaction") {
-      await db.from("bank_lines").update({ status: "matched", transaction_id: m.transactionId, matched_by: "auto" }).eq("id", m.lineId);
-    } else {
-      await db.from("bank_line_stays").insert(m.stayIds.map((stay_id) => ({ organization_id: orgId, line_id: m.lineId, stay_id })));
-      await db.from("bank_lines").update({ status: "matched", matched_by: "auto" }).eq("id", m.lineId);
+    try {
+      if (m.kind === "transaction") await linkEntry(db, m.lineId, m.transactionId, "auto");
+      else await linkStays(db, m.lineId, m.stayIds, "auto");
+      linked++;
+    } catch (e) {
+      // Handled meanwhile, or its entry or stay changed since it was read: leave that line for a person, go on.
+      if (!(e instanceof BankError)) throw e;
+      if (!isRace(e)) console.error("[bank] auto-match skipped a line:", e.code, e.message);
     }
   }
-  return matches.length;
+  return linked;
 }
 
 export function shift(date: string, days: number): string {
@@ -118,25 +124,42 @@ export function shift(date: string, days: number): string {
 
 /**
  * Rebuilds the memory of regular payees from every line already in the books: for each payee (and direction),
- * the villa, category and description of the latest entry. Cheap enough to run after each match.
+ * the villa, category and description of the latest entry. A payee no line is booked for any more (its lines put
+ * back in the list) is forgotten. Cheap enough to run after each match.
  */
 export async function learnPayees(db: SupabaseClient, orgId: string): Promise<void> {
-  const { data } = await db.from("bank_lines")
-    .select("date, direction, description, counterparty, payee_last4, transaction:transactions (villa_id, category_id, description)")
-    .eq("organization_id", orgId).eq("status", "matched").not("transaction_id", "is", null).order("date");
   type Row = { date: string; direction: "in" | "out"; description: string; counterparty: string | null; payee_last4: string | null;
     transaction: { villa_id: string; category_id: string | null; description: string | null } | null };
+  const rows: Row[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db.from("bank_lines")
+      .select("date, direction, description, counterparty, payee_last4, transaction:transactions (villa_id, category_id, description)")
+      .eq("organization_id", orgId).eq("status", "matched").not("transaction_id", "is", null)
+      .order("date").order("id").range(from, from + PAGE - 1);
+    if (error) return; // keep the memory as it is rather than rebuild it from a partial read
+    rows.push(...(data ?? []) as unknown as Row[]);
+    if ((data ?? []).length < PAGE) break;
+  }
   const memory = new Map<string, { row: Row; uses: number }>();
-  for (const row of (data ?? []) as unknown as Row[]) {
+  for (const row of rows) {
     const key = payeeKey(row);
     if (!key || !row.transaction) continue;
     const id = `${key}|${row.direction}`;
     memory.set(id, { row, uses: (memory.get(id)?.uses ?? 0) + 1 }); // ordered by date: the latest wins
   }
-  if (!memory.size) return;
-  await db.from("bank_payees").upsert([...memory.entries()].map(([id, { row, uses }]) => ({
-    organization_id: orgId, key: id.split("|")[0], direction: row.direction, name: row.counterparty,
-    villa_id: row.transaction!.villa_id, category_id: row.transaction!.category_id, description: row.transaction!.description,
-    uses, last_used: row.date,
-  })), { onConflict: "organization_id,key,direction" });
+  if (memory.size) {
+    await db.from("bank_payees").upsert([...memory.entries()].map(([id, { row, uses }]) => ({
+      organization_id: orgId, key: id.split("|")[0], direction: row.direction, name: row.counterparty,
+      villa_id: row.transaction!.villa_id, category_id: row.transaction!.category_id, description: row.transaction!.description,
+      uses, last_used: row.date,
+    })), { onConflict: "organization_id,key,direction" });
+  }
+  const { data: known } = await db.from("bank_payees").select("key, direction").eq("organization_id", orgId);
+  for (const p of known ?? []) {
+    if (!memory.has(`${p.key}|${p.direction}`)) {
+      await db.from("bank_payees").delete().eq("organization_id", orgId).eq("key", p.key).eq("direction", p.direction);
+    }
+  }
 }
+
+const PAGE = 1000;

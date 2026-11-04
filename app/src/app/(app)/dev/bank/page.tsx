@@ -8,7 +8,7 @@ import type { BankLineRow } from "@/lib/bank/data";
 
 const line = (l: Partial<BankLineRow> & Pick<BankLineRow, "id" | "date" | "direction" | "amount" | "description">): BankLineRow => ({
   statementId: "s1", account: "BCA ••••4821", currency: "IDR", counterparty: null, status: "unmatched", matchedBy: null,
-  linkedTo: null, suggestions: [], template: null, stays: [], known: null, ...l,
+  handledVia: null, note: null, personalReason: null, linkedTo: null, suggestions: [], template: null, stays: [], known: null, ...l,
 });
 
 const LINES: BankLineRow[] = [
@@ -23,8 +23,10 @@ const LINES: BankLineRow[] = [
     template: { fromId: "t9", fromDate: "2026-08-10", villaId: "v1", categoryId: "c2", category: "Pool & garden", description: "Pool maintenance" } }),
   line({ id: "6", date: "2026-09-04", direction: "out", amount: 2_000_000, description: "TARIKAN ATM 04/09", counterparty: null }),
   line({ id: "7", date: "2026-09-02", direction: "out", amount: 68_000, description: "QRIS KAMALIS LAUNDRY", counterparty: "Kamalis Laundry", status: "matched", matchedBy: "auto", linkedTo: "Laundry: bed linen and towels" }),
-  line({ id: "8", date: "2026-09-01", direction: "in", amount: 44_000_000, description: "TRSF CR AIRBNB", counterparty: "Airbnb Payments", status: "matched", matchedBy: "manual", linkedTo: "Airbnb payout" }),
-  line({ id: "9", date: "2026-09-03", direction: "out", amount: 350_000, description: "TOKOPEDIA", counterparty: "Tokopedia", status: "personal" }),
+  line({ id: "8", date: "2026-09-01", direction: "in", amount: 44_000_000, description: "TRSF CR AIRBNB", counterparty: "Airbnb Payments", status: "matched", matchedBy: "manual", linkedTo: "Airbnb payout",
+    handledVia: "agent", note: "Payout for HM4KX and HM9QP" }),
+  line({ id: "9", date: "2026-09-03", direction: "out", amount: 350_000, description: "TOKOPEDIA", counterparty: "Tokopedia", status: "personal",
+    handledVia: "agent", personalReason: "private_expense", note: "Personal shopping on the company card" }),
 ];
 
 export default function DevBank() {

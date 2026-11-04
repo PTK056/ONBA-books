@@ -399,6 +399,10 @@ function FindEntry({ line }: { line: BankLineRow }) {
   );
 }
 
+const REASONS: Record<string, string> = {
+  owner_transfer: "owner transfer", owner_contribution: "owner contribution", private_expense: "private expense", internal_transfer: "between own accounts",
+};
+
 function Done({ title, lines }: { title: string; lines: BankLineRow[] }) {
   const { pending, go } = useAction();
   return (
@@ -410,9 +414,17 @@ function Done({ title, lines }: { title: string; lines: BankLineRow[] }) {
         {lines.map((l) => (
           <div key={l.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 p-3 text-sm">
             <span className="w-16 tabular-nums text-zinc-500">{shortDate(l.date)}</span>
-            <span className="min-w-0 flex-1 truncate">
-              {l.counterparty ?? l.description}
-              {l.linkedTo && <span className="text-zinc-500"> → {l.linkedTo}{l.matchedBy === "auto" ? " (auto)" : ""}</span>}
+            <span className="min-w-0 flex-1">
+              <span className="block truncate">
+                {l.counterparty ?? l.description}
+                {l.linkedTo && <span className="text-zinc-500"> → {l.linkedTo}{l.matchedBy === "auto" ? " (auto)" : ""}</span>}
+                {l.personalReason && <span className="text-zinc-500"> · {REASONS[l.personalReason] ?? l.personalReason}</span>}
+              </span>
+              {l.handledVia === "agent" && (
+                <span className="block truncate text-xs text-zinc-500" title={l.note ?? undefined}>
+                  By the assistant{l.note ? `: ${l.note}` : ""}
+                </span>
+              )}
             </span>
             <Amount line={l} />
             <button className={small} disabled={pending} onClick={() => go(() => resetLine(l.id))} title="Put back in the list">

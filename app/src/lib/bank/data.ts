@@ -14,6 +14,8 @@ export interface Suggestion { id: string; date: string; description: string; cat
 export interface BankLineRow {
   id: string; statementId: string; account: string; date: string; direction: "in" | "out"; amount: number; currency: string;
   description: string; counterparty: string | null; status: "unmatched" | "matched" | "personal"; matchedBy: string | null;
+  /** Who handled it (auto, app, agent: the assistant), with its note and, for a personal line, the reason. */
+  handledVia: "auto" | "app" | "agent" | null; note: string | null; personalReason: string | null;
   /** What the line is linked to, in words. */
   linkedTo: string | null;
   suggestions: Suggestion[];
@@ -45,24 +47,24 @@ const LATE_AFTER_DAYS = 3;   // past Airbnb's "should arrive by"
 const UNPAID_AFTER_DAYS = 3; // Airbnb pays about a day after arrival
 
 export async function bankPage(db: SupabaseClient, orgId: string) {
-  const [{ data: accounts }, { data: statements }, { data: lines }, { data: payees }, { data: villas }, { data: cats }] = await Promise.all([
+  const [{ data: accounts }, { data: statements }, { data: lines }, knownFor] = await Promise.all([
     db.from("bank_accounts").select("id, name, last4").eq("organization_id", orgId),
     db.from("bank_statements")
       .select("id, account_id, period_start, period_end, lines_added, lines_skipped, balanced, notes")
       .eq("organization_id", orgId).order("period_start", { ascending: false }),
     db.from("bank_lines")
       .select("id, statement_id, account_id, date, direction, amount, currency, description, counterparty, payee_last4, status, matched_by, "
+        + "handled_via, handled_note, personal_reason, "
         + "transaction:transactions (date, description, category:categories (name)), stays:bank_line_stays (stay:stays (external_ref, guest_name, check_in))")
       .eq("organization_id", orgId).order("date", { ascending: false }).limit(1000),
-    db.from("bank_payees").select("key, direction, villa_id, category_id, description, uses, last_used").eq("organization_id", orgId),
-    db.from("villas").select("id, name").eq("organization_id", orgId),
-    db.from("categories").select("id, name").eq("organization_id", orgId),
+    payeeMemory(db, orgId),
   ]);
   const accountName = new Map((accounts ?? []).map((a) => [a.id, a.last4 ? `${a.name} ••••${a.last4}` : a.name]));
 
   type Row = {
     id: string; statement_id: string; account_id: string; date: string; direction: "in" | "out"; amount: number; currency: string;
     description: string; counterparty: string | null; payee_last4: string | null; status: BankLineRow["status"]; matched_by: string | null;
+    handled_via: BankLineRow["handledVia"]; handled_note: string | null; personal_reason: string | null;
     transaction: { date: string; description: string | null; category: { name: string } | null } | null;
     stays: { stay: { external_ref: string | null; guest_name: string | null; check_in: string } }[];
   };
@@ -102,21 +104,6 @@ export async function bankPage(db: SupabaseClient, orgId: string) {
 
   const near = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) <= LINK_DAYS * 86_400_000;
 
-  // Regular payees: where their last payment was booked.
-  const villaName = new Map((villas ?? []).map((v) => [v.id, v.name]));
-  const catName = new Map((cats ?? []).map((c) => [c.id, c.name]));
-  const memory = new Map((payees ?? []).filter((p) => p.villa_id).map((p) => [`${p.key}|${p.direction}`, p]));
-  const knownFor = (r: { date: string; direction: string; description: string; counterparty: string | null; payee_last4: string | null }): KnownPayee | null => {
-    const key = payeeKey(r);
-    const p = key ? memory.get(`${key}|${r.direction}`) : undefined;
-    if (!p) return null;
-    return {
-      villaId: p.villa_id!, villa: villaName.get(p.villa_id!) ?? "", categoryId: p.category_id,
-      category: p.category_id ? catName.get(p.category_id) ?? null : null, uses: p.uses,
-      // "… August 2026" last time, paid in October: "… October 2026".
-      description: p.description ? retitle(p.description, p.last_used, r.date) : null,
-    };
-  };
   const named = namesOf(open.map((r) => ({ id: r.id, text: [r.counterparty, r.description].filter(Boolean).join(" · ") })));
   const out: BankLineRow[] = rows.map((r) => {
     const stays = r.stays.map((x) => x.stay);
@@ -139,7 +126,7 @@ export async function bankPage(db: SupabaseClient, orgId: string) {
     return {
       id: r.id, statementId: r.statement_id, account: accountName.get(r.account_id) ?? "", date: r.date, direction: r.direction,
       amount: Number(r.amount), currency: r.currency, description: r.description, counterparty: r.counterparty,
-      status: r.status, matchedBy: r.matched_by, linkedTo, suggestions, template, stays: payable, known,
+      status: r.status, matchedBy: r.matched_by, handledVia: r.handled_via, note: r.handled_note, personalReason: r.personal_reason, linkedTo, suggestions, template, stays: payable, known,
     };
   });
 
@@ -150,6 +137,29 @@ export async function bankPage(db: SupabaseClient, orgId: string) {
     linesAdded: s.lines_added, linesSkipped: s.lines_skipped, balanced: s.balanced, notes: s.notes, charges: charges.get(s.id) ?? 0,
   }));
   return { statements: stmts, lines: out, ...await payoutsPage(db, orgId, rows.map((r) => r.date).sort().at(-1) ?? null) };
+}
+
+/** Regular payees: for a bank line, where the last payment to (or from) the same payee was booked; null if unknown. */
+export async function payeeMemory(db: SupabaseClient, orgId: string) {
+  const [{ data: payees }, { data: villas }, { data: cats }] = await Promise.all([
+    db.from("bank_payees").select("key, direction, villa_id, category_id, description, uses, last_used").eq("organization_id", orgId),
+    db.from("villas").select("id, name").eq("organization_id", orgId),
+    db.from("categories").select("id, name").eq("organization_id", orgId),
+  ]);
+  const villaName = new Map((villas ?? []).map((v) => [v.id, v.name]));
+  const catName = new Map((cats ?? []).map((c) => [c.id, c.name]));
+  const memory = new Map((payees ?? []).filter((p) => p.villa_id).map((p) => [`${p.key}|${p.direction}`, p]));
+  return (r: { date: string; direction: string; description: string; counterparty: string | null; payee_last4: string | null }): KnownPayee | null => {
+    const key = payeeKey(r);
+    const p = key ? memory.get(`${key}|${r.direction}`) : undefined;
+    if (!p) return null;
+    return {
+      villaId: p.villa_id!, villa: villaName.get(p.villa_id!) ?? "", categoryId: p.category_id,
+      category: p.category_id ? catName.get(p.category_id) ?? null : null, uses: p.uses,
+      // "… August 2026" last time, paid in October: "… October 2026".
+      description: p.description ? retitle(p.description, p.last_used, r.date) : null,
+    };
+  };
 }
 
 /** What Airbnb sent and the bank hasn't shown yet, and stays booked from e-mails with no payout at all. */
