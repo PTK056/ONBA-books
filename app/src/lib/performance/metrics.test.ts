@@ -183,7 +183,7 @@ test("a goal's path: the cumulative result so far, then the months left as last 
   assert.equal(p.actual.at(-1)!.month, "2026-10-01");
   assert.equal(p.actual.at(-1)!.value, s.cumulative);
   assert.equal(p.projection.at(-1)!.month, "2027-04-01");
-  assert.equal(p.projection.at(-1)!.value, s.projected, "ends where the goal's projection says");
+  assert.equal(Math.round(p.projection.at(-1)!.value), Math.round(s.projected!), "ends where the goal's projection says");
 });
 
 test("a goal further than a year away takes each month from the latest year closed", async () => {
@@ -197,7 +197,7 @@ test("a goal further than a year away takes each month from the latest year clos
   assert.equal(s.monthsLeft, 17);
   assert.equal(s.lastYearSame, expected);
   const { goalPath } = await import("./metrics.ts");
-  assert.equal(goalPath(far, d, "2026-10-01").projection.at(-1)!.value, s.projected);
+  assert.equal(Math.round(goalPath(far, d, "2026-10-01").projection.at(-1)!.value), Math.round(s.projected!));
 });
 
 test("a villa's goal counts that villa only: its pace leaves out the company and the other villas", async () => {
@@ -206,7 +206,7 @@ test("a villa's goal counts that villa only: its pace leaves out the company and
   const villa = goalStatus({ ...breakEven, placeId: V }, d, "2026-10-01");
   assert.equal(Math.round(villa.pace3! - all.pace3!), 18_000_000 / 3, "the company's fees are not the villa's");
   const { goalPath } = await import("./metrics.ts");
-  assert.equal(goalPath({ ...breakEven, placeId: V }, d, "2026-10-01").projection.at(-1)!.value, villa.projected, "chart and figures agree");
+  assert.equal(Math.round(goalPath({ ...breakEven, placeId: V }, d, "2026-10-01").projection.at(-1)!.value), Math.round(villa.projected!), "chart and figures agree");
 });
 
 test("a month before the first entry still has its figures (a new organization)", () => {

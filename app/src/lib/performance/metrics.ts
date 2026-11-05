@@ -549,7 +549,8 @@ export function goalPath(goal: Goal, d: Data, month: string): GoalPath {
       const made = ly ? fig(ly).operating : pace;
       if (made === null) break;
       const committed = sum(d.entries.filter((e) => scope.has(e.placeId) && e.direction === "out" && e.source !== "stay" && monthOf(e.date) === m && e.date <= goal.byDate).map((e) => e.amount));
-      value += made - committed - (m === monthOf(goal.byDate) ? goal.planned : 0);
+      // What is planned but not booked yet is spread over the months left (a lease is paid for its months).
+      value += made - committed - goal.planned / monthsBetween(month, goal.byDate);
       projection.push({ month: m, value });
     }
   }
