@@ -174,6 +174,11 @@ Le mois suivant, il commence par le bilan des actions : « Le mois dernier : 2 a
 - **Onglet Performance** (admins) : chiffres du mois, objectifs avec courbe (cumul et projection), actions, calendrier
   des 60 jours, tableau mois par mois, charges anormales, données manquantes, réglages (objectifs, nuits bloquées).
 - **Chat** : `block_nights`, `unblock_nights`, `performance_summary`.
+- **Onglet refait pour aller au but (05/11/2026)** : mois ‹ › ; le verdict (la phrase, puis par objectif, en onglets :
+  « Short by X a month », il faut / on fait, courbe survolable) ; les actions (gain total possible, bilan du mois
+  d'avant) ; 4 chiffres avec mini-courbe, un clic ouvre le mois par mois (tableau replié dedans) ; 60 jours avec le plus
+  grand trou en clair ; « To watch / Went well / Unusual expenses » en onglets ; réglages repliés. Composants :
+  `components/performance/` (`PerformanceView`, `GoalPanel`, `Figures`, `Settings`, `ui`).
 
 Premier passage à blanc sur les données réelles (octobre 2026, sans le séjour de Beck annulé) : occupation 54,5 %
 (64,5 % un an plus tôt), il faut 30,5 M IDR par mois avant bail jusqu'en avril, le rythme est de 21,6 M ; comme l'an
