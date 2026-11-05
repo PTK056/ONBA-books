@@ -41,8 +41,9 @@ export function stayFromEmails(confirmed: Confirmed, payouts: PaidLine[], cancel
   for (const p of own) if (p.checkOut > checkOut && p.checkIn === confirmed.checkIn) checkOut = p.checkOut;
 
   if (canceled) {
-    // What the host keeps; once paid out, the payouts are the exact figure.
-    const net = own.length ? paidNet : canceled.kept;
+    // What the host keeps. A payout of that amount gives it to the cent; a payout sent before the cancellation (the
+    // guest refunded after arriving) is not kept: Airbnb takes it back from a later payout.
+    const net = own.length && Math.abs(paidNet - canceled.kept) < ROUNDING ? paidNet : canceled.kept;
     gross = net > 0 ? grossFor(net) : 0;
     fees = round2(gross - net);
     feesEstimated = net > 0;

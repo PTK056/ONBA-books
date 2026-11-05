@@ -28,7 +28,7 @@ const pause = () => new Promise((r) => setTimeout(r, GAP_MS));
  * The linked Telegram chats of the organization's admins, for whom it is the organization the chat works in (their
  * first one, as the chat assistant's session). Being made admin of someone else's organization never reaches your chat.
  */
-async function adminChats(orgId: string): Promise<{ linkId: string; chat: string }[]> {
+export async function adminChats(orgId: string): Promise<{ linkId: string; chat: string }[]> {
   const db = adminClient();
   const { data: admins } = await db.from("memberships").select("user_id").eq("organization_id", orgId).eq("role", "admin");
   const users = (admins ?? []).map((m) => m.user_id as string);

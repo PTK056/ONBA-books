@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { AuthInfo, McpServer } from "@modelcontextprotocol/server";
 import { allocateByNights, nightsBetween } from "@/lib/stays/airbnb";
 import { defineBank } from "./bank";
+import { definePerformance } from "./performance";
 import { storeEvidence } from "./files";
 import {
   createStaff, describePay, listStaff, logWork, markPaid, monthLabel, payroll, preparePayroll, StaffError, updateStaff,
@@ -641,6 +642,7 @@ function define(server: Registrar, channel: Channel) {
   }));
 
   defineBank(server);
+  definePerformance(server);
 }
 
 /** Pay of this month that is due (someone's payday has come) and not yet paid. */

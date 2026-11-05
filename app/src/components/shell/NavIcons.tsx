@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 /** Splyce's own icons for the main sections: a 1.75 line on a 24 grid and one accent dot, like the wordmark's. */
 export type IconProps = { size?: number; className?: string };
-export type Section = "overview" | "transactions" | "documents" | "scan" | "review" | "stays" | "team" | "bank" | "connections" | "settings";
+export type Section = "overview" | "transactions" | "documents" | "scan" | "review" | "stays" | "team" | "bank" | "performance" | "connections" | "settings";
 
 /** A line icon; the one `<Dot>` takes the accent colour where `--icon-dot` is set, the line colour elsewhere. */
 function Line({ size = 24, className, children }: IconProps & { children: ReactNode }) {
@@ -20,6 +20,9 @@ const Dot = ({ cx, cy, r = 2 }: { cx: number; cy: number; r?: number }) => (
 );
 
 export const NAV_ICONS: Record<Section, (p: IconProps) => ReactNode> = {
+  performance: (p) => (
+    <Line {...p}><path d="M3 20h18M4 16l5-5 4 3 6-7" /><path d="M15 7h4v4" /><Dot cx={19} cy={7} r={2.25} /></Line>
+  ),
   overview: (p) => (
     <Line {...p}><rect x="3" y="3" width="9" height="18" rx="2.5" /><rect x="15" y="3" width="6" height="8" rx="2" /><Dot cx={18} cy={17.5} r={2.5} /></Line>
   ),

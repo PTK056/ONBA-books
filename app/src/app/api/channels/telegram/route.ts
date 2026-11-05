@@ -14,6 +14,8 @@ import { closeMonth } from "@/lib/bank/accountant/schedule";
 import { runAccountant } from "@/lib/bank/accountant/run";
 import { escapeHtml, SIGNATURE } from "@/lib/bank/accountant/render";
 import { BankError } from "@/lib/bank/errors";
+import { generateReport, lastClosedMonth, notifyReport, onMonthClosed } from "@/lib/performance/report";
+import { monthName as reportMonth, SIGNATURE as PERFORMANCE } from "@/lib/performance/render";
 import { clientFor, sessionFor, today } from "@/lib/mcp/session";
 
 // Telegram webhook. Answers 200 at once and does the work after the response,
@@ -24,7 +26,7 @@ const CONNECT = `${APP_URL}/connect/telegram`;
 const MAX_VOICE_SECONDS = 180;
 const HELP = "Send me receipts (photo or PDF), voice notes, expenses (\"350k petrol Kadek yesterday\"), booking screenshots or reminders, "
   + "and ask what's left to do. Each morning I send what needs you, if anything.\n"
-  + "/bank: Sply Accountant goes through the bank lines left to do · /new starts a fresh conversation · /brief off stops the morning brief · /stop disconnects this chat.";
+  + "/bank: Sply Accountant goes through the bank lines left to do · /performance: the report of the last closed month · /new starts a fresh conversation · /brief off stops the morning brief · /stop disconnects this chat.";
 
 export async function POST(request: NextRequest) {
   if (!validSecret(request.headers.get("x-telegram-bot-api-secret-token"))) return new NextResponse(null, { status: 401 });
@@ -74,6 +76,12 @@ async function handle(msg: TgMessage) {
       await sendMessage(chatId, "🧾 Sply Accountant could not go through the bank lines just now. Try again in a few minutes.");
     });
   }
+  if (text === "/performance") {
+    return performance(link, chatId).catch(async (e) => {
+      console.error("[telegram] /performance", e);
+      await sendMessage(chatId, `${PERFORMANCE}: the report could not be sent just now. Try again in a few minutes.`);
+    });
+  }
   if (text === "/new") {
     await adminClient().from("chat_conversations").update({ messages: [], attachments: {} }).eq("link_id", link.id);
     return sendMessage(chatId, "Fresh start. What can I do?");
@@ -115,6 +123,27 @@ async function bankPass(link: { id: string; user_id: string }, chatId: string) {
   if (!run.error) await sendMessage(chatId, "🧾 Nothing to do: every bank line is handled.");
 }
 
+/** /performance: the report of the last month closed everywhere, written now if it does not exist yet. */
+async function performance(link: { id: string; user_id: string }, chatId: string) {
+  const token = await accessTokenFor(link.id);
+  if (!token) return sendMessage(chatId, `Your Splyce connection has expired. Connect again: ${CONNECT}`);
+  const session = await sessionFor(token, link.user_id);
+  if (session.role !== "admin") return sendMessage(chatId, "Only admins of the organization see Sply Performance's reports.");
+  const month = await lastClosedMonth(session.db, session.org.id);
+  if (!month) return sendMessage(chatId, `${PERFORMANCE}: no month is closed yet. A report comes once a month is closed, in Overview or with Sply Accountant's button.`);
+  const { data: existing } = await session.db.from("performance_reports").select("id, status")
+    .eq("organization_id", session.org.id).eq("month", month).maybeSingle();
+  let id = existing?.status === "ready" ? existing.id as string : null;
+  if (!id) {
+    await sendMessage(chatId, `${PERFORMANCE} is writing the report of ${reportMonth(month)}… (about a minute)`);
+    const g = await generateReport(session.db, session.org.id, month);
+    if (g.status === "busy") return sendMessage(chatId, `${PERFORMANCE}: the report of ${reportMonth(month)} is being written; it arrives here when ready.`);
+    if (g.error && !g.reportId) return sendMessage(chatId, `${PERFORMANCE}: ${g.error}`);
+    id = g.reportId;
+  }
+  if (id && !(await notifyReport(session.org.id, id, chatId))) await sendMessage(chatId, `${PERFORMANCE}: the report could not be shown here. Open it in the app.`);
+}
+
 /**
  * A button under a Sply Accountant message: OK / Decline on one proposal (bp:<id>:y|n), or OK all sure (ba:<run>).
  * Acts as the user this chat is linked to, so the database checks they are an admin of the proposal's organization.
@@ -131,7 +160,17 @@ async function handleButton(cb: TgCallback) {
   const one = /^bp:([0-9a-f-]{36}):([yn])$/i.exec(cb.data);
   const all = /^ba:([0-9a-f-]{36}):(\d{1,3})$/i.exec(cb.data);
   const close = /^mc:([0-9a-f-]{36}):(\d{4})-(0[1-9]|1[0-2])$/i.exec(cb.data);
+  const task = /^pa:([0-9a-f-]{36})$/i.exec(cb.data);
   try {
+    if (task) {
+      // Sply Performance: one of its actions becomes a Splyce task (admins only; a second tap gives the same task).
+      const { error } = await db.rpc("performance_action_accept", { p_action: task[1] });
+      if (error) {
+        return answerCallback(cb.id, /not_found/i.test(error.message) ? "This action is no longer in the report (it was rewritten): see Performance."
+          : /permission|row-level/i.test(error.message) ? "Only an admin can add it." : "Could not add it. Try again.");
+      }
+      return answerCallback(cb.id, "Added to your tasks ✅");
+    }
     if (close) {
       // Closing last month (Sply Accountant's closing message): admins only, and only a month that is over.
       const session = await sessionFor(token, link.user_id);
@@ -152,6 +191,8 @@ async function handleButton(cb: TgCallback) {
             + "Its entries can no longer change; reopen it in Overview if needed.",
           [[{ text: "Open Overview", url: `${APP_URL}/overview?month=${month.slice(0, 7)}` }]]);
       }
+      // Closed everywhere now: Sply Performance writes the month's report and sends it here.
+      if (names.length) await onMonthClosed(session.db, session.org.id, month).catch((e) => console.error("[performance] on close", e));
       return;
     }
     if (one) {

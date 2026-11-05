@@ -14,6 +14,7 @@ const NAV = [
   { href: "/import", label: "Import stays", icon: I.stays },
   { href: "/team", label: "Team", icon: I.team },
   { href: "/bank", label: "Bank", icon: I.bank, adminOnly: true },
+  { href: "/performance", label: "Performance", icon: I.performance, adminOnly: true },
   { href: "/connections", label: "Connections", icon: I.connections, adminOnly: true },
   { href: "/settings", label: "Settings", icon: I.settings, adminOnly: true },
 ] as const;

@@ -5,6 +5,9 @@ import { PeriodView } from "@/components/overview/PeriodView";
 import { loadOverview } from "@/lib/overview/data";
 import { loadPeriod } from "@/lib/overview/period";
 
+// Closing the last place of a month writes Sply Performance's report in the background (about a minute).
+export const maxDuration = 300;
+
 export default function OverviewPage({ searchParams }: PageProps<"/overview">) {
   return (
     <main className="flex flex-1 flex-col">

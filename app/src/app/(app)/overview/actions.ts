@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { onMonthClosed } from "@/lib/performance/report";
 import { createClient } from "@/lib/supabase/server";
 
 export type CloseResult = { ok: true } | { ok: false; error: string };
@@ -17,6 +19,7 @@ export async function setMonthClosed(villaId: string, month: string, closed: boo
   const { data: villa } = await db.from("villas").select("organization_id").eq("id", villaId).single();
   if (!villa || !claims?.claims) return { ok: false, error: "Unknown villa." };
 
+  const { data: before } = await db.from("month_closes").select("status").eq("villa_id", villaId).eq("month", month).maybeSingle();
   const { error } = await db.from("month_closes").upsert(
     closed
       ? { organization_id: villa.organization_id, villa_id: villaId, month, status: "closed", closed_by: claims.claims.sub, closed_at: new Date().toISOString() }
@@ -24,6 +27,8 @@ export async function setMonthClosed(villaId: string, month: string, closed: boo
     { onConflict: "villa_id,month" },
   );
   if (error) return { ok: false, error: "Only an admin can close or reopen a month." };
+  // The last place closed: Sply Performance writes the month's report and sends it on Telegram.
+  if (closed && before?.status !== "closed") after(() => onMonthClosed(db, villa.organization_id, month).catch((e) => console.error("[performance] on close", e)));
   revalidatePath("/overview");
   return { ok: true };
 }

@@ -65,6 +65,19 @@ test("canceled then paid out: the payout is the exact amount kept", () => {
   assert.equal(r.paid, true);
 });
 
+test("paid out, then canceled with a full refund: nothing is kept", () => {
+  // Real case: paid €425.16 on 31/10, canceled on 03/11, "payout has been updated to €0".
+  const r = stayFromEmails(booking(), [paid(425.16, 8_643_874)], { kind: "canceled", code: "HMAAAA0001", kept: 0, currency: null });
+  assert.equal(r.status, "canceled");
+  assert.deepEqual([r.stay.gross, r.stay.fees, r.stay.net, r.feesEstimated], [0, 0, 0, false]);
+});
+
+test("paid out, then canceled keeping part: what is kept, not the payout", () => {
+  const r = stayFromEmails(booking(), [paid(425.16, 8_643_874)], { kind: "canceled", code: "HMAAAA0001", kept: 120, currency: "EUR" });
+  assert.equal(r.stay.net, 120);
+  assert.equal(r.feesEstimated, true);
+});
+
 test("payout shares add up to the total", () => {
   assert.deepEqual(receivedShares([{ amount: 95.88 }], 1_938_587), [1_938_587]);
   const s = receivedShares([{ amount: 100 }, { amount: 200 }], 1000);
