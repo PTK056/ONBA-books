@@ -58,7 +58,7 @@ export async function bankPage(db: SupabaseClient, orgId: string) {
       .eq("organization_id", orgId).order("period_start", { ascending: false }),
     db.from("bank_lines")
       .select("id, statement_id, account_id, date, direction, amount, currency, description, counterparty, payee_last4, status, matched_by, "
-        + "handled_via, handled_note, personal_reason, "
+        + "transaction_id, handled_via, handled_note, personal_reason, "
         + "transaction:transactions (date, description, category:categories (name)), stays:bank_line_stays (stay:stays (external_ref, guest_name, check_in))")
       .eq("organization_id", orgId).order("date", { ascending: false }).limit(1000),
     payeeMemory(db, orgId),
@@ -70,11 +70,14 @@ export async function bankPage(db: SupabaseClient, orgId: string) {
   type Row = {
     id: string; statement_id: string; account_id: string; date: string; direction: "in" | "out"; amount: number; currency: string;
     description: string; counterparty: string | null; payee_last4: string | null; status: BankLineRow["status"]; matched_by: string | null;
-    handled_via: BankLineRow["handledVia"]; handled_note: string | null; personal_reason: string | null;
+    transaction_id: string | null; handled_via: BankLineRow["handledVia"]; handled_note: string | null; personal_reason: string | null;
     transaction: { date: string; description: string | null; category: { name: string } | null } | null;
     stays: { stay: { external_ref: string | null; guest_name: string | null; check_in: string } }[];
   };
   const rows = (lines ?? []) as unknown as Row[];
+  // Lines paying one entry together: a purchase paid in several transfers (bank charges booked together are one entry).
+  const payments = new Map<string, number>();
+  for (const r of rows) if (r.transaction_id && r.matched_by !== "created") payments.set(r.transaction_id, (payments.get(r.transaction_id) ?? 0) + 1);
 
   // Entries around the unmatched lines: to link one (close and not linked yet), or to copy last month's.
   const open = rows.filter((r) => r.status === "unmatched");
@@ -113,8 +116,10 @@ export async function bankPage(db: SupabaseClient, orgId: string) {
   const named = namesOf(open.map((r) => ({ id: r.id, text: [r.counterparty, r.description].filter(Boolean).join(" · ") })));
   const out: BankLineRow[] = rows.map((r) => {
     const stays = r.stays.map((x) => x.stay);
+    const parts = r.transaction_id && r.matched_by !== "created" ? payments.get(r.transaction_id) ?? 0 : 0;
     const linkedTo = r.transaction
-      ? [r.transaction.category?.name, r.transaction.description].filter(Boolean).join(" · ") || "An entry"
+      ? ([r.transaction.category?.name, r.transaction.description].filter(Boolean).join(" · ") || "An entry")
+        + (parts > 1 ? ` (one of ${parts} payments)` : "")
       : stays.length ? `Airbnb ${stays.map((x) => x.external_ref ?? x.check_in).join(", ")}` : null;
     const line = { date: r.date, direction: r.direction, amount: Number(r.amount) };
     // Same amount within two weeks; an entry naming this line's payee first, one naming another payee left out.

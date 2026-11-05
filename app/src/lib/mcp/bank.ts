@@ -181,7 +181,9 @@ export function defineBank(server: Registrar) {
       "For one bank line still to do: the entries already in the books that could be the same money (same direction, not linked to another "
       + "line, amount equal or close, date close), with a score and the reasons; for money in, also the stays it could pay (a deposit, "
       + "the balance, an Airbnb payout read from its e-mail). Use before choosing between link_bank_line and add_bank_line_to_books. "
-      + "Give text to search the entries' descriptions at any amount (e.g. an expense booked with the transfer fee included).",
+      + "Give text to search the entries' descriptions at any amount (e.g. an expense booked with the transfer fee included). "
+      + "An entry with paid_in_part_by_lines is a total other bank lines already pay in part (a purchase paid in several transfers); "
+      + "this line fits in what is left: link it with part_of_entry, only if the user says it is one of those payments.",
     inputSchema: z.object({
       bank_line_id: UUID,
       date_window_days: z.number().int().min(1).max(120).optional().describe("Default 10."),
@@ -195,12 +197,14 @@ export function defineBank(server: Registrar) {
     mustBeOpen(l);
     const line = { date: l.date, direction: l.direction, amount: num(l.amount), currency: l.currency, counterparty: l.counterparty, description: l.description };
     const [found, payable] = await Promise.all([
-      entryCandidates(s.db, s.org.id, s.org.reportingCurrency, line, { windowDays: a.date_window_days, tolerancePct: a.amount_tolerance_pct, text: a.text }),
+      entryCandidates(s.db, s.org.id, s.org.reportingCurrency, line,
+        { windowDays: a.date_window_days, tolerancePct: a.amount_tolerance_pct, text: a.text, parts: true }),
       stayCandidates(s.db, s.org.id, line),
     ]).catch((e) => { throw e instanceof BankError ? new ToolError(e.message) : e; });
     const entries = found.map((e) => ({
       transaction_id: e.transactionId, date: e.date, amount: e.amount, currency: e.currency, description: e.description,
       category: e.category, villa: e.villa, score: e.score, reasons: e.reasons,
+      ...(e.paidBy ? { paid_in_part_by_lines: e.paidBy.lines, left_to_pay: e.paidBy.left, left_currency: l.currency } : {}),
     }));
     const stays = payable.map((x) => ({
       stay_id: x.stayId, reference: x.reference, guest: x.guest, platform: x.platform, check_in: x.checkIn, check_out: x.checkOut,
@@ -256,15 +260,18 @@ export function defineBank(server: Registrar) {
       "Same as \"Link to this\" in the Bank tab: the money is already in the books. Give transaction_id for an entry (a recorded expense, a "
       + "payroll payment, an income), or stay_ids for money in that pays stays (one Airbnb payout can pay several). Candidates come from "
       + "suggest_bank_links. If the amount differs (from the entry, or from the stays' net or announced payout), the tool refuses with "
-      + "amount_mismatch: ask the user, then pass accept_amount_difference only if they agree. Nothing is booked for the gap.",
+      + "amount_mismatch: ask the user, then pass accept_amount_difference only if they agree. Nothing is booked for the gap. "
+      + "An entry already linked is refused (entry_taken), unless it is a total paid in several transfers and the user says this line is "
+      + "one of them: pass part_of_entry; the lines together never pay more than the entry.",
     inputSchema: z.object({
       bank_line_id: UUID,
       transaction_id: UUID.optional(),
       stay_ids: z.array(UUID).min(1).max(20).optional(),
       accept_amount_difference: z.boolean().optional(),
+      part_of_entry: z.boolean().optional().describe("The line is one of several payments of the entry (with transaction_id)."),
       note: NOTE,
     }),
-  }, (async (s, a: { bank_line_id: string; transaction_id?: string; stay_ids?: string[]; accept_amount_difference?: boolean; note?: string }) => {
+  }, (async (s, a: { bank_line_id: string; transaction_id?: string; stay_ids?: string[]; accept_amount_difference?: boolean; part_of_entry?: boolean; note?: string }) => {
     requireAdmin(s);
     if (!!a.transaction_id === !!a.stay_ids?.length) throw new ToolError("Give either transaction_id or stay_ids.");
     const l = await loadLine(s, a.bank_line_id);
@@ -276,7 +283,7 @@ export function defineBank(server: Registrar) {
         .eq("id", a.transaction_id).eq("organization_id", s.org.id).maybeSingle();
       if (!t) throw new ToolError("not_found: No entry with that id.");
       try {
-        await write(s, l.id, () => linkEntry(s.db, l.id, t.id, "agent", a.note, !a.accept_amount_difference));
+        await write(s, l.id, () => linkEntry(s.db, l.id, t.id, "agent", a.note, !a.accept_amount_difference, !!a.part_of_entry));
       } catch (e) {
         if (e instanceof ToolError && e.message.startsWith("amount_mismatch")) {
           throw new ToolError(`${e.message} Ask the user; link with accept_amount_difference only if they agree.`);

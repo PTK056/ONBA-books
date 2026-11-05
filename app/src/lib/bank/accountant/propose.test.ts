@@ -15,7 +15,7 @@ const org: OrgNames = {
 
 const entry = (over: Partial<Dossier["entries"][number]> = {}): Dossier["entries"][number] => ({
   ref: "E1", transactionId: "tx-1", date: "2026-10-02", amount: 850000, currency: "IDR", description: "PLN electricity",
-  category: "Utilities", villa: "Casa ONBA", score: 0.9, reasons: ["same amount"], gap: 0, ...over,
+  category: "Utilities", villa: "Casa ONBA", score: 0.9, reasons: ["same amount"], gap: 0, paidBy: null, ...over,
 });
 const stay = (over: Partial<Dossier["stays"][number]> = {}): Dossier["stays"][number] => ({
   ref: "S1", stayId: "st-1", reference: "HM1", guest: "Lea", platform: "airbnb", checkIn: "2026-10-01", checkOut: "2026-10-04",

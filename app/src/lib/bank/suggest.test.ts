@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { amountGap, scoreEntry } from "./suggest.ts";
+import { amountGap, partRoom, scoreEntry } from "./suggest.ts";
 
 const line = { date: "2026-10-10", amount: 350000, currency: "IDR", counterparty: "KADEK SURYANI", description: "TRF KE KADEK SURYANI" };
 const entry = (over: Partial<{ date: string; amount: number; currency: string; amountReporting: number; description: string | null }>) =>
@@ -39,4 +39,31 @@ test("two currencies that cannot be compared give no credit for the amount", () 
 test("amountGap: exact in the same currency, relative otherwise", () => {
   assert.equal(amountGap(line, 350000, false), 0);
   assert.equal(amountGap(line, 315000, false), 0.1);
+});
+
+// Part payments: the same answers as bank_line_link in migration bank_part_payments (see tests/bank_parts.sql).
+const lump = { date: "2025-05-01", amount: 1_000_000, currency: "IDR", amountReporting: 1_000_000, description: "Furnitures/ general" };
+const idr = (amount: number) => ({ amount, currency: "IDR" });
+
+test("a part payment fits in what is left, to the cent, in one currency", () => {
+  assert.deepEqual(partRoom(idr(250_000), lump, [idr(300_000)], "IDR"), { fits: true, left: 700_000 });
+  assert.deepEqual(partRoom(idr(450_000), lump, [idr(300_000), idr(250_000)], "IDR"), { fits: true, left: 450_000 });
+  assert.equal(partRoom(idr(1), lump, [idr(300_000), idr(250_000), idr(450_000)], "IDR").fits, false);
+  assert.equal(partRoom(idr(0.02), lump, [idr(999_999.99)], "IDR").fits, false);
+  assert.equal(partRoom(idr(0.01), lump, [idr(999_999.99)], "IDR").fits, true);
+});
+
+test("a converted entry: lines in the reporting currency add up against its converted value", () => {
+  const usd = { date: "2025-05-01", amount: 100, currency: "USD", amountReporting: 1_600_000, description: null };
+  assert.deepEqual(partRoom(idr(800_000), usd, [idr(800_000)], "IDR"), { fits: true, left: 800_000 });
+  assert.equal(partRoom(idr(1000), usd, [idr(800_000), idr(800_000)], "IDR").fits, false);
+  // Mixing the entry's currency and converted amounts: shares of the entry, 0.01% over allowed.
+  assert.equal(partRoom(idr(800_100), usd, [{ amount: 50, currency: "USD" }], "IDR").fits, true);
+  assert.equal(partRoom(idr(801_000), usd, [{ amount: 50, currency: "USD" }], "IDR").fits, false);
+  assert.deepEqual(partRoom(idr(1), usd, [{ amount: 50, currency: "USD" }], "IDR"), { fits: true, left: 800_000 });
+});
+
+test("currencies that cannot be added up never fit", () => {
+  assert.deepEqual(partRoom({ amount: 10, currency: "EUR" }, lump, [idr(300_000)], "IDR"), { fits: false, left: null });
+  assert.deepEqual(partRoom(idr(10), lump, [{ amount: 10, currency: "EUR" }], "IDR"), { fits: false, left: null });
 });

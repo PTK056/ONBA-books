@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { BankError } from "./errors";
 import { shift } from "./ops";
 import { payoutStates } from "./payouts";
-import { scoreEntry } from "./suggest";
+import { partRoom, scoreEntry } from "./suggest";
 
 // What a bank line still to do could be: entries already in the books, and for money in the stays it could pay.
 // Shared by the assistant's suggest_bank_links tool and Sply Accountant's dossiers.
@@ -17,6 +17,8 @@ export interface EntryCandidate {
   category: string | null; villa: string | null; score: number; reasons: string[];
   /** Relative amount gap (0 = same money; null = currencies that cannot be compared). */
   gap: number | null;
+  /** Already paid in part by other bank lines (with `parts`): how many, and what is left in the line's currency. */
+  paidBy: { lines: number; left: number | null } | null;
 }
 
 export interface StayCandidate {
@@ -47,12 +49,13 @@ export async function whereIn<T>(
 }
 
 /**
- * Booked entries that could be this line: same direction, not a stay's income, not linked to another bank line, within
- * the window, amount within the tolerance (any amount when searching words). Best first, at most `limit`.
+ * Booked entries that could be this line: same direction, not a stay's income, not linked to another bank line (with
+ * `parts`, or paid in part by others with room left for this one), within the window, amount within the tolerance (any
+ * amount when searching words). Best first, at most `limit`.
  */
 export async function entryCandidates(
   db: SupabaseClient, orgId: string, reportingCurrency: string, line: LineToExplain,
-  opts: { windowDays?: number; tolerancePct?: number; text?: string; limit?: number } = {},
+  opts: { windowDays?: number; tolerancePct?: number; text?: string; limit?: number; parts?: boolean } = {},
 ): Promise<EntryCandidate[]> {
   const windowDays = opts.windowDays ?? 10;
   const tolerance = (opts.tolerancePct ?? 0) / 100;
@@ -68,16 +71,28 @@ export async function entryCandidates(
   type Tx = { id: string; date: string; amount: number; currency: string; amount_reporting: number; description: string | null;
     villa: { name: string } | null; category: { name: string } | null };
   const list = (data ?? []) as unknown as Tx[];
-  const taken = await whereIn<{ transaction_id: string }>(db, orgId, "bank_lines", "transaction_id", "transaction_id", list.map((t) => t.id));
-  const used = new Set(taken.map((t) => t.transaction_id));
-  return list.filter((t) => !used.has(t.id)).map((t) => {
+  const taken = await whereIn<{ transaction_id: string; amount: number; currency: string }>(
+    db, orgId, "bank_lines", "transaction_id, amount, currency", "transaction_id", list.map((t) => t.id));
+  const paidBy = new Map<string, { amount: number; currency: string }[]>();
+  for (const x of taken) paidBy.set(x.transaction_id, [...(paidBy.get(x.transaction_id) ?? []), { amount: num(x.amount), currency: x.currency }]);
+  type Paid = { lines: number; left: number | null } | null;
+  return list.flatMap((t) => {
     const e = { date: t.date, amount: num(t.amount), currency: t.currency, amountReporting: num(t.amount_reporting), description: t.description };
-    return { t, ...scoreEntry(line, e, reportingCurrency, windowDays) };
+    const paid = paidBy.get(t.id);
+    if (!paid) return [{ t, paid: null as Paid, ...scoreEntry(line, e, reportingCurrency, windowDays) }];
+    // Linked already: only as one more payment of it, when asked for and when this line fits in what is left.
+    const room = opts.parts ? partRoom(line, e, paid, reportingCurrency) : null;
+    if (!room?.fits || room.left === null) return [];
+    // Scored and filtered against what is left to pay, in the line's currency: the last payment is the same money.
+    const rest = { ...e, currency: line.currency, amount: room.left, amountReporting: room.left };
+    const scored = scoreEntry(line, rest, reportingCurrency, windowDays);
+    return [{ t, paid: { lines: paid.length, left: room.left } as Paid, ...scored,
+      reasons: [`paid in part by ${paid.length} bank line${paid.length === 1 ? "" : "s"}, ${room.left} ${line.currency} left`, ...scored.reasons] }];
   }).filter((x) => words || (x.gap !== null && x.gap <= tolerance + 1e-9))
     .sort((x, y) => y.score - x.score).slice(0, opts.limit ?? 10)
-    .map(({ t, score, reasons, gap }) => ({
+    .map(({ t, paid, score, reasons, gap }) => ({
       transactionId: t.id, date: t.date, amount: num(t.amount), currency: t.currency, description: t.description,
-      category: t.category?.name ?? null, villa: t.villa?.name ?? null, score, reasons, gap,
+      category: t.category?.name ?? null, villa: t.villa?.name ?? null, score, reasons, gap, paidBy: paid,
     }));
 }
 

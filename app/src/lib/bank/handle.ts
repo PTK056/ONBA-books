@@ -33,11 +33,16 @@ export function bookLines(db: SupabaseClient, lineIds: string[], entries: GroupE
   return call(db, "bank_lines_book_group", { p_lines: lineIds, p_entries: entries, p_via: via, p_note: note ?? null });
 }
 
-/** Links a line to an entry; with sameAmount the database refuses (amount_mismatch) an entry of another amount. */
-export async function linkEntry(db: SupabaseClient, lineId: string, transactionId: string, via: Via, note?: string | null, sameAmount = false): Promise<void> {
+/**
+ * Links a line to an entry; with sameAmount the database refuses (amount_mismatch) an entry of another amount. With part,
+ * the line may join an entry other lines already pay (several transfers for one purchase), never paying more than it.
+ */
+export async function linkEntry(
+  db: SupabaseClient, lineId: string, transactionId: string, via: Via, note?: string | null, sameAmount = false, part = false,
+): Promise<void> {
   await call(db, "bank_line_link", {
     p_line: lineId, p_transaction: transactionId, p_by: via === "auto" ? "auto" : "manual", p_via: via, p_note: note ?? null,
-    p_same_amount: sameAmount,
+    p_same_amount: sameAmount, p_part: part,
   });
 }
 

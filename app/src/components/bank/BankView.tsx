@@ -4,7 +4,7 @@ import { AlertTriangle, BedDouble, Check, ChevronDown, Copy, FileText, Landmark,
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { acceptAllSure, addStatement, askSply, bookCharges, createFromLine, decide, findEntries, linkLine, linkStay, markPersonal, matchAgain, resetLine, type EntryCandidate, type Result } from "@/app/(app)/bank/actions";
+import { acceptAllSure, addStatement, askSply, bookCharges, createFromLine, decide, findEntries, linkLine, linkStay, markPersonal, matchAgain, resetLine, type EntryCandidate, type FullEntry, type Result } from "@/app/(app)/bank/actions";
 import { isSure, oneChargePerStatement, proposalLabel, type ProposalView } from "@/lib/bank/accountant/render";
 import { money } from "@/components/overview/format";
 import { Highlight, MiniStat } from "@/components/shell/Highlight";
@@ -400,10 +400,14 @@ function TodoLine({ line, villas, categories, reportingCurrency }: { line: BankL
   );
 }
 
-/** Search the books for the entry this line pays, when no suggestion came up; the closest amounts first. */
+/**
+ * Search the books for the entry this line pays, when no suggestion came up; the closest amounts first. An entry
+ * other lines already pay in part (a purchase paid in several transfers) shows what is left; this line joins it.
+ */
 function FindEntry({ line }: { line: BankLineRow }) {
   const [search, setSearch] = useState("");
   const [entries, setEntries] = useState<EntryCandidate[] | null>(null);
+  const [full, setFull] = useState<FullEntry[]>([]);
   const [failed, setFailed] = useState<string | null>(null);
   const { error, pending, go } = useAction();
 
@@ -412,7 +416,7 @@ function FindEntry({ line }: { line: BankLineRow }) {
     const t = setTimeout(async () => {
       const r = await findEntries(line.id, search);
       if (!live) return;
-      if (r.ok) { setEntries(r.entries); setFailed(null); } else setFailed(r.error);
+      if (r.ok) { setEntries(r.entries); setFull(r.full); setFailed(null); } else setFailed(r.error);
     }, search ? 300 : 0);
     return () => { live = false; clearTimeout(t); };
   }, [line.id, search]);
@@ -422,23 +426,37 @@ function FindEntry({ line }: { line: BankLineRow }) {
       <input className={`${field} max-w-sm`} value={search} onChange={(e) => setSearch(e.target.value)} autoFocus
         placeholder="Search a description (optional)" aria-label="Search the books" />
       {entries === null && !failed && <p className="text-xs text-zinc-500">Looking…</p>}
-      {entries?.length === 0 && <p className="text-xs text-zinc-500">No entry left to link from 3 months before to 1 month after this line.</p>}
+      {entries?.length === 0 && !full.length && <p className="text-xs text-zinc-500">No entry left to link from 3 months before to 1 month after this line.</p>}
+      {entries && full.map((f, i) => (
+        <p key={i} className="text-xs text-zinc-500">
+          “{f.description ?? "An entry"}” ({shortDate(f.date)}) matches, but {f.lines === 1 ? "a bank line already pays" : `${f.lines} bank lines already pay`}{" "}
+          {f.left ? <>all of it except {money(f.left, line.currency)} {line.currency}, less than this line</> : "all of it"}.
+          Put {f.lines === 1 ? "that line" : "one of them"} back in the list if it is wrong.
+        </p>
+      ))}
       {entries && entries.length > 0 && (
         <ul className="flex flex-col divide-y divide-zinc-100 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
           {entries.map((e) => {
-            const gap = e.inLineCurrency === null ? 0 : Math.round(e.inLineCurrency - line.amount);
+            const gap = e.paidBy || e.inLineCurrency === null ? 0 : Math.round(e.inLineCurrency - line.amount);
             return (
               <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
                 <span className="w-14 tabular-nums text-zinc-500">{shortDate(e.date)}</span>
                 <span className="min-w-0 flex-1 truncate">
                   {[e.category, e.villa, e.description].filter(Boolean).join(" · ") || "No description"}
+                  {e.paidBy && (
+                    <span className="block text-xs text-zinc-500">
+                      Paid in part by {e.paidBy.lines} bank line{e.paidBy.lines === 1 ? "" : "s"}
+                      {e.paidBy.left !== null && <>: {money(e.paidBy.left, line.currency)} {line.currency} left</>}
+                    </span>
+                  )}
                 </span>
                 <span className="tabular-nums">
                   {money(e.amount, e.currency)} <span className="text-xs text-zinc-400">{e.currency}</span>
                   {gap !== 0 && <span className="ml-1 text-xs text-amber-700 dark:text-amber-400">({gap > 0 ? "+" : "−"}{money(Math.abs(gap), line.currency)})</span>}
                 </span>
-                <button className={small} disabled={pending} onClick={() => go(() => linkLine(line.id, e.id))}>
-                  <Link2 size={13} /> This one
+                <button className={small} disabled={pending} onClick={() => go(() => linkLine(line.id, e.id, !!e.paidBy))}
+                  title={e.paidBy ? "This line is one more payment of that entry" : "This line is that entry"}>
+                  <Link2 size={13} /> {e.paidBy ? "One of its payments" : "This one"}
                 </button>
               </li>
             );

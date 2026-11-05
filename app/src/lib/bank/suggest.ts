@@ -9,10 +9,39 @@ export interface EntryToScore {
 }
 
 /** The entry's amount in the line's currency, or null when the two cannot be compared. */
-export function inLineCurrency(line: LineToMatch, e: EntryToScore, reportingCurrency: string): number | null {
+export function inLineCurrency(line: Pick<LineToMatch, "currency">, e: EntryToScore, reportingCurrency: string): number | null {
   if (e.currency === line.currency) return e.amount;
   return line.currency === reportingCurrency ? e.amountReporting : null;
 }
+
+type Paid = { amount: number; currency: string };
+
+/**
+ * One more bank line as a part payment of an entry other lines already pay: whether it fits, and what is left to pay in
+ * the line's currency (null when the currencies cannot be added up). The same rule as bank_line_link in migration
+ * bank_part_payments: to the cent in one currency, 0.01% over allowed when mixing the entry's currency and converted amounts.
+ */
+export function partRoom(line: Paid, e: EntryToScore, paidBy: Paid[], reportingCurrency: string): { fits: boolean; left: number | null } {
+  const own = (x: Paid) => x.currency === e.currency;
+  const comparable = (x: Paid) => own(x) || x.currency === reportingCurrency;
+  if (!comparable(line) || !paidBy.every(comparable)) return { fits: false, left: null };
+  if (!e.amountReporting && (!own(line) || !paidBy.every(own))) return { fits: false, left: null };
+  const sum = (xs: Paid[]) => xs.reduce((n, x) => n + x.amount, 0);
+  const ownPaid = sum(paidBy.filter(own));
+  const repPaid = sum(paidBy.filter((x) => !own(x)));
+  const share = ownPaid / e.amount + (e.amountReporting ? repPaid / e.amountReporting : 0);
+  const whole = own(line) ? e.amount : e.amountReporting;
+  const allOwn = own(line) && paidBy.every(own);
+  const allRep = !own(line) && !paidBy.some(own);
+  const left = Math.max(0, Math.round((allOwn ? e.amount - ownPaid : allRep ? e.amountReporting - repPaid : whole * (1 - share)) * 100) / 100);
+  const fits = allOwn ? ownPaid + line.amount <= e.amount + 0.005
+    : allRep ? repPaid + line.amount <= e.amountReporting + 0.005
+    : share + line.amount / whole <= 1 + PART_SLACK;
+  return { fits, left };
+}
+
+/** As private.bank_part_slack() in migration bank_part_payments. */
+export const PART_SLACK = 0.0001;
 
 /**
  * Relative gap between the amounts (0 = same). A converted amount within 0.01% (plus a cent) counts as the same:
