@@ -46,9 +46,12 @@ async function adminChats(orgId: string): Promise<{ linkId: string; chat: string
 const buttonsFor = (v: ProposalView): Button[][] => v.status !== "pending" || v.action === "ask" ? []
   : [[{ text: "✅ OK", data: callbackData.accept(v.id) }, { text: "✖ Decline", data: callbackData.reject(v.id) }]];
 
-/** Tells the admins what a pass proposed. Returns how many chats were told. */
-export async function notifyRun(orgId: string, runId: string, title: string): Promise<number> {
-  const chats = await adminChats(orgId);
+/**
+ * Tells the admins what a pass proposed (or only the chat `only`, if it is one of theirs). A proposal already sent to
+ * a chat is not sent to it again; the summary is. Returns how many chats were told.
+ */
+export async function notifyRun(orgId: string, runId: string, title: string, only?: string): Promise<number> {
+  const chats = (await adminChats(orgId)).filter((c) => !only || c.chat === only);
   if (!chats.length) return 0;
   const db = adminClient();
   const views = oneChargePerStatement(await listProposals(db, orgId, { runId, pending: true }));
@@ -82,7 +85,7 @@ export async function notifyRun(orgId: string, runId: string, title: string): Pr
       continue;
     }
     const sent: ProposalView[] = [];
-    for (const v of singles) {
+    for (const v of singles.filter((x) => !x.telegram.some((m) => m.chat === chat))) {
       await pause();
       try {
         const message = await sendHtml(chat, telegramText(v), buttonsFor(v));
@@ -95,6 +98,18 @@ export async function notifyRun(orgId: string, runId: string, title: string): Pr
     await addNotes(linkId, sent.map(note));
   }
   return chats.length;
+}
+
+/**
+ * Sends one chat what is still waiting for a decision, pass by pass (oldest first): a pass started in the Bank tab
+ * is not sent to Telegram, and /bank with nothing new shows these. Returns how many passes were shown.
+ */
+export async function notifyOpen(orgId: string, chat: string): Promise<number> {
+  const open = await listProposals(adminClient(), orgId, { pending: true });
+  const runs = [...new Set(open.map((v) => v.runId))];
+  let shown = 0;
+  for (const runId of runs) shown += await notifyRun(orgId, runId, "Waiting for you", chat) ? 1 : 0;
+  return shown;
 }
 
 /**

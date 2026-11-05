@@ -8,7 +8,7 @@ import { processChat, type Incoming } from "@/lib/channels/worker";
 import { adminClient } from "@/lib/supabase/admin";
 import { accessTokenFor } from "@/lib/channels/links";
 import { acceptSure, decideProposal } from "@/lib/bank/accountant/apply";
-import { addNotes, notifyRun, refreshTelegram, runTitle } from "@/lib/bank/accountant/notify";
+import { addNotes, notifyOpen, notifyRun, refreshTelegram, runTitle } from "@/lib/bank/accountant/notify";
 import { runAccountant } from "@/lib/bank/accountant/run";
 import { escapeHtml, SIGNATURE } from "@/lib/bank/accountant/render";
 import { BankError } from "@/lib/bank/errors";
@@ -102,10 +102,15 @@ async function bankPass(link: { id: string; user_id: string }, chatId: string) {
   if (session.role !== "admin") return sendMessage(chatId, "Only admins of the organization can see the bank lines.");
   await sendMessage(chatId, "🧾 Sply Accountant is going through your bank lines…");
   const run = await runAccountant(session.db, session.org.id, { trigger: "chat" });
-  if (run.error && !run.proposed) return sendMessage(chatId, `🧾 ${run.error}`);
-  if (!run.runId || !run.proposed) return sendMessage(chatId, "🧾 Nothing new: every bank line left to do already has a proposal (see the Bank tab), or none is left.");
-  await notifyRun(session.org.id, run.runId, await runTitle(session.org.id, null));
-  if (run.left) await sendMessage(chatId, `🧾 ${run.left} more line${run.left === 1 ? "" : "s"} next time: send /bank again once these are decided.`);
+  if (run.runId && run.proposed) {
+    await notifyRun(session.org.id, run.runId, await runTitle(session.org.id, null));
+    if (run.left) await sendMessage(chatId, `🧾 ${run.left} more line${run.left === 1 ? "" : "s"} next time: send /bank again once these are decided.`);
+    return;
+  }
+  if (run.error) await sendMessage(chatId, `🧾 ${run.error}`);
+  // Nothing new: what earlier passes proposed and is still undecided (a pass from the Bank tab is not sent here).
+  if (await notifyOpen(session.org.id, chatId)) return;
+  if (!run.error) await sendMessage(chatId, "🧾 Nothing to do: every bank line is handled.");
 }
 
 /**
