@@ -149,4 +149,13 @@ select pg_temp.fails(format('select public.bank_proposal_claim(%L, %L)', pg_temp
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
 select pg_temp.expect((select status from bank_proposals where id = pg_temp.id('p3')) = 'pending', 'and it is still open for its admin');
 
+-- Passes on a schedule (migration bank_accountant_schedule): the weekly review and the closing have their own trigger.
+select public.bank_run_finish(id, 0, null, null, null) from bank_accountant_runs where finished_at is null;
+insert into ids select 'run_w', public.bank_run_start(pg_temp.id('org'), null, 'weekly', 0, null);
+select public.bank_run_finish(pg_temp.id('run_w'), 0, null, null, null);
+insert into ids select 'run_m', public.bank_run_start(pg_temp.id('org'), null, 'monthly', 0, null);
+select pg_temp.expect((select count(*) from bank_accountant_runs where trigger in ('weekly', 'monthly')) = 2, 'weekly and monthly passes are recorded');
+select public.bank_run_finish(pg_temp.id('run_m'), 0, null, null, null);
+select pg_temp.fails(format('select public.bank_run_start(%L, null, %L, 0, null)', pg_temp.id('org'), 'hourly'), 'new row', 'an unknown trigger is refused');
+
 rollback;

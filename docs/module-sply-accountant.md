@@ -177,6 +177,25 @@ l'on peut activer l'application automatique.
 - Pas encore : l'évaluation sur l'historique (à faire avant d'activer l'application automatique), la relance des
   justificatifs, l'application automatique « certaine ».
 
+## Livré ensuite (05-06/11/2026)
+
+- **Paiements en plusieurs fois** (migration `bank_part_payments`) : plusieurs lignes peuvent payer une même écriture (un
+  achat réglé en plusieurs virements), jamais plus qu'elle, au centime près. Seule une personne le demande (onglet Bank,
+  ou l'assistant avec `part_of_entry`) ; le rapprochement automatique et Sply Accountant ne le font jamais.
+- **`/bank` sans rien de neuf** renvoie dans le chat ce qui attend encore une décision (un passage lancé depuis l'onglet
+  Bank n'est pas envoyé sur Telegram).
+- **Calendrier** (décidé par Pierre le 06/11, migration `bank_accountant_schedule`), lancé par la tâche du brief du matin
+  (07:30 à Bali), pour chaque admin dont le chat est relié :
+  - à l'ajout d'un relevé : le passage, comme avant ;
+  - **chaque lundi** : un passage sur les lignes restées sans proposition, puis la revue (propositions à décider,
+    lignes inexpliquées, reçus à valider, dépenses sans justificatif avec la demande d'envoyer la photo) ; rien si rien ;
+  - **le 10** : la clôture du mois précédent (lignes du mois à faire, reçus, justificatifs du mois, relevés de chaque
+    compte) avec un bouton « Close ». Un relevé manquant est seulement signalé (un compte peut ne pas avoir bougé) et
+    rien n'empêche de clôturer : le bouton devient « Close anyway ». Sply ne clôture jamais seul ;
+  - **le 15** : le même rapport en rappel si le mois n'est pas clôturé.
+  Ces jours-là, le brief du matin ne répète pas les reçus ni le mois à clôturer.
+- Test à la main : `GET /api/cron/brief?accountant=weekly|closing` avec le secret du cron.
+
 ## Questions ouvertes
 
 Aucune à ce stade : les trois questions ont été tranchées (§ Décisions).

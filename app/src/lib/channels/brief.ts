@@ -23,19 +23,22 @@ interface Todo {
 
 const getTodo = toolDefs("chat").find((t) => t.name === "get_todo")!;
 
-/** What deserves a message this morning, or null. */
-export async function briefItems(s: Session) {
+/**
+ * What deserves a message this morning, or null. With `booksSent`, Sply Accountant already wrote today (weekly review,
+ * closing): receipts and the month to close are left to it.
+ */
+export async function briefItems(s: Session, opts: { booksSent?: boolean } = {}) {
   const todo = (await getTodo.handler(s, {} as never)) as Todo;
   const soon = new Date(Date.parse(`${todo.today}T00:00:00Z`) + SOON_DAYS * 86_400_000).toISOString().slice(0, 10);
   const items = {
     today: todo.today,
     payroll_due: todo.payroll_due,
     tasks_due: todo.tasks.filter((t) => t.due_date && t.due_date <= soon),
-    receipts_to_review: todo.receipts_to_review,
-    expenses_missing_receipt: todo.expenses_missing_receipt,
-    month_to_close: Number(todo.today.slice(8, 10)) <= CLOSE_REMINDER_UNTIL_DAY ? todo.month_to_close : null,
-    review_link: todo.receipts_to_review ? todo.review : null,
-    missing_receipts_link: todo.expenses_missing_receipt.count ? `${APP_URL}/transactions?receipt=missing` : null,
+    receipts_to_review: opts.booksSent ? 0 : todo.receipts_to_review,
+    expenses_missing_receipt: opts.booksSent ? { count: 0, latest: [] } : todo.expenses_missing_receipt,
+    month_to_close: !opts.booksSent && Number(todo.today.slice(8, 10)) <= CLOSE_REMINDER_UNTIL_DAY ? todo.month_to_close : null,
+    review_link: !opts.booksSent && todo.receipts_to_review ? todo.review : null,
+    missing_receipts_link: !opts.booksSent && todo.expenses_missing_receipt.count ? `${APP_URL}/transactions?receipt=missing` : null,
     airbnb: await airbnbBrief(s).catch(() => null),
   };
   const empty = !items.payroll_due && !items.tasks_due.length && !items.receipts_to_review && !items.expenses_missing_receipt.count && !items.month_to_close

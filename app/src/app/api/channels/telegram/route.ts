@@ -8,11 +8,13 @@ import { processChat, type Incoming } from "@/lib/channels/worker";
 import { adminClient } from "@/lib/supabase/admin";
 import { accessTokenFor } from "@/lib/channels/links";
 import { acceptSure, decideProposal } from "@/lib/bank/accountant/apply";
+import { monthName, previousMonth } from "@/lib/bank/accountant/closing";
 import { addNotes, notifyOpen, notifyRun, refreshTelegram, runTitle } from "@/lib/bank/accountant/notify";
+import { closeMonth } from "@/lib/bank/accountant/schedule";
 import { runAccountant } from "@/lib/bank/accountant/run";
 import { escapeHtml, SIGNATURE } from "@/lib/bank/accountant/render";
 import { BankError } from "@/lib/bank/errors";
-import { clientFor, sessionFor } from "@/lib/mcp/session";
+import { clientFor, sessionFor, today } from "@/lib/mcp/session";
 
 // Telegram webhook. Answers 200 at once and does the work after the response,
 // so Telegram never retries a message while Claude is still thinking.
@@ -128,7 +130,30 @@ async function handleButton(cb: TgCallback) {
 
   const one = /^bp:([0-9a-f-]{36}):([yn])$/i.exec(cb.data);
   const all = /^ba:([0-9a-f-]{36}):(\d{1,3})$/i.exec(cb.data);
+  const close = /^mc:([0-9a-f-]{36}):(\d{4})-(0[1-9]|1[0-2])$/i.exec(cb.data);
   try {
+    if (close) {
+      // Closing last month (Sply Accountant's closing message): admins only, and only a month that is over.
+      const session = await sessionFor(token, link.user_id);
+      if (session.org.id !== close[1].toLowerCase()) return answerCallback(cb.id, "This message is about another organization.");
+      if (session.role !== "admin") return answerCallback(cb.id, "Only an admin can close a month.");
+      const month = `${close[2]}-${close[3]}-01`;
+      // Only last month: an older message's button is out of date (a month reopened since stays open).
+      if (month !== previousMonth(today(session))) return answerCallback(cb.id, "This message is out of date: close the month in Overview.");
+      const names = await closeMonth(session, month).catch((e) => {
+        console.error("[accountant] close month", e);
+        return null;
+      });
+      if (!names) return answerCallback(cb.id, "Could not close it. Try again, or close it in Overview.");
+      await answerCallback(cb.id, names.length ? `${monthName(month)} closed` : "Already closed.");
+      if (cb.message) {
+        await editHtml(String(chat.id), cb.message.message_id,
+          `<b>${escapeHtml(SIGNATURE)}</b>\n🔒 ${escapeHtml(monthName(month))} closed${names.length ? `: ${escapeHtml(names.join(", "))}` : " already"}. `
+            + "Its entries can no longer change; reopen it in Overview if needed.",
+          [[{ text: "Open Overview", url: `${APP_URL}/overview?month=${month.slice(0, 7)}` }]]);
+      }
+      return;
+    }
     if (one) {
       const { data: p } = await db.from("bank_proposals").select("organization_id, line_id").eq("id", one[1]).maybeSingle();
       if (!p) return answerCallback(cb.id, "This proposal is not yours to decide.");

@@ -31,7 +31,8 @@ export interface RunResult {
 }
 
 export async function runAccountant(
-  db: SupabaseClient, orgId: string, opts: { trigger: "statement" | "app" | "chat"; statementId?: string },
+  db: SupabaseClient, orgId: string,
+  opts: { trigger: "statement" | "app" | "chat" | "weekly" | "monthly"; statementId?: string; /** One try within this time. */ timeoutMs?: number },
 ): Promise<RunResult> {
   const org = await loadOrg(db, orgId);
   let q = db.from("bank_lines").select(OPEN_LINE_FIELDS).eq("organization_id", orgId).eq("status", "unmatched").order("date").limit(1000);
@@ -82,7 +83,7 @@ export async function runAccountant(
           system: SYSTEM,
           output_config: { effort: "medium", format: zodOutputFormat(Output) },
           messages: [{ role: "user", content: JSON.stringify(buildInput(org, dossiers)) }],
-        });
+        }, opts.timeoutMs ? { timeout: opts.timeoutMs, maxRetries: 0 } : undefined);
         usage = { input_tokens: r.usage.input_tokens, output_tokens: r.usage.output_tokens };
         if (r.stop_reason !== "end_turn") throw new Error(`stopped: ${r.stop_reason}`);
         const text = r.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
