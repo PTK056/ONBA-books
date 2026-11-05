@@ -3,11 +3,17 @@ import "server-only";
 // Telegram Bot API: the few calls the agent needs.
 const API = () => `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
 
-async function call<T = unknown>(method: string, body: object): Promise<T> {
+async function call<T = unknown>(method: string, body: object, retry = true): Promise<T> {
   const res = await fetch(`${API()}/${method}`, {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
   });
   const json = await res.json().catch(() => ({}));
+  // Too many messages: Telegram says how long to wait; wait once (up to 10 s) and try again.
+  const wait = Number(json.parameters?.retry_after);
+  if (!json.ok && res.status === 429 && retry && wait > 0 && wait <= 10) {
+    await new Promise((r) => setTimeout(r, wait * 1000));
+    return call<T>(method, body, false);
+  }
   if (!json.ok) throw new Error(`telegram ${method}: ${res.status} ${json.description ?? ""}`);
   return json.result as T;
 }
@@ -22,6 +28,36 @@ export async function sendMessage(chatId: string, text: string) {
     }
   }
 }
+
+/** A button under a message: it either sends `data` back to the webhook (callback_query) or opens `url`. */
+export type Button = { text: string; data: string } | { text: string; url: string };
+
+const keyboard = (buttons?: Button[][]) => buttons?.length
+  ? { inline_keyboard: buttons.map((row) => row.map((b) => ("data" in b ? { text: b.text, callback_data: b.data } : { text: b.text, url: b.url }))) }
+  : { inline_keyboard: [] };
+
+/** Sends HTML we wrote ourselves (already escaped, and short: fields are cut before escaping), with buttons; returns the message id. */
+export async function sendHtml(chatId: string, html: string, buttons?: Button[][]): Promise<number> {
+  const m = await call<{ message_id: number }>("sendMessage", {
+    chat_id: chatId, text: html, parse_mode: "HTML", link_preview_options: { is_disabled: true },
+    ...(buttons?.length ? { reply_markup: keyboard(buttons) } : {}),
+  });
+  return m.message_id;
+}
+
+/** Rewrites a message we sent (e.g. once its buttons were used); no buttons given removes them. */
+export async function editHtml(chatId: string, messageId: number, html: string, buttons?: Button[][]) {
+  await call("editMessageText", {
+    chat_id: chatId, message_id: messageId, text: html, parse_mode: "HTML",
+    link_preview_options: { is_disabled: true }, reply_markup: keyboard(buttons),
+  }).catch((e) => {
+    if (!String(e).includes("message is not modified")) throw e;
+  });
+}
+
+/** Ends the spinner on a pressed button, with an optional short notice. */
+export const answerCallback = (id: string, text?: string) =>
+  call("answerCallbackQuery", { callback_query_id: id, ...(text ? { text: text.slice(0, 190) } : {}) }).catch(() => {});
 
 export const sendTyping = (chatId: string) => call("sendChatAction", { chat_id: chatId, action: "typing" }).catch(() => {});
 
@@ -65,4 +101,12 @@ export interface TgMessage {
   document?: { file_id: string; mime_type?: string; file_name?: string; file_size?: number };
   voice?: { file_id: string; duration?: number; mime_type?: string };
   media_group_id?: string;
+}
+
+/** A pressed button, as much of it as we use. */
+export interface TgCallback {
+  id: string;
+  from: { id: number };
+  message?: { message_id: number; chat: { id: number; type: string } };
+  data?: string;
 }

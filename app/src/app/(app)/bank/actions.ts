@@ -2,12 +2,17 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { acceptSure, decideProposal } from "@/lib/bank/accountant/apply";
+import { refreshTelegram, notifyRun, runTitle } from "@/lib/bank/accountant/notify";
+import { runAccountant } from "@/lib/bank/accountant/run";
 import { bookStatementCharges } from "@/lib/bank/book-charges";
 import { BankError, bookLine, linkEntry, linkStays, markLinePersonal, resetLine as reset } from "@/lib/bank/handle";
 import { autoMatch, ingestStatement, learnPayees, shift } from "@/lib/bank/ops";
 import { readStatementPdf, StatementError } from "@/lib/bank/statement-pdf";
 import { parseWiseCsv, WiseCsvError } from "@/lib/bank/wise-csv";
 import { getCurrentOrg, places } from "@/lib/org";
+import { clientFor } from "@/lib/mcp/session";
 import { createClient } from "@/lib/supabase/server";
 
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
@@ -79,6 +84,19 @@ export async function addStatement(file: { path: string; name: string; mimeType:
     if (r.skipped) parts.push(`${r.skipped} already known`);
     parts.push(`${matched} matched with your books`);
     if (statement.balanced === false) parts.push("the balances don't add up: check the lines against the PDF");
+    // Sply Accountant looks at what is left, after the reply, as the user (their token outlives the request).
+    const token = (await db.auth.getSession()).data.session?.access_token;
+    if (token) {
+      after(async () => {
+        try {
+          const run = await runAccountant(clientFor(token), org.id, { trigger: "statement", statementId: r.statementId });
+          if (run.runId && run.proposed) await notifyRun(org.id, run.runId, await runTitle(org.id, r.statementId));
+        } catch (e) {
+          console.error("[accountant] after statement:", e);
+        }
+      });
+      parts.push("Sply is looking at the rest");
+    }
     return done(parts.join(", ") + ".");
   } catch (e) {
     console.error("[bank] store:", e);
@@ -236,4 +254,53 @@ export async function resetLine(lineId: string): Promise<Result> {
   }
   await learnPayees(db, org.id);
   return done();
+}
+
+/** Sply Accountant over every line still to do with no proposal yet: proposals only, nothing booked. */
+export async function askSply(): Promise<Result> {
+  const org = await admin();
+  if (!org) return { ok: false, error: "Not allowed." };
+  const db = await createClient();
+  try {
+    const r = await runAccountant(db, org.id, { trigger: "app" });
+    if (r.error && !r.proposed) return { ok: false, error: r.error };
+    const parts = [r.proposed ? `Sply has ${r.proposed} proposal${r.proposed === 1 ? "" : "s"} for you` : "Nothing new for Sply to look at"];
+    if (r.error) parts.push(r.error);
+    else if (r.left) parts.push(`${r.left} more line${r.left === 1 ? "" : "s"} next time`);
+    return done(parts.join(". ") + ".");
+  } catch (e) {
+    return { ok: false, error: failure(e) };
+  }
+}
+
+/** OK or Decline on one of Sply's proposals. Its Telegram messages are updated after the reply. */
+export async function decide(proposalId: string, decision: "accept" | "reject"): Promise<Result> {
+  const org = await admin();
+  if (!org || !UUID.test(proposalId)) return { ok: false, error: "Not allowed." };
+  const db = await createClient();
+  const { data: p } = await db.from("bank_proposals").select("id").eq("id", proposalId).eq("organization_id", org.id).maybeSingle();
+  if (!p) return { ok: false, error: "Not allowed." };
+  try {
+    const d = await decideProposal(db, proposalId, decision);
+    after(() => refreshTelegram(org.id, [d.id]).catch((e) => console.error("[accountant] refresh:", e)));
+    if (d.status === "failed" || d.status === "stale") return { ok: false, error: d.outcome ?? "Not applied." };
+    revalidatePath("/transactions");
+    return done();
+  } catch (e) {
+    return { ok: false, error: e instanceof BankError && e.code === "already_handled" ? "Already decided." : failure(e) };
+  }
+}
+
+/** OK on every sure proposal still open. */
+export async function acceptAllSure(): Promise<Result> {
+  const org = await admin();
+  if (!org) return { ok: false, error: "Not allowed." };
+  const db = await createClient();
+  const r = await acceptSure(db, org.id);
+  after(() => refreshTelegram(org.id, r.decided.map((d) => d.id)).catch((e) => console.error("[accountant] refresh:", e)));
+  revalidatePath("/transactions");
+  revalidatePath("/overview");
+  return r.failed
+    ? { ok: false, error: `${r.applied} done; ${r.failed} could not be applied: see their lines.` }
+    : done(`${r.applied} done.`);
 }

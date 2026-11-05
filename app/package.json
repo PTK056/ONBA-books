@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "check:queries": "node --env-file-if-exists=.env.local scripts/check-queries.mts",
-    "test": "node --test src/lib/**/*.test.ts",
+    "test": "node --test \"src/lib/**/*.test.ts\"",
     "test:db": "node supabase/tests/run.mjs"
   },
   "dependencies": {

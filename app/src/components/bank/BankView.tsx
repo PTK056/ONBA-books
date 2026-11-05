@@ -4,7 +4,8 @@ import { AlertTriangle, BedDouble, Check, ChevronDown, Copy, FileText, Landmark,
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { addStatement, bookCharges, createFromLine, findEntries, linkLine, linkStay, markPersonal, matchAgain, resetLine, type EntryCandidate, type Result } from "@/app/(app)/bank/actions";
+import { acceptAllSure, addStatement, askSply, bookCharges, createFromLine, decide, findEntries, linkLine, linkStay, markPersonal, matchAgain, resetLine, type EntryCandidate, type Result } from "@/app/(app)/bank/actions";
+import { isSure, oneChargePerStatement, proposalLabel, type ProposalView } from "@/lib/bank/accountant/render";
 import { money } from "@/components/overview/format";
 import { Highlight, MiniStat } from "@/components/shell/Highlight";
 import type { BankLineRow, BankStatementRow, ExpectedPayout, UnpaidStay } from "@/lib/bank/data";
@@ -74,7 +75,12 @@ export function BankView(props: Props) {
             <h2 className="text-lg font-semibold">
               At the bank, not in your books <span className="text-zinc-400">· {todo.length}</span>
             </h2>
-            {todo.length > 0 && <MatchAgain />}
+            {todo.length > 0 && (
+              <span className="flex flex-wrap items-center gap-2">
+                <SplyBar todo={todo} />
+                <MatchAgain />
+              </span>
+            )}
           </div>
           {todo.length === 0
             ? <p className="card p-4 text-sm text-zinc-500">Nothing left: every line is in your books or marked personal.</p>
@@ -143,6 +149,50 @@ function MatchAgain() {
         {pending ? "Matching…" : "Match again"}
       </button>
     </span>
+  );
+}
+
+/** Sply Accountant: look at the lines with no proposal yet; accept every sure proposal at once. */
+function SplyBar({ todo }: { todo: BankLineRow[] }) {
+  const { error, message, pending, go } = useAction();
+  const proposals = todo.map((l) => l.proposal).filter((p): p is ProposalView => !!p);
+  const sure = oneChargePerStatement(proposals.filter(isSure)).length;
+  const unproposed = todo.length - proposals.length;
+  return (
+    <span className="flex items-center gap-2 text-sm">
+      {(message || error) && <span className={error ? "text-red-600" : "text-zinc-500"}>{error ?? message}</span>}
+      {sure > 0 && (
+        <button className={primary} disabled={pending} onClick={() => go(acceptAllSure)} title="Apply every proposal Sply is sure of">
+          {pending ? "Applying…" : `OK all ${sure} sure`}
+        </button>
+      )}
+      {unproposed > 0 && (
+        <button className={secondary} disabled={pending} onClick={() => go(askSply)}
+          title="Sply Accountant proposes what each line is; nothing is booked until you say OK">
+          {pending ? "Sply is looking…" : `🧾 Ask Sply (${unproposed})`}
+        </button>
+      )}
+    </span>
+  );
+}
+
+/** Sply's proposal on a line: what it is and why, with OK and Decline (a question has no OK). */
+function Proposal({ p }: { p: ProposalView }) {
+  const { error, pending, go } = useAction();
+  return (
+    <div className="ml-20 flex flex-col gap-1.5 rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 max-sm:ml-0 dark:border-brand-800 dark:bg-brand-950/40">
+      <p className="text-sm">
+        <span className="font-medium">🧾 Sply{p.action === "ask" ? " asks" : ""}:</span> {proposalLabel(p)}
+        {isSure(p) && <span className="ml-2 rounded bg-brand-600 px-1.5 py-0.5 text-[11px] font-medium text-white">sure</span>}
+      </p>
+      {p.amountDiffers && p.action !== "ask" && <p className="text-xs text-amber-700 dark:text-amber-400">The amount differs: OK links it anyway; nothing is booked for the gap.</p>}
+      {p.action !== "ask" && <p className="text-xs text-zinc-500">{p.why}</p>}
+      <div className="flex gap-2">
+        {p.action !== "ask" && <button className={main} disabled={pending} onClick={() => go(() => decide(p.id, "accept"))}><Check size={13} /> OK</button>}
+        <button className={small} disabled={pending} onClick={() => go(() => decide(p.id, "reject"))}>{p.action === "ask" ? "Dismiss" : "Decline"}</button>
+      </div>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </div>
   );
 }
 
@@ -304,6 +354,7 @@ function TodoLine({ line, villas, categories, reportingCurrency }: { line: BankL
       {line.counterparty && line.description !== line.counterparty && (
         <p className="truncate pl-20 text-xs text-zinc-500 max-sm:pl-0">{line.description}</p>
       )}
+      {line.proposal && <Proposal p={line.proposal} />}
       <div className="flex flex-wrap gap-2 pl-20 max-sm:pl-0">
         {suggested[0] && suggestion(suggested[0], main)}
         {!suggested.length && <button className={main} disabled={pending} onClick={() => toggle("add")}>Add to the books</button>}

@@ -2,10 +2,17 @@ import { after, NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { findLink, redeemCode, unlink } from "@/lib/channels/links";
 import { APP_URL } from "@/lib/channels/oauth";
-import { sendMessage, type TgMessage } from "@/lib/channels/telegram";
+import { answerCallback, editHtml, sendMessage, type TgCallback, type TgMessage } from "@/lib/channels/telegram";
 import { transcriptionEnabled } from "@/lib/channels/transcribe";
 import { processChat, type Incoming } from "@/lib/channels/worker";
 import { adminClient } from "@/lib/supabase/admin";
+import { accessTokenFor } from "@/lib/channels/links";
+import { acceptSure, decideProposal } from "@/lib/bank/accountant/apply";
+import { addNotes, notifyRun, refreshTelegram, runTitle } from "@/lib/bank/accountant/notify";
+import { runAccountant } from "@/lib/bank/accountant/run";
+import { escapeHtml, SIGNATURE } from "@/lib/bank/accountant/render";
+import { BankError } from "@/lib/bank/errors";
+import { clientFor, sessionFor } from "@/lib/mcp/session";
 
 // Telegram webhook. Answers 200 at once and does the work after the response,
 // so Telegram never retries a message while Claude is still thinking.
@@ -15,11 +22,16 @@ const CONNECT = `${APP_URL}/connect/telegram`;
 const MAX_VOICE_SECONDS = 180;
 const HELP = "Send me receipts (photo or PDF), voice notes, expenses (\"350k petrol Kadek yesterday\"), booking screenshots or reminders, "
   + "and ask what's left to do. Each morning I send what needs you, if anything.\n"
-  + "/new starts a fresh conversation · /brief off stops the morning brief · /stop disconnects this chat.";
+  + "/bank: Sply Accountant goes through the bank lines left to do · /new starts a fresh conversation · /brief off stops the morning brief · /stop disconnects this chat.";
 
 export async function POST(request: NextRequest) {
   if (!validSecret(request.headers.get("x-telegram-bot-api-secret-token"))) return new NextResponse(null, { status: 401 });
   const update = await request.json().catch(() => null);
+  const pressed = update?.callback_query as TgCallback | undefined;
+  if (pressed) {
+    after(() => handleButton(pressed).catch((e) => console.error("[telegram] button", e)));
+    return NextResponse.json({ ok: true });
+  }
   const msg = update?.message as TgMessage | undefined;
   if (!msg) return NextResponse.json({ ok: true }); // edits, reactions…: ignored
   after(() => handle(msg).catch((e) => console.error("[telegram]", e)));
@@ -54,6 +66,12 @@ async function handle(msg: TgMessage) {
     await adminClient().from("channel_links").update({ brief_enabled: on }).eq("id", link.id);
     return sendMessage(chatId, on ? "Morning brief on: each morning, what's left to do (nothing if nothing is)." : "Morning brief off. /brief on to turn it back on.");
   }
+  if (text === "/bank") {
+    return bankPass(link, chatId).catch(async (e) => {
+      console.error("[telegram] /bank", e);
+      await sendMessage(chatId, "🧾 Sply Accountant could not go through the bank lines just now. Try again in a few minutes.");
+    });
+  }
   if (text === "/new") {
     await adminClient().from("chat_conversations").update({ messages: [], attachments: {} }).eq("link_id", link.id);
     return sendMessage(chatId, "Fresh start. What can I do?");
@@ -74,6 +92,68 @@ async function handle(msg: TgMessage) {
 
   await adminClient().rpc("chat_enqueue", { p_link: link.id, p_item: item });
   await processChat(link, chatId);
+}
+
+/** /bank: Sply Accountant proposes what each bank line left to do is; the proposals arrive here with their buttons. */
+async function bankPass(link: { id: string; user_id: string }, chatId: string) {
+  const token = await accessTokenFor(link.id);
+  if (!token) return sendMessage(chatId, `Your Splyce connection has expired. Connect again: ${CONNECT}`);
+  const session = await sessionFor(token, link.user_id);
+  if (session.role !== "admin") return sendMessage(chatId, "Only admins of the organization can see the bank lines.");
+  await sendMessage(chatId, "🧾 Sply Accountant is going through your bank lines…");
+  const run = await runAccountant(session.db, session.org.id, { trigger: "chat" });
+  if (run.error && !run.proposed) return sendMessage(chatId, `🧾 ${run.error}`);
+  if (!run.runId || !run.proposed) return sendMessage(chatId, "🧾 Nothing new: every bank line left to do already has a proposal (see the Bank tab), or none is left.");
+  await notifyRun(session.org.id, run.runId, await runTitle(session.org.id, null));
+  if (run.left) await sendMessage(chatId, `🧾 ${run.left} more line${run.left === 1 ? "" : "s"} next time: send /bank again once these are decided.`);
+}
+
+/**
+ * A button under a Sply Accountant message: OK / Decline on one proposal (bp:<id>:y|n), or OK all sure (ba:<run>).
+ * Acts as the user this chat is linked to, so the database checks they are an admin of the proposal's organization.
+ */
+async function handleButton(cb: TgCallback) {
+  const chat = cb.message?.chat;
+  if (!chat || chat.type !== "private" || !cb.data) return answerCallback(cb.id);
+  const link = await findLink("telegram", String(chat.id));
+  if (!link) return answerCallback(cb.id, "Connect this chat to Splyce first.");
+  const token = await accessTokenFor(link.id);
+  if (!token) return answerCallback(cb.id, "Your Splyce connection has expired: connect again.");
+  const db = clientFor(token);
+
+  const one = /^bp:([0-9a-f-]{36}):([yn])$/i.exec(cb.data);
+  const all = /^ba:([0-9a-f-]{36}):(\d{1,3})$/i.exec(cb.data);
+  try {
+    if (one) {
+      const { data: p } = await db.from("bank_proposals").select("organization_id, line_id").eq("id", one[1]).maybeSingle();
+      if (!p) return answerCallback(cb.id, "This proposal is not yours to decide.");
+      const d = await decideProposal(db, one[1], one[2] === "y" ? "accept" : "reject");
+      await answerCallback(cb.id, d.status === "applied" ? "Done ✅" : d.status === "rejected" ? "Declined" : d.outcome ?? "Not applied");
+      await refreshTelegram(p.organization_id, [d.id]);
+      if (d.status === "rejected") {
+        await sendMessage(String(chat.id), "Noted. Tell me what it is (e.g. \"Pool & garden, Casa ONBA\"), or handle it in the Bank tab.");
+        await addNotes(link.id, [{ bank_line_id: p.line_id, sent: "proposal declined by the user; they may now say what the line is" }]);
+      }
+      return;
+    }
+    if (all) {
+      const { data: run } = await db.from("bank_accountant_runs").select("organization_id").eq("id", all[1]).maybeSingle();
+      if (!run) return answerCallback(cb.id, "This is not yours to decide.");
+      const r = await acceptSure(db, run.organization_id, all[1], Number(all[2]));
+      await answerCallback(cb.id, `${r.applied} done${r.failed ? `, ${r.failed} not applied` : ""}`);
+      await refreshTelegram(run.organization_id, r.decided.map((d) => d.id));
+      if (cb.message) {
+        await editHtml(String(chat.id), cb.message.message_id,
+          `<b>${escapeHtml(SIGNATURE)}</b>\n✅ ${r.applied} sure one${r.applied === 1 ? "" : "s"} done${r.failed ? ` · ⚠️ ${r.failed} not applied (see the Bank tab)` : ""}.`,
+          [[{ text: "Open the Bank tab", url: `${APP_URL}/bank` }]]);
+      }
+      return;
+    }
+    return answerCallback(cb.id);
+  } catch (e) {
+    if (e instanceof BankError) return answerCallback(cb.id, e.code === "already_handled" ? "Already decided." : e.message);
+    throw e;
+  }
 }
 
 function validSecret(given: string | null) {

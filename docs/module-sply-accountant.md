@@ -1,6 +1,6 @@
 # Module Sply Accountant (rapprochement bancaire par l'assistant)
 
-Conception proposée le 04/11/2026 ; **choix validés par Pierre le 04/11/2026** (voir § Décisions). S'appuie sur les outils banque livrés le même jour
+Conception proposée le 04/11/2026 ; **choix validés par Pierre le 04/11/2026** (voir § Décisions). **V1 codée le 05/11/2026** (§ Livré en V1), à déployer. S'appuie sur les outils banque livrés le même jour
 (`Splyce — Bank MCP tools spec.md`, migration `bank_agent`).
 
 ## But
@@ -159,6 +159,23 @@ l'on peut activer l'application automatique.
   avec Undo.
 - **V3** : relevés reçus par Telegram ou e-mail, rapprochement des reçus en attente avec les lignes, plusieurs entrées pour
   une ligne.
+
+## Livré en V1 (05/11/2026)
+
+- Migration `bank_accountant` : `bank_accountant_runs`, `bank_proposals` (lecture seule pour les utilisateurs ; toute écriture
+  passe par des fonctions vérifiées), propositions périmées dès que leur ligne est traitée ailleurs, un passage à la fois par
+  organisation, délai de 10 min pour une proposition restée « en cours », notes du chat, quota `bank_review` (30 par mois).
+- Code : `app/src/lib/bank/accountant/` (dossiers, proposition, application, Telegram), recherche de candidats partagée avec
+  le MCP (`lib/bank/candidates.ts`).
+- Déclencheurs : fin de l'ajout d'un relevé, bouton « Ask Sply » dans l'onglet Bank, commande `/bank` sur Telegram.
+- Telegram : un résumé avec la liste des propositions sûres et « OK all », puis un message avec OK / Decline pour chaque
+  proposition à vérifier et chaque question (10 au plus par passage, le reste dans l'onglet Bank). Écart avec le plan :
+  les propositions sûres ne reçoivent pas chacune un message, pour ne pas inonder le chat.
+- « Sure » est décidé par le code, pas par Claude (le texte bancaire qu'il lit est écrit par l'émetteur du virement) :
+  jamais pour « personal », ni pour une ligne en devise ; un ajout seulement s'il suit l'habitude du bénéficiaire (2 fois au
+  moins) ; un lien seulement vers le seul candidat au montant exact.
+- Pas encore : l'évaluation sur l'historique (à faire avant d'activer l'application automatique), la relance des
+  justificatifs, l'application automatique « certaine ».
 
 ## Questions ouvertes
 

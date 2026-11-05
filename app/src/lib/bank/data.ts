@@ -1,6 +1,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { nameFit, namesOf } from "./match";
+import { listProposals } from "./accountant/views";
+import type { ProposalView } from "./accountant/render";
 import { payeeKey } from "./payees";
 import { CHARGE, shift } from "./ops";
 import { payoutStates } from "./payouts";
@@ -25,6 +27,8 @@ export interface BankLineRow {
   stays: StaySuggestion[];
   /** A regular payee: where their last payment was booked. */
   known: KnownPayee | null;
+  /** What Sply Accountant proposes for it, waiting for OK or Decline. */
+  proposal: ProposalView | null;
 }
 export interface KnownPayee {
   villaId: string; villa: string; categoryId: string | null; category: string | null; description: string | null; uses: number;
@@ -47,7 +51,7 @@ const LATE_AFTER_DAYS = 3;   // past Airbnb's "should arrive by"
 const UNPAID_AFTER_DAYS = 3; // Airbnb pays about a day after arrival
 
 export async function bankPage(db: SupabaseClient, orgId: string) {
-  const [{ data: accounts }, { data: statements }, { data: lines }, knownFor] = await Promise.all([
+  const [{ data: accounts }, { data: statements }, { data: lines }, knownFor, proposals] = await Promise.all([
     db.from("bank_accounts").select("id, name, last4").eq("organization_id", orgId),
     db.from("bank_statements")
       .select("id, account_id, period_start, period_end, lines_added, lines_skipped, balanced, notes")
@@ -58,7 +62,9 @@ export async function bankPage(db: SupabaseClient, orgId: string) {
         + "transaction:transactions (date, description, category:categories (name)), stays:bank_line_stays (stay:stays (external_ref, guest_name, check_in))")
       .eq("organization_id", orgId).order("date", { ascending: false }).limit(1000),
     payeeMemory(db, orgId),
+    listProposals(db, orgId, { pending: true }),
   ]);
+  const proposalOf = new Map(proposals.map((p) => [p.lineId, p]));
   const accountName = new Map((accounts ?? []).map((a) => [a.id, a.last4 ? `${a.name} ••••${a.last4}` : a.name]));
 
   type Row = {
@@ -126,7 +132,8 @@ export async function bankPage(db: SupabaseClient, orgId: string) {
     return {
       id: r.id, statementId: r.statement_id, account: accountName.get(r.account_id) ?? "", date: r.date, direction: r.direction,
       amount: Number(r.amount), currency: r.currency, description: r.description, counterparty: r.counterparty,
-      status: r.status, matchedBy: r.matched_by, handledVia: r.handled_via, note: r.handled_note, personalReason: r.personal_reason, linkedTo, suggestions, template, stays: payable, known,
+      status: r.status, matchedBy: r.matched_by, handledVia: r.handled_via, note: r.handled_note, personalReason: r.personal_reason, linkedTo,
+      proposal: r.status === "unmatched" ? proposalOf.get(r.id) ?? null : null, suggestions, template, stays: payable, known,
     };
   });
 

@@ -1,12 +1,12 @@
 import "server-only";
 import { z } from "zod";
 import { bookStatementCharges } from "@/lib/bank/book-charges";
+import { entryCandidates, nearestRate, RATE_MAX_AGE_DAYS, stayCandidates, staysFit, whereIn } from "@/lib/bank/candidates";
 import { CHARGE } from "@/lib/bank/charges";
 import { payeeMemory } from "@/lib/bank/data";
 import { BankError, bookLine, linkEntry, linkStays, markLinePersonal, resetLine, type PersonalReason } from "@/lib/bank/handle";
 import { learnPayees, shift } from "@/lib/bank/ops";
 import { payoutStates } from "@/lib/bank/payouts";
-import { scoreEntry } from "@/lib/bank/suggest";
 import { APP_URL as APP } from "@/lib/app-url";
 import { requireAdmin, resolveCategory, resolveVilla, ToolError, type Session } from "./session";
 import type { Registrar } from "./tools";
@@ -79,40 +79,17 @@ async function write<T>(s: Session, lineId: string, run: () => Promise<T>, expla
 
 const num = (x: unknown) => Number(x);
 
-/** Rows of `table` whose `column` is one of `ids`, asked 100 at a time (a long id list overflows the URL). */
-async function whereIn<T>(s: Session, table: string, fields: string, column: string, ids: string[], extra?: (q: any) => any): Promise<T[]> { // eslint-disable-line @typescript-eslint/no-explicit-any
-  const out: T[] = [];
-  for (let i = 0; i < ids.length; i += 100) {
-    let q = s.db.from(table).select(fields).eq("organization_id", s.org.id).in(column, ids.slice(i, i + 100));
-    if (extra) q = extra(q);
-    const { data, error } = await q;
-    if (error) throw new ToolError("Could not load the books. Try again.");
-    out.push(...((data ?? []) as T[]));
-  }
-  return out;
-}
 const r2 = (n: number) => Math.round(n * 100) / 100;
-
-const RATE_MAX_AGE_DAYS = 45;
 
 /** Rate for a line in a foreign currency: the one given, else the one used closest to its date if close enough (and said so). */
 async function bankRate(s: Session, currency: string, date: string, given?: number): Promise<{ rate: number; source: string | null }> {
   if (currency === s.org.reportingCurrency) return { rate: 1, source: null };
   if (given) return { rate: given, source: null };
-  // The rate used closest to the line's date, within the window on either side.
-  const base = () => s.db.from("transactions").select("fx_rate, date").eq("organization_id", s.org.id).eq("currency", currency);
-  const [before, after] = await Promise.all([
-    base().lte("date", date).gte("date", shift(date, -RATE_MAX_AGE_DAYS)).order("date", { ascending: false }).limit(1),
-    base().gt("date", date).lte("date", shift(date, RATE_MAX_AGE_DAYS)).order("date", { ascending: true }).limit(1),
-  ]);
-  if (before.error || after.error) throw new ToolError("Could not look up the exchange rate. Try again.");
-  const gap = (d: string) => Math.abs(Date.parse(d) - Date.parse(date));
-  const last = [before.data?.[0], after.data?.[0]].filter((x): x is { fx_rate: number; date: string } => !!x)
-    .sort((x, y) => gap(x.date) - gap(y.date))[0];
-  if (!last) {
+  const near = await nearestRate(s.db, s.org.id, currency, date).catch((e) => { throw e instanceof BankError ? new ToolError(e.message) : e; });
+  if (!near) {
     throw new ToolError(`fx_rate_required: No ${currency} → ${s.org.reportingCurrency} rate used within ${RATE_MAX_AGE_DAYS} days of ${date}. Ask the user for fx_rate (1 ${currency} = ? ${s.org.reportingCurrency}).`);
   }
-  return { rate: Number(last.fx_rate), source: `rate used on ${last.date}, the closest to this line: tell the user` };
+  return { rate: near.rate, source: `rate used on ${near.date}, the closest to this line: tell the user` };
 }
 
 export function defineBank(server: Registrar) {
@@ -170,7 +147,8 @@ export function defineBank(server: Registrar) {
 
     // Lines sharing a reference with these (a Wise fee and its transfer).
     const refs = [...new Set(rows.map((l) => l.reference).filter((x): x is string => !!x))];
-    const same = await whereIn<{ id: string; account_id: string; reference: string }>(s, "bank_lines", "id, account_id, reference", "reference", refs);
+    const same = await whereIn<{ id: string; account_id: string; reference: string }>(s.db, s.org.id, "bank_lines", "id, account_id, reference", "reference", refs)
+      .catch((e) => { throw e instanceof BankError ? new ToolError(e.message) : e; });
     const known = rows.some((l) => l.status === "unmatched") ? await payeeMemory(s.db, s.org.id) : null;
 
     const total = count ?? rows.length;
@@ -215,64 +193,20 @@ export function defineBank(server: Registrar) {
     requireAdmin(s);
     const l = await loadLine(s, a.bank_line_id);
     mustBeOpen(l);
-    const windowDays = a.date_window_days ?? 10;
-    const tolerance = (a.amount_tolerance_pct ?? 0) / 100;
-    const words = a.text?.replace(/[%_,()*]/g, " ").trim();
-    const line = { date: l.date, amount: num(l.amount), currency: l.currency, counterparty: l.counterparty, description: l.description };
-
-    let q = s.db.from("transactions")
-      .select("id, date, amount, currency, amount_reporting, description, villa:villas (name), category:categories (name)")
-      .eq("organization_id", s.org.id).eq("status", "validated").eq("direction", l.direction).is("stay_id", null)
-      .gte("date", shift(l.date, words ? -90 : -windowDays)).lte("date", shift(l.date, words ? 30 : windowDays)).limit(300);
-    if (words) q = q.ilike("description", `%${words}%`);
-    const { data: txs, error: searchError } = await q;
-    if (searchError) throw new ToolError("Could not search the books. Try again before adding anything.");
-    type Tx = { id: string; date: string; amount: number; currency: string; amount_reporting: number; description: string | null;
-      villa: { name: string } | null; category: { name: string } | null };
-    const list = (txs ?? []) as unknown as Tx[];
-    const taken = await whereIn<{ transaction_id: string }>(s, "bank_lines", "transaction_id", "transaction_id", list.map((t) => t.id));
-    const used = new Set(taken.map((t) => t.transaction_id));
-    const entries = list.filter((t) => !used.has(t.id)).map((t) => {
-      const e = { date: t.date, amount: num(t.amount), currency: t.currency, amountReporting: num(t.amount_reporting), description: t.description };
-      return { t, ...scoreEntry(line, e, s.org.reportingCurrency, windowDays) };
-    }).filter((x) => words || (x.gap !== null && x.gap <= tolerance + 1e-9))
-      .sort((x, y) => y.score - x.score).slice(0, 10)
-      .map(({ t, score, reasons }) => ({
-        transaction_id: t.id, date: t.date, amount: num(t.amount), currency: t.currency, description: t.description,
-        category: t.category?.name ?? null, villa: t.villa?.name ?? null, score, reasons,
-      }));
-
-    let stays: object[] = [];
-    if (l.direction === "in") {
-      const [{ data: around, error: staysError }, payouts] = await Promise.all([
-        s.db.from("stays").select("id, external_ref, guest_name, platform, check_in, check_out")
-          .eq("organization_id", s.org.id).gte("check_out", shift(l.date, -5)).lte("check_in", shift(l.date, 90)).limit(200),
-        payoutStates(s.db, s.org.id, shift(l.date, -30)),
-      ]);
-      if (staysError) throw new ToolError("Could not search the stays. Try again before adding anything.");
-      const pending = payouts.filter((p) => p.stayId && !p.lineId && p.sentOn <= l.date && shift(p.sentOn, 15) >= l.date);
-      const closest = (around ?? [])
-        .sort((x, y) => Math.abs(Date.parse(x.check_in) - Date.parse(l.date)) - Math.abs(Date.parse(y.check_in) - Date.parse(l.date)));
-      const ids = [...new Set([...pending.map((p) => p.stayId!), ...closest.slice(0, 5).map((x) => x.id)])].slice(0, 8);
-      if (ids.length) {
-        const [{ data: info }, { data: incomes }, { data: links }] = await Promise.all([
-          s.db.from("stays").select("id, external_ref, guest_name, platform, check_in, check_out").in("id", ids),
-          s.db.from("transactions").select("stay_id, direction, amount_reporting").in("stay_id", ids).eq("status", "validated"),
-          s.db.from("bank_line_stays").select("stay_id").in("stay_id", ids),
-        ]);
-        stays = (info ?? []).map((x) => {
-          const payout = pending.find((p) => p.stayId === x.id);
-          const net = (incomes ?? []).filter((t) => t.stay_id === x.id)
-            .reduce((n, t) => n + (t.direction === "in" ? 1 : -1) * num(t.amount_reporting), 0);
-          return {
-            stay_id: x.id, reference: x.external_ref, guest: x.guest_name, platform: x.platform, check_in: x.check_in, check_out: x.check_out,
-            net_booked: r2(net), currency: s.org.reportingCurrency,
-            lines_already_linked: (links ?? []).filter((k) => k.stay_id === x.id).length,
-            ...(payout ? { payout_email: { amount: payout.received, currency: payout.currency, sent_on: payout.sentOn, arrives_by: payout.arrivesBy } } : {}),
-          };
-        });
-      }
-    }
+    const line = { date: l.date, direction: l.direction, amount: num(l.amount), currency: l.currency, counterparty: l.counterparty, description: l.description };
+    const [found, payable] = await Promise.all([
+      entryCandidates(s.db, s.org.id, s.org.reportingCurrency, line, { windowDays: a.date_window_days, tolerancePct: a.amount_tolerance_pct, text: a.text }),
+      stayCandidates(s.db, s.org.id, line),
+    ]).catch((e) => { throw e instanceof BankError ? new ToolError(e.message) : e; });
+    const entries = found.map((e) => ({
+      transaction_id: e.transactionId, date: e.date, amount: e.amount, currency: e.currency, description: e.description,
+      category: e.category, villa: e.villa, score: e.score, reasons: e.reasons,
+    }));
+    const stays = payable.map((x) => ({
+      stay_id: x.stayId, reference: x.reference, guest: x.guest, platform: x.platform, check_in: x.checkIn, check_out: x.checkOut,
+      net_booked: x.netBooked, currency: s.org.reportingCurrency, lines_already_linked: x.linesAlreadyLinked,
+      ...(x.payoutEmail ? { payout_email: { amount: x.payoutEmail.amount, currency: x.payoutEmail.currency, sent_on: x.payoutEmail.sentOn, arrives_by: x.payoutEmail.arrivesBy } } : {}),
+    }));
     return {
       line: { bank_line_id: l.id, date: l.date, direction: l.direction, amount: num(l.amount), currency: l.currency, counterparty: l.counterparty, description: l.description },
       entries, ...(l.direction === "in" ? { stays } : {}),
@@ -356,16 +290,14 @@ export function defineBank(server: Registrar) {
     // A transfer for stays should be their net, or the payout Airbnb's e-mail announced; else the user must agree.
     const ids = [...new Set(a.stay_ids!)];
     const [incomes, payouts] = await Promise.all([
-      whereIn<{ stay_id: string; direction: string; amount_reporting: number }>(s, "transactions", "stay_id, direction, amount_reporting", "stay_id", ids,
+      whereIn<{ stay_id: string; direction: string; amount_reporting: number }>(s.db, s.org.id, "transactions", "stay_id, direction, amount_reporting", "stay_id", ids,
         (q) => q.eq("status", "validated")),
       payoutStates(s.db, s.org.id, shift(l.date, -60)),
-    ]);
+    ]).catch((e) => { throw e instanceof BankError ? new ToolError(e.message) : e; });
     const net = r2(incomes.reduce((n, t) => n + (t.direction === "in" ? 1 : -1) * num(t.amount_reporting), 0));
     const announced = r2(payouts.filter((p) => p.stayId && ids.includes(p.stayId) && !p.lineId && p.currency === l.currency)
       .reduce((n, p) => n + p.received, 0));
-    const tolerance = 0.01 + line.amount * 0.0001; // as for an entry in another currency (migration bank_agent)
-    const fits = l.currency === s.org.reportingCurrency && Math.abs(net - line.amount) < tolerance
-      || announced > 0 && Math.abs(announced - line.amount) < tolerance;
+    const fits = staysFit({ ...line, direction: l.direction }, s.org.reportingCurrency, net, announced);
     if (!fits && !a.accept_amount_difference) {
       throw new ToolError(`amount_mismatch: The line is ${line.amount} ${line.currency}; these stays' net booked is ${net} ${s.org.reportingCurrency}`
         + `${announced ? `, the payouts announced by e-mail ${announced} ${l.currency}` : ""}. A deposit or a part payment is fine: ask the user, then link with accept_amount_difference.`);

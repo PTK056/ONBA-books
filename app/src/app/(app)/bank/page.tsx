@@ -7,8 +7,8 @@ import { getCurrentOrg, places } from "@/lib/org";
 import { bankSettings, type Bearer } from "@/lib/settings";
 import { createClient } from "@/lib/supabase/server";
 
-// Reading a statement with Claude takes about half a minute.
-export const maxDuration = 120;
+// Reading a statement with Claude takes about half a minute; Sply Accountant's pass after it about as long.
+export const maxDuration = 300;
 
 export default function BankPage() {
   return (
