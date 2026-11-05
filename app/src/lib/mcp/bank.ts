@@ -95,17 +95,24 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 
 const RATE_MAX_AGE_DAYS = 45;
 
-/** Rate for a line in a foreign currency: the one given, else the last one used if it is recent enough (and said so). */
+/** Rate for a line in a foreign currency: the one given, else the one used closest to its date if close enough (and said so). */
 async function bankRate(s: Session, currency: string, date: string, given?: number): Promise<{ rate: number; source: string | null }> {
   if (currency === s.org.reportingCurrency) return { rate: 1, source: null };
   if (given) return { rate: given, source: null };
-  const { data } = await s.db.from("transactions").select("fx_rate, date").eq("organization_id", s.org.id).eq("currency", currency)
-    .order("date", { ascending: false }).limit(1);
-  const last = data?.[0];
-  if (!last || Math.abs(Date.parse(last.date) - Date.parse(date)) > RATE_MAX_AGE_DAYS * 86_400_000) {
-    throw new ToolError(`fx_rate_required: No recent ${currency} → ${s.org.reportingCurrency} rate around ${date}. Ask the user for fx_rate (1 ${currency} = ? ${s.org.reportingCurrency}).`);
+  // The rate used closest to the line's date, within the window on either side.
+  const base = () => s.db.from("transactions").select("fx_rate, date").eq("organization_id", s.org.id).eq("currency", currency);
+  const [before, after] = await Promise.all([
+    base().lte("date", date).gte("date", shift(date, -RATE_MAX_AGE_DAYS)).order("date", { ascending: false }).limit(1),
+    base().gt("date", date).lte("date", shift(date, RATE_MAX_AGE_DAYS)).order("date", { ascending: true }).limit(1),
+  ]);
+  if (before.error || after.error) throw new ToolError("Could not look up the exchange rate. Try again.");
+  const gap = (d: string) => Math.abs(Date.parse(d) - Date.parse(date));
+  const last = [before.data?.[0], after.data?.[0]].filter((x): x is { fx_rate: number; date: string } => !!x)
+    .sort((x, y) => gap(x.date) - gap(y.date))[0];
+  if (!last) {
+    throw new ToolError(`fx_rate_required: No ${currency} → ${s.org.reportingCurrency} rate used within ${RATE_MAX_AGE_DAYS} days of ${date}. Ask the user for fx_rate (1 ${currency} = ? ${s.org.reportingCurrency}).`);
   }
-  return { rate: Number(last.fx_rate), source: `last rate used, on ${last.date}: tell the user` };
+  return { rate: Number(last.fx_rate), source: `rate used on ${last.date}, the closest to this line: tell the user` };
 }
 
 export function defineBank(server: Registrar) {
@@ -124,19 +131,22 @@ export function defineBank(server: Registrar) {
       direction: z.enum(["in", "out"]).optional(),
       text: z.string().max(80).optional().describe("Words in the counterparty or the description."),
       limit: z.number().int().min(1).max(200).optional().describe("Default 50."),
-      cursor: z.string().max(12).optional().describe("next_cursor of the previous page."),
+      cursor: z.string().max(60).optional().describe("next_cursor of the previous page."),
     }),
     annotations: { readOnlyHint: true },
   }, (async (s, a: { status?: "unmatched" | "matched" | "personal" | "all"; from?: string; to?: string; account?: string; direction?: "in" | "out"; text?: string; limit?: number; cursor?: string }) => {
     requireAdmin(s);
     const status = a.status ?? "unmatched";
     const limit = a.limit ?? 50;
-    const offset = Math.max(0, Number.parseInt(a.cursor ?? "0", 10) || 0);
+    // The cursor is the last line seen (date, id), not a position: lines handled meanwhile leave the list without
+    // shifting the next page.
+    const after = a.cursor ? /^(\d{4}-\d{2}-\d{2})_([0-9a-f-]{36})$/i.exec(a.cursor) : null;
+    if (a.cursor && !after) throw new ToolError("Unknown cursor: use next_cursor as returned, or start without one.");
     const { data: accounts } = await s.db.from("bank_accounts").select("id, name, last4, currency").eq("organization_id", s.org.id);
     const accountName = new Map((accounts ?? []).map((x) => [x.id, x.last4 ? `${x.name} ••••${x.last4}` : x.name]));
 
     let q = s.db.from("bank_lines").select(LINE_FIELDS, { count: "exact" }).eq("organization_id", s.org.id)
-      .order("date", { ascending: false }).order("id").range(offset, offset + limit - 1);
+      .order("date", { ascending: false }).order("id").limit(limit);
     if (status !== "all") q = q.eq("status", status);
     if (a.from) q = q.gte("date", a.from);
     if (a.to) q = q.lte("date", a.to);
@@ -148,7 +158,12 @@ export function defineBank(server: Registrar) {
       q = q.in("account_id", ids);
     }
     const words = a.text?.replace(/[^\p{L}\p{N} -]/gu, " ").trim();
-    if (words) q = q.or(`counterparty.ilike.%${words}%,description.ilike.%${words}%`);
+    // One or-filter holding every condition that needs one (PostgREST takes a single "or" parameter).
+    const groups = [
+      ...(words ? [`or(counterparty.ilike.%${words}%,description.ilike.%${words}%)`] : []),
+      ...(after ? [`or(date.lt.${after[1]},and(date.eq.${after[1]},id.gt.${after[2]}))`] : []),
+    ];
+    if (groups.length) q = q.or(`and(${groups.join(",")})`);
     const { data, count, error } = await q;
     if (error) throw new ToolError("Could not load the bank lines. Try again.");
     const rows = (data ?? []) as unknown as LineRow[];
@@ -177,7 +192,7 @@ export function defineBank(server: Registrar) {
           related_line_ids: same.filter((x) => x.id !== l.id && x.reference === l.reference && x.account_id === l.account_id).map((x) => x.id),
         };
       }),
-      next_cursor: offset + rows.length < total ? String(offset + rows.length) : null,
+      next_cursor: rows.length < total && rows.length ? `${rows.at(-1)!.date}_${rows.at(-1)!.id}` : null,
       link: `${APP}/bank`,
     };
   }));
@@ -210,7 +225,8 @@ export function defineBank(server: Registrar) {
       .eq("organization_id", s.org.id).eq("status", "validated").eq("direction", l.direction).is("stay_id", null)
       .gte("date", shift(l.date, words ? -90 : -windowDays)).lte("date", shift(l.date, words ? 30 : windowDays)).limit(300);
     if (words) q = q.ilike("description", `%${words}%`);
-    const { data: txs } = await q;
+    const { data: txs, error: searchError } = await q;
+    if (searchError) throw new ToolError("Could not search the books. Try again before adding anything.");
     type Tx = { id: string; date: string; amount: number; currency: string; amount_reporting: number; description: string | null;
       villa: { name: string } | null; category: { name: string } | null };
     const list = (txs ?? []) as unknown as Tx[];
@@ -228,11 +244,12 @@ export function defineBank(server: Registrar) {
 
     let stays: object[] = [];
     if (l.direction === "in") {
-      const [{ data: around }, payouts] = await Promise.all([
+      const [{ data: around, error: staysError }, payouts] = await Promise.all([
         s.db.from("stays").select("id, external_ref, guest_name, platform, check_in, check_out")
           .eq("organization_id", s.org.id).gte("check_out", shift(l.date, -5)).lte("check_in", shift(l.date, 90)).limit(200),
         payoutStates(s.db, s.org.id, shift(l.date, -30)),
       ]);
+      if (staysError) throw new ToolError("Could not search the stays. Try again before adding anything.");
       const pending = payouts.filter((p) => p.stayId && !p.lineId && p.sentOn <= l.date && shift(p.sentOn, 15) >= l.date);
       const closest = (around ?? [])
         .sort((x, y) => Math.abs(Date.parse(x.check_in) - Date.parse(l.date)) - Math.abs(Date.parse(y.check_in) - Date.parse(l.date)));
@@ -346,7 +363,9 @@ export function defineBank(server: Registrar) {
     const net = r2(incomes.reduce((n, t) => n + (t.direction === "in" ? 1 : -1) * num(t.amount_reporting), 0));
     const announced = r2(payouts.filter((p) => p.stayId && ids.includes(p.stayId) && !p.lineId && p.currency === l.currency)
       .reduce((n, p) => n + p.received, 0));
-    const fits = l.currency === s.org.reportingCurrency && Math.abs(net - line.amount) < 1 || announced > 0 && Math.abs(announced - line.amount) < 1;
+    const tolerance = 0.01 + line.amount * 0.0001; // as for an entry in another currency (migration bank_agent)
+    const fits = l.currency === s.org.reportingCurrency && Math.abs(net - line.amount) < tolerance
+      || announced > 0 && Math.abs(announced - line.amount) < tolerance;
     if (!fits && !a.accept_amount_difference) {
       throw new ToolError(`amount_mismatch: The line is ${line.amount} ${line.currency}; these stays' net booked is ${net} ${s.org.reportingCurrency}`
         + `${announced ? `, the payouts announced by e-mail ${announced} ${l.currency}` : ""}. A deposit or a part payment is fine: ask the user, then link with accept_amount_difference.`);
