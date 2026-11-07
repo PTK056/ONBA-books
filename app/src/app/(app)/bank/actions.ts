@@ -328,6 +328,18 @@ export async function markPersonal(lineId: string, reason: PersonalReason | null
   return done();
 }
 
+/** Sets a line still to do aside (out of the list, nothing booked), or puts it back in the list. */
+export async function setAside(lineId: string, aside: boolean): Promise<Result> {
+  const org = await admin();
+  if (!org || !UUID.test(lineId)) return { ok: false, error: "Not allowed." };
+  const db = await createClient();
+  const { data, error } = await db.from("bank_lines").update({ set_aside_at: aside === true ? new Date().toISOString() : null })
+    .eq("id", lineId).eq("organization_id", org.id).eq("status", "unmatched").select("id");
+  if (error) return { ok: false, error: "Could not save. Try again." };
+  if (!data?.length) return { ok: false, error: "This line was already handled." };
+  return done();
+}
+
 /** The owner's own note on a line, still to do or handled; empty removes it. */
 export async function saveNote(lineId: string, note: string): Promise<Result> {
   const org = await admin();

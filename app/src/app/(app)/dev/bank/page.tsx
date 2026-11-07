@@ -9,7 +9,7 @@ import type { ProposalView } from "@/lib/bank/accountant/render";
 
 const line = (l: Partial<BankLineRow> & Pick<BankLineRow, "id" | "date" | "direction" | "amount" | "description">): BankLineRow => ({
   statementId: "s1", account: "BCA ••••4821", currency: "IDR", counterparty: null, status: "unmatched", matchedBy: null,
-  handledVia: null, note: null, personalReason: null, ownNote: null, linkedTo: null, proposal: null, guesses: [], template: null, known: null, ...l,
+  handledVia: null, note: null, personalReason: null, ownNote: null, setAside: false, linkedTo: null, proposal: null, guesses: [], template: null, known: null, ...l,
 });
 
 const proposal = (over: Partial<ProposalView> & Pick<ProposalView, "id" | "action" | "line">): ProposalView => ({

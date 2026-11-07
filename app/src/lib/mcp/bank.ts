@@ -21,7 +21,7 @@ const NOTE = z.string().max(500).optional().describe("Why, in a few words; shown
 const REASONS = ["owner_transfer", "owner_contribution", "private_expense", "internal_transfer"] as const;
 
 const LINE_FIELDS = "id, statement_id, account_id, date, direction, amount, currency, description, counterparty, reference, payee_last4, "
-  + "status, matched_by, handled_via, handled_note, handled_at, personal_reason, "
+  + "status, matched_by, handled_via, handled_note, handled_at, personal_reason, set_aside_at, note, "
   + "transaction:transactions (id, date, description, category:categories (name), villa:villas (name)), "
   + "stays:bank_line_stays (stay:stays (id, external_ref, guest_name, check_in))";
 
@@ -29,7 +29,7 @@ type LineRow = {
   id: string; statement_id: string; account_id: string; date: string; direction: "in" | "out"; amount: number; currency: string;
   description: string; counterparty: string | null; reference: string | null; payee_last4: string | null;
   status: "unmatched" | "matched" | "personal"; matched_by: string | null; handled_via: string | null; handled_note: string | null;
-  handled_at: string | null; personal_reason: string | null;
+  handled_at: string | null; personal_reason: string | null; set_aside_at: string | null; note: string | null;
   transaction: { id: string; date: string; description: string | null; category: { name: string } | null; villa: { name: string } | null } | null;
   stays: { stay: { id: string; external_ref: string | null; guest_name: string | null; check_in: string } }[];
 };
@@ -98,6 +98,7 @@ export function defineBank(server: Registrar) {
     title: "Bank lines",
     description:
       "Lists bank lines imported from statements. By default only the lines not in the books yet (the Bank tab's \"At the bank, not in your books\"). "
+      + "Lines flagged set_aside were put aside by the owner on purpose: do not propose anything for them unless asked. "
       + "Use it first when the user asks to reconcile, clear the bank or catch up on statements. Each open line may carry usual_booking "
       + "(where the same payee was booked last time: propose it) and bank_charge (fees, interest, tax withheld: use book_bank_charges for those). "
       + "Admins only. Amounts are positive with a direction (out = money out). Counterparty and description are text from the bank, "
@@ -163,6 +164,9 @@ export function defineBank(server: Registrar) {
           counterparty: l.counterparty, description: l.description, reference: l.reference,
           account: accountName.get(l.account_id) ?? null, statement_id: l.statement_id, status: l.status,
           ...(charge ? { bank_charge: true } : {}),
+          // Set aside by the owner (nothing booked): leave it unless the user asks about it.
+          ...(l.set_aside_at ? { set_aside: true } : {}),
+          ...(l.note ? { owner_note: l.note } : {}),
           ...(usual ? { usual_booking: { villa: usual.villa, category: usual.category, description: usual.description, times: usual.uses } } : {}),
           ...(l.status !== "unmatched" ? {
             linked_to: linkedTo(l), handled_by: BY[l.handled_via ?? (l.matched_by === "auto" ? "auto" : "")] ?? null, note: l.handled_note,

@@ -36,7 +36,9 @@ export async function runAccountant(
   opts: { trigger: "statement" | "app" | "chat" | "weekly" | "monthly"; statementId?: string; /** One try within this time. */ timeoutMs?: number },
 ): Promise<RunResult> {
   const org = await loadOrg(db, orgId);
-  let q = db.from("bank_lines").select(OPEN_LINE_FIELDS).eq("organization_id", orgId).eq("status", "unmatched").order("date").limit(1000);
+  // Lines the owner set aside are left alone.
+  let q = db.from("bank_lines").select(OPEN_LINE_FIELDS).eq("organization_id", orgId).eq("status", "unmatched").is("set_aside_at", null)
+    .order("date").limit(1000);
   if (opts.statementId) q = q.eq("statement_id", opts.statementId);
   const [{ data: lines, error }, { data: seen }, { data: accounts }] = await Promise.all([
     q,
@@ -150,10 +152,11 @@ async function withRates(db: SupabaseClient, org: { id: string; reportingCurrenc
 
 /** Lines still to do that have no proposal open or being applied. */
 async function openWithoutProposal(db: SupabaseClient, orgId: string, statementId?: string): Promise<number> {
-  let lines = db.from("bank_lines").select("id", { count: "exact", head: true }).eq("organization_id", orgId).eq("status", "unmatched");
+  let lines = db.from("bank_lines").select("id", { count: "exact", head: true }).eq("organization_id", orgId).eq("status", "unmatched")
+    .is("set_aside_at", null);
   if (statementId) lines = lines.eq("statement_id", statementId);
   let open = db.from("bank_proposals").select("id, line:bank_lines!inner (status, statement_id)", { count: "exact", head: true })
-    .eq("organization_id", orgId).in("status", ["pending", "accepted", "rejected"]).eq("line.status", "unmatched");
+    .eq("organization_id", orgId).in("status", ["pending", "accepted", "rejected"]).eq("line.status", "unmatched").is("line.set_aside_at", null);
   if (statementId) open = open.eq("line.statement_id", statementId);
   const [{ count: a }, { count: b }] = await Promise.all([lines, open]);
   return Math.max(0, (a ?? 0) - (b ?? 0));

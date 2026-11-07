@@ -31,6 +31,8 @@ export interface BankLineRow {
   handledVia: "auto" | "app" | "agent" | null; note: string | null; personalReason: string | null;
   /** The owner's own note, on any line. */
   ownNote: string | null;
+  /** Still not in the books, but set aside by the owner: out of the list to do. */
+  setAside: boolean;
   /** What the line is linked to, in words. */
   linkedTo: string | null;
   guesses: GuessView[];
@@ -67,7 +69,7 @@ export async function bankPage(db: SupabaseClient, orgId: string, reportingCurre
       .eq("organization_id", orgId).order("period_start", { ascending: false }),
     db.from("bank_lines")
       .select("id, statement_id, account_id, date, direction, amount, currency, description, counterparty, reference, payee_last4, status, matched_by, "
-        + "transaction_id, handled_via, handled_note, personal_reason, note, "
+        + "transaction_id, handled_via, handled_note, personal_reason, note, set_aside_at, "
         + "transaction:transactions (date, description, category:categories (name)), stays:bank_line_stays (stay:stays (external_ref, guest_name, check_in))")
       .eq("organization_id", orgId).order("date", { ascending: false }).limit(1000),
     payeeMemory(db, orgId),
@@ -80,7 +82,7 @@ export async function bankPage(db: SupabaseClient, orgId: string, reportingCurre
     id: string; statement_id: string; account_id: string; date: string; direction: "in" | "out"; amount: number; currency: string;
     description: string; counterparty: string | null; reference: string | null; payee_last4: string | null; status: BankLineRow["status"];
     matched_by: string | null; transaction_id: string | null; handled_via: BankLineRow["handledVia"]; handled_note: string | null;
-    personal_reason: string | null; note: string | null;
+    personal_reason: string | null; note: string | null; set_aside_at: string | null;
     transaction: { date: string; description: string | null; category: { name: string } | null } | null;
     stays: { stay: { external_ref: string | null; guest_name: string | null; check_in: string } }[];
   };
@@ -180,7 +182,7 @@ export async function bankPage(db: SupabaseClient, orgId: string, reportingCurre
       id: r.id, statementId: r.statement_id, account: accountName.get(r.account_id) ?? "", date: r.date, direction: r.direction,
       amount: Number(r.amount), currency: r.currency, description: r.description, counterparty: r.counterparty,
       status: r.status, matchedBy: r.matched_by, handledVia: r.handled_via, note: r.handled_note, personalReason: r.personal_reason,
-      ownNote: r.note, linkedTo, proposal: todo ? proposalOf.get(r.id) ?? null : null,
+      ownNote: r.note, setAside: todo && !!r.set_aside_at, linkedTo, proposal: todo ? proposalOf.get(r.id) ?? null : null,
       guesses: todo ? guessLine(openById.get(r.id)!, openLines, around, stays, reportingCurrency).map(viewOf) : [],
       template, known: todo ? knownFor(r) : null,
     };

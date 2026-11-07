@@ -1,12 +1,12 @@
 "use client";
 
-import { AlertTriangle, ArrowLeftRight, BedDouble, Check, ChevronDown, Copy, FileText, FolderInput, Landmark, Link2, StickyNote, Undo2, UserRound } from "lucide-react";
+import { AlertTriangle, Archive, ArchiveRestore, ArrowLeftRight, BedDouble, Check, ChevronDown, Copy, FileText, FolderInput, Landmark, Link2, StickyNote, Undo2, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import {
   acceptAllSure, addStatement, askSply, bookCharges, cancelTogether, createFromLine, decide, findEntries, findStays, linkLine, linkStay,
-  linkWithLines, markPersonal, matchAgain, resetLine, saveNote, type EntryCandidate, type FullEntry, type Result, type StayOption,
+  linkWithLines, markPersonal, matchAgain, resetLine, saveNote, setAside, type EntryCandidate, type FullEntry, type Result, type StayOption,
 } from "@/app/(app)/bank/actions";
 import { isSure, oneChargePerStatement, proposalLabel, type ProposalView } from "@/lib/bank/accountant/render";
 import { money } from "@/components/overview/format";
@@ -55,7 +55,8 @@ function useAction() {
 
 export function BankView(props: Props) {
   const { statements, lines } = props;
-  const todo = lines.filter((l) => l.status === "unmatched");
+  const todo = lines.filter((l) => l.status === "unmatched" && !l.setAside);
+  const aside = lines.filter((l) => l.status === "unmatched" && l.setAside);
   const matched = lines.filter((l) => l.status === "matched");
   const personal = lines.filter((l) => l.status === "personal");
 
@@ -66,7 +67,7 @@ export function BankView(props: Props) {
           <Highlight
             className="col-span-2" label="At the bank, not in your books" icon={<Landmark size={16} />}
             value={String(todo.length)} unit={todo.length === 1 ? "line" : "lines"}
-            note={`${matched.length} matched · ${personal.length} personal`}
+            note={`${matched.length} matched · ${personal.length} personal${aside.length ? ` · ${aside.length} set aside` : ""}`}
           />
           <MiniStat label="Statements" value={String(statements.length)} />
           <MiniStat label="Airbnb payouts on their way" value={String(props.expected.length + props.unpaid.length)} />
@@ -90,6 +91,16 @@ export function BankView(props: Props) {
             ? <p className="card p-4 text-sm text-zinc-500">Nothing left: every line is in your books or marked personal.</p>
             : <div className="card divide-y divide-zinc-100 dark:divide-zinc-800">{todo.map((l) => <TodoLine key={l.id} line={l} {...props} />)}</div>}
         </section>
+      )}
+
+      {aside.length > 0 && (
+        <details className="group">
+          <summary className="cursor-pointer text-lg font-semibold marker:text-zinc-400">
+            Set aside <span className="text-zinc-400">· {aside.length}</span>
+            <span className="ml-2 text-sm font-normal text-zinc-500">not in your books, out of the way until you come back to them</span>
+          </summary>
+          <div className="card mt-3 divide-y divide-zinc-100 dark:divide-zinc-800">{aside.map((l) => <TodoLine key={l.id} line={l} {...props} />)}</div>
+        </details>
       )}
 
       <Payouts expected={props.expected} unpaid={props.unpaid} />
@@ -411,6 +422,10 @@ function TodoLine({ line, villas, categories, reportingCurrency }: { line: BankL
             <StickyNote size={13} /> Note
           </button>
         )}
+        <button className={`${small} border-transparent text-zinc-500`} disabled={pending} onClick={() => go(() => setAside(line.id, !line.setAside))}
+          title={line.setAside ? "Back in the list of lines to do" : "Out of the list for now: nothing is booked, Sply leaves it alone; add a note to say why"}>
+          {line.setAside ? <><ArchiveRestore size={13} /> Back to the list</> : <><Archive size={13} /> Set aside</>}
+        </button>
       </div>
       {more && (
         <ul className="ml-20 flex flex-col divide-y divide-zinc-100 rounded-lg border border-zinc-200 max-sm:ml-0 dark:divide-zinc-800 dark:border-zinc-800">

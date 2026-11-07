@@ -31,7 +31,8 @@ async function receiptsToReview(s: Session) {
 }
 
 async function linesToDo(s: Session, from?: string, to?: string) {
-  let q = s.db.from("bank_lines").select("id", { count: "exact", head: true }).eq("organization_id", s.org.id).eq("status", "unmatched");
+  let q = s.db.from("bank_lines").select("id", { count: "exact", head: true }).eq("organization_id", s.org.id).eq("status", "unmatched")
+    .is("set_aside_at", null); // set aside by the owner: not to do
   if (from && to) q = q.gte("date", from).lte("date", to);
   const { count } = await q;
   return count ?? 0;

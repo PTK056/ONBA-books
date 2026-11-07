@@ -133,6 +133,19 @@ select pg_temp.expect((select status from bank_proposals where id = pg_temp.id('
   and pg_temp.status('y_in') = 'unmatched', 'declining one declines the set, and the lines stay to do');
 select public.bank_run_finish(pg_temp.id('run'), 4, null, null, null);
 
+-- ------------------------------------------------------------------ set aside (migration bank_set_aside)
+insert into ids values ('aside', pg_temp.line('aside', 'out', 820500));
+update bank_lines set set_aside_at = now() where id = pg_temp.id('aside');
+select pg_temp.expect((select status = 'unmatched' and set_aside_at is not null from bank_lines where id = pg_temp.id('aside')),
+  'a line set aside stays out of the books (still unmatched)');
+select public.bank_line_personal(pg_temp.id('aside'), 'private_expense');
+select pg_temp.expect((select set_aside_at is null from bank_lines where id = pg_temp.id('aside')), 'once handled, it is no longer set aside');
+select public.bank_line_reset(pg_temp.id('aside'));
+select pg_temp.expect((select status = 'unmatched' and set_aside_at is null from bank_lines where id = pg_temp.id('aside')),
+  'put back, it is in the list to do again');
+update bank_lines set set_aside_at = now() where id = pg_temp.id('sent');
+select pg_temp.expect((select set_aside_at is null from bank_lines where id = pg_temp.id('sent')), 'a handled line cannot be set aside');
+
 -- ------------------------------------------------------------------ who may
 insert into memberships (organization_id, user_id, role) values (pg_temp.id('org'), '00000000-0000-0000-0000-0000000000a1', 'staff');
 insert into ids values ('s1', pg_temp.line('s1', 'out', 5000)), ('s2', pg_temp.line('s2', 'in', 5000));
