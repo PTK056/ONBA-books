@@ -15,13 +15,18 @@ export function Pulse({ p, currency: cur, action, onSetGoal }: {
   p: PulseData; currency: string; action: string | null; onSetGoal: () => void;
 }) {
   const profit = p.result >= 0;
+  // Named inside the expenses: Airbnb's fees (the gap between gross and what is paid out) and the costs paid ahead.
+  const inside = [
+    p.platformFees ? `Airbnb fees ${fmt(p.platformFees, cur, true)}` : null,
+    p.prepaid.amount ? `${p.prepaid.names.join(", ")} ${fmt(p.prepaid.amount, cur, true)}` : null,
+  ].filter((x): x is string => !!x);
   const max = Math.max(p.income, p.expenses, 1);
   return (
     <div className="flex flex-col gap-4">
       <section className="card flex flex-col gap-5 p-6">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className="text-sm font-medium text-zinc-500">
-            {monthName(p.month)} · {profit ? "profit" : "loss"}{p.live ? " so far" : ""}
+            {monthName(p.month)} · net {profit ? "profit" : "loss"}{p.live ? " so far" : ""}
           </p>
           <p className="flex flex-wrap gap-2 text-xs">
             {p.vsLastMonth && <Delta label={`vs ${shortMonth(p.vsLastMonth.month)}`} diff={p.result - p.vsLastMonth.result} cur={cur} />}
@@ -29,16 +34,19 @@ export function Pulse({ p, currency: cur, action, onSetGoal }: {
           </p>
         </div>
 
-        <p className={`text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl ${profit ? "text-brand-700 dark:text-brand-300" : "text-rose-600 dark:text-rose-400"}`}>
-          {signed(p.result, cur)} <span className="text-base font-normal text-zinc-400">{cur}</span>
-        </p>
+        <div>
+          <p className={`text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl ${profit ? "text-brand-700 dark:text-brand-300" : "text-rose-600 dark:text-rose-400"}`}>
+            {signed(p.result, cur)} <span className="text-base font-normal text-zinc-400">{cur}</span>
+          </p>
+          <p className="mt-1 text-xs text-zinc-500">Net: gross revenue minus every expense, Airbnb fees included.</p>
+        </div>
 
         {/* In against out: the gap between the two bars is the result. */}
         <div className="viz-root flex flex-col gap-2 text-sm">
-          <Bar label="In" note="income" value={p.income} max={max} cur={cur} color="var(--series-income)" />
-          <Bar label="Out" note={p.prepaid.amount ? `expenses, of which ${p.prepaid.names.join(", ")} ${fmt(p.prepaid.amount, cur, true)}` : "expenses"}
+          <Bar label="In" note="gross revenue: what guests paid after discounts, before Airbnb fees" value={p.income} max={max} cur={cur} color="var(--series-income)" />
+          <Bar label="Out" note={`expenses${inside.length ? `, incl. ${inside.join(" and ")}` : ""}`}
             value={p.expenses} max={max} cur={cur} color="var(--series-expenses)" />
-          {p.margin !== null && <p className="text-xs text-zinc-500">{Math.round(p.margin * 100)}% of the income is left{p.live ? ", nights still to come included" : ""}.</p>}
+          {p.margin !== null && <p className="text-xs text-zinc-500">{Math.round(p.margin * 100)}% of the gross revenue is left as net{p.live ? ", nights still to come included" : ""}.</p>}
         </div>
       </section>
 
@@ -48,8 +56,8 @@ export function Pulse({ p, currency: cur, action, onSetGoal }: {
           : <Tile icon={<CalendarRange size={16} />} label="Occupancy" value={p.occupancy === null ? "—" : `${Math.round(p.occupancy * 100)}%`} note={monthName(p.month)} />}
         <Tile icon={<CalendarRange size={16} />} label="Next 30 days" value={p.next30.share === null ? "—" : `${Math.round(p.next30.share * 100)}% booked`}
           note={`${p.next30.booked} of ${p.next30.available} nights`} />
-        <Tile icon={<Moon size={16} />} label="Nightly rate" value={p.nightlyRate.now === null ? "—" : fmt(p.nightlyRate.now, cur, true)}
-          note={p.nightlyRate.now !== null && p.nightlyRate.before ? `${p.nightlyRate.now >= p.nightlyRate.before ? "↑" : "↓"} ${Math.abs(Math.round((p.nightlyRate.now / p.nightlyRate.before - 1) * 100))}% vs last month` : "before Airbnb fees"} />
+        <Tile icon={<Moon size={16} />} label="Nightly rate · gross" value={p.nightlyRate.now === null ? "—" : fmt(p.nightlyRate.now, cur, true)}
+          note={`before Airbnb fees${p.nightlyRate.now !== null && p.nightlyRate.before ? ` · ${p.nightlyRate.now >= p.nightlyRate.before ? "↑" : "↓"} ${Math.abs(Math.round((p.nightlyRate.now / p.nightlyRate.before - 1) * 100))}% vs last month` : ""}`} />
       </section>
 
       {(action || p.nextGap) && (

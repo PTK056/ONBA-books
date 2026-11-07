@@ -39,15 +39,15 @@ export function OverviewView({ data: o }: { data: Overview }) {
 
       {editor && <TodoBar o={o} monthName={monthName} />}
 
-      <Stat label="Net result" icon={<Wallet size={16} />} tint="emerald" value={o.totals.net} previous={o.previous.net} currency={cur} goodWhenUp featured
+      <Stat label="Net result · after every expense, Airbnb fees included" icon={<Wallet size={16} />} tint="emerald" value={o.totals.net} previous={o.previous.net} currency={cur} goodWhenUp featured
         note={[margin !== null ? `${Math.round(margin * 100)}% margin` : null, o.ahead.income ? "includes nights still to come" : null].filter(Boolean).join(" · ") || undefined} />
 
       <section className="-mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Income" icon={<TrendingUp size={16} />} tint="blue" value={o.totals.income} previous={o.previous.income} currency={cur} goodWhenUp
+        <Stat label="Income · gross" icon={<TrendingUp size={16} />} tint="blue" value={o.totals.income} previous={o.previous.income} currency={cur} goodWhenUp
           note={o.ahead.income ? `${money(o.ahead.income, cur)} still to come` : undefined} />
         <Stat label="Expenses" icon={<TrendingDown size={16} />} tint="orange" value={o.totals.expenses} previous={o.previous.expenses} currency={cur} goodWhenUp={false} />
         <OccupancyStat current={occ} previous={occPrev} ahead={o.ahead.nights} />
-        <Stat label="Nightly rate" icon={<Moon size={16} />} tint="violet" value={occ.adr ?? 0} previous={occPrev.adr ?? 0} currency={cur} goodWhenUp
+        <Stat label="Nightly rate · gross" icon={<Moon size={16} />} tint="violet" value={occ.adr ?? 0} previous={occPrev.adr ?? 0} currency={cur} goodWhenUp
           note={occ.booked ? `RevPAR ${money(occ.revpar, cur)}` : "No nights booked"} />
       </section>
 

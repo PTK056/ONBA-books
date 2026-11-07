@@ -8,9 +8,13 @@ export interface Pulse {
   month: string;
   /** The month is the current one: its figures still move (bookings to come, expenses to book). */
   live: boolean;
+  /** Gross: what guests paid after discounts, before the platforms' fees (and any other income). */
   income: number;
+  /** Every cost, the platforms' fees included. */
   expenses: number;
-  /** Income − expenses: positive, a profit; negative, a loss. */
+  /** The platforms' fees, inside `expenses`. */
+  platformFees: number;
+  /** Net: income − expenses. Positive, a profit; negative, a loss. */
   result: number;
   margin: number | null;
   /** Costs paid ahead and booked month by month (a lease), inside `expenses`. */
@@ -62,7 +66,7 @@ export function pulse(f: Facts, today: string): Pulse {
   const g = f.goals[0];
   return {
     month: f.month, live,
-    income: cur.income, expenses: cur.expenses, result: cur.result,
+    income: cur.income, expenses: cur.expenses, platformFees: cur.platformFees, result: cur.result,
     margin: cur.income ? cur.result / cur.income : null,
     prepaid: { names: f.prepaid.filter((n) => (cur.byCategory[n] ?? 0) > 0), amount: prepaidAmount },
     vsLastMonth: prev ? { month: prev.month, result: prev.result } : null,
