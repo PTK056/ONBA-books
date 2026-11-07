@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { SettingsForms } from "@/components/settings/SettingsForms";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { getCurrentOrg } from "@/lib/org";
-import { bankSettings } from "@/lib/settings";
+import { bankSettings, moduleOn } from "@/lib/settings";
 import { createClient } from "@/lib/supabase/server";
 
 export default function SettingsPage() {
@@ -22,10 +22,11 @@ async function Content() {
   if (org.kind === "signed_out") redirect("/login?next=/settings");
   if (org.kind === "none") redirect("/setup");
   if (org.role !== "admin" || !org.company) notFound();
-  const bank = await bankSettings(await createClient(), org.id);
+  const db = await createClient();
+  const [bank, bankOn] = await Promise.all([bankSettings(db, org.id), moduleOn(db, org.id, "bank")]);
   return (
     <SettingsForms
-      company={org.company.name} villas={org.villas} defaultCurrency={org.villas[0]?.currency ?? org.reportingCurrency} bank={bank}
+      company={org.company.name} villas={org.villas} defaultCurrency={org.villas[0]?.currency ?? org.reportingCurrency} bank={bank} bankOn={bankOn}
     />
   );
 }

@@ -2,6 +2,7 @@ import "server-only";
 import { APP_URL } from "@/lib/app-url";
 import { sendHtml, type Button } from "@/lib/channels/telegram";
 import { today, type Session } from "@/lib/mcp/session";
+import { moduleOn } from "@/lib/settings";
 import { closeData, closingText, coverage, monthEnd, monthName, previousMonth, weeklyText, type Scheduled } from "./closing";
 import { addNotes, notifyOpen } from "./notify";
 import { runAccountant } from "./run";
@@ -58,6 +59,8 @@ export async function runScheduled(
   s: Session, link: { id: string; chat: string }, what: Scheduled, pass: { timeoutMs: number } | null,
 ): Promise<boolean> {
   if (s.role !== "admin") return false;
+  // Bank reconciliation is an optional module: off, Sply Accountant does not write (the brief covers receipts and the close).
+  if (!(await moduleOn(s.db, s.org.id, "bank"))) return false;
   const day = today(s);
   const closing = what !== "weekly";
   const month = previousMonth(day);

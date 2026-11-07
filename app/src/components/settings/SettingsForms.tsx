@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { addVilla, renameCompany, renameVilla, saveBankSettings, type Result } from "@/app/(app)/settings/actions";
+import { addVilla, renameCompany, renameVilla, saveBankSettings, setModule, type Result } from "@/app/(app)/settings/actions";
 import type { BankSettings, Bearer } from "@/lib/settings";
 
 const field = "h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-brand-600 dark:border-zinc-700 dark:bg-zinc-900";
@@ -22,13 +22,40 @@ function useSave() {
 
 type Villa = { id: string; name: string; currency: string };
 
-export function SettingsForms({ company, villas, defaultCurrency, bank }: { company: string; villas: Villa[]; defaultCurrency: string; bank: BankSettings }) {
+export function SettingsForms({ company, villas, defaultCurrency, bank, bankOn }: {
+  company: string; villas: Villa[]; defaultCurrency: string; bank: BankSettings; bankOn: boolean;
+}) {
   return (
     <div className="flex flex-col gap-6">
       <Villas villas={villas} defaultCurrency={defaultCurrency} />
       <CompanyName name={company} />
-      <BankForm bank={bank} villaCount={villas.length} company={company} />
+      <BankModule on={bankOn} />
+      {bankOn && <BankForm bank={bank} villaCount={villas.length} company={company} />}
     </div>
+  );
+}
+
+/** The optional Bank module: off by default, out of the sidebar, Sply Accountant and the brief until turned on. */
+function BankModule({ on }: { on: boolean }) {
+  const { error, pending, save } = useSave();
+  return (
+    <section className="card flex flex-col gap-3 p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="font-semibold">Bank reconciliation <span className="ml-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-normal text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">optional</span></h2>
+          <p className="text-sm text-zinc-500">
+            Add your bank statements and check each line against your books, with Sply Accountant&apos;s help. Off, the Bank tab
+            and its messages are hidden; what was done is kept for when you turn it back on.
+          </p>
+        </div>
+        <button role="switch" aria-checked={on} disabled={pending} onClick={() => save(() => setModule("bank", !on))}
+          className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:opacity-50 ${on ? "bg-brand-600" : "bg-zinc-300 dark:bg-zinc-700"}`}>
+          <span className="sr-only">Bank reconciliation</span>
+          <span className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition ${on ? "left-5" : "left-0.5"}`} />
+        </button>
+      </div>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+    </section>
   );
 }
 

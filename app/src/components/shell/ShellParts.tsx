@@ -2,6 +2,7 @@ import { LogOut } from "lucide-react";
 import { connection } from "next/server";
 import { signOut } from "@/app/auth/signout/actions";
 import { getCurrentOrg, places, selectedPlace } from "@/lib/org";
+import { moduleOn } from "@/lib/settings";
 import { createClient } from "@/lib/supabase/server";
 
 import { PlaceSelect } from "./PlaceSelect";
@@ -10,9 +11,12 @@ import { Sidebar } from "./Sidebar";
 // Session-dependent pieces of the sidebar, each streamed behind its own Suspense boundary.
 
 /** The sidebar, with the admin-only pages when the user is an admin. */
-export async function SidebarForRole(props: Omit<React.ComponentProps<typeof Sidebar>, "admin">) {
+export async function SidebarForRole(props: Omit<React.ComponentProps<typeof Sidebar>, "admin" | "bank">) {
   const org = await getCurrentOrg();
-  return <Sidebar {...props} admin={org.kind === "member" && org.role === "admin"} />;
+  const admin = org.kind === "member" && org.role === "admin";
+  // The Bank tab only when the optional module is on.
+  const bank = admin && await moduleOn(await createClient(), org.id, "bank");
+  return <Sidebar {...props} admin={admin} bank={bank} />;
 }
 
 export async function OrgName() {

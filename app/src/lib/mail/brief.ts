@@ -2,6 +2,7 @@ import "server-only";
 import { APP_URL } from "@/lib/app-url";
 import { payoutsPage } from "@/lib/bank/data";
 import type { Session } from "@/lib/mcp/session";
+import { moduleOn } from "@/lib/settings";
 
 // The morning brief's Airbnb lines (docs/module-gmail-reservations.md §8). Never what the Airbnb app already
 // shows (new bookings, cancellations, payouts sent): only the books and the bank. Admins only.
@@ -55,11 +56,15 @@ export async function airbnbBrief(s: Session): Promise<AirbnbBrief | null> {
     }
   }
 
-  const { data: last } = await s.db.from("bank_lines").select("date").eq("organization_id", s.org.id)
-    .order("date", { ascending: false }).limit(1).maybeSingle();
-  const { expected } = await payoutsPage(s.db, s.org.id, last?.date ?? null);
-  const late = expected.filter((p) => p.state === "late")
-    .map((p) => ({ guest: p.guest, amount: p.received, currency: p.currency, due_by: p.arrivesBy }));
+  // Payouts late at the bank: only with the Bank module on (without statements, nothing can be "late").
+  let late: AirbnbBrief["late_payouts"] = [];
+  if (await moduleOn(s.db, s.org.id, "bank")) {
+    const { data: last } = await s.db.from("bank_lines").select("date").eq("organization_id", s.org.id)
+      .order("date", { ascending: false }).limit(1).maybeSingle();
+    const { expected } = await payoutsPage(s.db, s.org.id, last?.date ?? null);
+    late = expected.filter((p) => p.state === "late")
+      .map((p) => ({ guest: p.guest, amount: p.received, currency: p.currency, due_by: p.arrivesBy }));
+  }
 
   if (!inBooks.length && !late.length && !gmailProblem) return null;
   return {

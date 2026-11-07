@@ -4,6 +4,16 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // Organization settings: what differs from one client or one contract to another is a setting, never a code change.
 // Stored per module in module_activations.settings; anything missing takes the default below.
 
+/**
+ * Optional modules, off until an admin turns them on in Settings (no row = off). Bank reconciliation is one: useful to
+ * some, too much for most owners, so it stays out of the way.
+ */
+export type Module = "bank";
+export async function moduleOn(db: SupabaseClient, orgId: string, module: Module): Promise<boolean> {
+  const { data } = await db.from("module_activations").select("enabled").eq("organization_id", orgId).eq("module", module).maybeSingle();
+  return data?.enabled === true;
+}
+
 /** Who bears bank fees, and who gets bank interest: the company, or the villas in equal shares. */
 export type Bearer = "company" | "villas";
 export interface BankSettings { feesTo: Bearer; interestTo: Bearer }

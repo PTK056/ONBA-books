@@ -5,6 +5,7 @@ import { APP_URL } from "@/lib/channels/oauth";
 import { answerCallback, editHtml, sendMessage, type TgCallback, type TgMessage } from "@/lib/channels/telegram";
 import { transcriptionEnabled } from "@/lib/channels/transcribe";
 import { processChat, type Incoming } from "@/lib/channels/worker";
+import { moduleOn } from "@/lib/settings";
 import { adminClient } from "@/lib/supabase/admin";
 import { accessTokenFor } from "@/lib/channels/links";
 import { acceptSure, decideProposal } from "@/lib/bank/accountant/apply";
@@ -110,6 +111,9 @@ async function bankPass(link: { id: string; user_id: string }, chatId: string) {
   if (!token) return sendMessage(chatId, `Your Splyce connection has expired. Connect again: ${CONNECT}`);
   const session = await sessionFor(token, link.user_id);
   if (session.role !== "admin") return sendMessage(chatId, "Only admins of the organization can see the bank lines.");
+  if (!(await moduleOn(session.db, session.org.id, "bank"))) {
+    return sendMessage(chatId, `Bank reconciliation is off. Turn it on in Settings if you want it: ${APP_URL}/settings`);
+  }
   await sendMessage(chatId, "🧾 Sply Accountant is going through your bank lines…");
   const run = await runAccountant(session.db, session.org.id, { trigger: "chat" });
   if (run.runId && run.proposed) {

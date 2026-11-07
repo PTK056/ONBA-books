@@ -1,10 +1,11 @@
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
 import { Suspense } from "react";
 import { BankView } from "@/components/bank/BankView";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { bankPage } from "@/lib/bank/data";
 import { getCurrentOrg, places } from "@/lib/org";
-import { bankSettings, type Bearer } from "@/lib/settings";
+import { bankSettings, moduleOn, type Bearer } from "@/lib/settings";
 import { createClient } from "@/lib/supabase/server";
 
 // Reading a statement with Claude takes about half a minute; Sply Accountant's pass after it about as long.
@@ -29,6 +30,15 @@ async function Content() {
   if (org.kind === "signed_out") redirect("/login?next=/bank");
   if (org.kind === "none" || !org.villas.length) redirect("/setup");
   if (org.role !== "admin") notFound();
+  // The module is off: say where to turn it on, nothing else (a bookmark or an old link lands here).
+  if (!(await moduleOn(await createClient(), org.id, "bank"))) {
+    return (
+      <section className="card flex flex-col gap-2 p-6 text-sm">
+        <p className="font-medium">Bank reconciliation is off.</p>
+        <p className="text-zinc-500">It is an optional module: turn it on in <Link href="/settings" className="text-brand-700 underline dark:text-brand-400">Settings</Link> to add bank statements and check them against your books. Anything done before is kept.</p>
+      </section>
+    );
+  }
   const db = await createClient();
   const [data, { data: cats }, settings] = await Promise.all([
     bankPage(db, org.id, org.reportingCurrency),

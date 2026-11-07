@@ -27,8 +27,10 @@ interface Props {
   /** The villa chooser, under the organization (and in the top bar on small screens). */
   place?: React.ReactNode;
   placeCompact?: React.ReactNode;
-  /** Shows the admin-only pages (Bank, Connections, Settings). */
+  /** Shows the admin-only pages (Connections, Settings; Bank with its module). */
   admin?: boolean;
+  /** The optional Bank module is on. */
+  bank?: boolean;
 }
 
 /** Fixed sidebar on large screens; a compact top bar with tabs below that. */
@@ -41,10 +43,10 @@ export function Sidebar(props: Props) {
 }
 
 /** The same sidebar with no current page highlighted, shown while the path is resolved. */
-export function SidebarView({ org, reviewBadge, user, path, admin, place, placeCompact }: Props & { path: string | null }) {
+export function SidebarView({ org, reviewBadge, user, path, admin, bank, place, placeCompact }: Props & { path: string | null }) {
   const on = (href: string) => path !== null && (path === href || path.startsWith(`${href}/`));
   const active = (match: readonly string[]) => match.some(on);
-  const nav = NAV.filter((item) => admin || !("adminOnly" in item));
+  const nav = NAV.filter((item) => (admin || !("adminOnly" in item)) && (item.href !== "/bank" || bank));
   const setup = SETUP.filter(() => admin);
   const link = "group flex items-center gap-2.5 rounded-full px-3 py-2 text-sm text-white/70 [--icon-dot:var(--color-accent)] aria-[current=page]:[--icon-dot:currentColor] hover:bg-white/5 hover:text-white aria-[current=page]:bg-accent aria-[current=page]:font-semibold aria-[current=page]:text-sidebar";
 

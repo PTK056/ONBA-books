@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentOrg, places } from "@/lib/org";
-import type { BankSettings } from "@/lib/settings";
+import type { BankSettings, Module } from "@/lib/settings";
 import { createClient } from "@/lib/supabase/server";
 
 export type Result = { ok: true } | { ok: false; error: string };
@@ -20,6 +20,21 @@ export async function saveBankSettings(s: BankSettings): Promise<Result> {
   if (error) return { ok: false, error: "Could not save. Try again." };
   revalidatePath("/settings");
   revalidatePath("/bank");
+  return { ok: true };
+}
+
+/** Turns an optional module on or off (its data stays; turned back on, it is all there). */
+export async function setModule(module: Module, on: boolean): Promise<Result> {
+  const org = await getCurrentOrg();
+  if (org.kind !== "member" || org.role !== "admin") return { ok: false, error: "Only admins can change settings." };
+  if (module !== "bank") return { ok: false, error: "Unknown module." };
+  const db = await createClient();
+  const { error } = await db.from("module_activations").upsert(
+    { organization_id: org.id, module, enabled: on === true, updated_at: new Date().toISOString() },
+    { onConflict: "organization_id,module" },
+  );
+  if (error) return { ok: false, error: "Could not save. Try again." };
+  revalidatePath("/", "layout");
   return { ok: true };
 }
 
