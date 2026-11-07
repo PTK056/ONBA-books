@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { PerformanceView } from "@/components/performance/PerformanceView";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { addMonths, facts, goalPath, type Data, type Entry, type Goal } from "@/lib/performance/metrics";
+import { pulse } from "@/lib/performance/pulse";
 import type { ReportView } from "@/lib/performance/render";
 
 const V = "villa-1", C = "company";
@@ -53,7 +54,8 @@ const GOALS: Goal[] = [
 export default function PerformancePreview() {
   if (process.env.NODE_ENV !== "development") notFound();
   const data = books();
-  const month = "2026-10-01";
+  // Previewed as Performance opens: the current month, live (the report shown under Details is October's).
+  const month = "2026-11-01";
   const f = facts(data, month, "2026-11-05", "IDR");
   const view: ReportView = {
     month, facts: f, last: { total: 3, done: 2 },
@@ -74,8 +76,8 @@ export default function PerformancePreview() {
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-8">
       <PageHeader title="Performance" description="Preview with synthetic books." />
       <PerformanceView
-        month={month} months={["2026-10-01", "2026-09-01"]} closed report={{ status: "ready", error: null, updatedAt: "2026-11-10T08:00:00Z" }}
-        view={view} facts={f} done={{ a2: false }}
+        month={month} months={["2026-11-01", "2026-10-01", "2026-09-01"]} closed={false} report={null}
+        view={view} facts={f} pulse={pulse(f, "2026-11-05")} done={{ a2: false }}
         paths={Object.fromEntries(GOALS.map((g) => [g.id, goalPath(g, data, month)]))}
         goals={GOALS}
         blocks={[{ id: "b1", villaId: V, start: "2026-10-20", end: "2026-10-29", reason: "owner", note: "Our own stay" }]}

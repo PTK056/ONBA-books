@@ -5,6 +5,7 @@ import { PeriodSwitch } from "@/components/overview/PeriodSwitch";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { getCurrentOrg } from "@/lib/org";
 import { addMonths, facts as liveFacts, goalPath, monthOf } from "@/lib/performance/metrics";
+import { pulse } from "@/lib/performance/pulse";
 import { loadData, loadOrg, reportView, todayIn } from "@/lib/performance/report";
 import { createClient } from "@/lib/supabase/server";
 
@@ -47,9 +48,10 @@ async function Content({ searchParams }: Pick<PageProps<"/performance">, "search
   for (const c of closes ?? []) closedCount.set(c.month, (closedCount.get(c.month) ?? 0) + 1);
   const closedMonths = [...closedCount].filter(([, n]) => n >= placeCount).map(([m]) => m).sort().reverse();
 
-  const months = [...new Set([...closedMonths, ...(reports ?? []).map((r) => r.month as string), addMonths(monthOf(today), -1)])].sort().reverse();
+  // The current month first: Performance is read every day, live; closed months and their reports behind ‹.
+  const months = [...new Set([...closedMonths, ...(reports ?? []).map((r) => r.month as string), addMonths(monthOf(today), -1), monthOf(today)])].sort().reverse();
   const wanted = typeof asked === "string" && /^\d{4}-\d{2}$/.test(asked) ? `${asked}-01` : null;
-  const month = wanted && months.includes(wanted) ? wanted : (reports?.find((r) => r.status === "ready")?.month as string | undefined) ?? closedMonths[0] ?? months[0];
+  const month = wanted && months.includes(wanted) ? wanted : monthOf(today);
 
   const report = (reports ?? []).find((r) => r.month === month) ?? null;
   const view = report && report.status !== "running" ? await reportView(db, org.id, report.id) : null;
@@ -68,6 +70,7 @@ async function Content({ searchParams }: Pick<PageProps<"/performance">, "search
       report={report ? { status: report.status, error: report.error, updatedAt: report.updated_at } : null}
       view={view}
       facts={f}
+      pulse={pulse(f, today)}
       done={done}
       // The goals as the report saw them (a goal edited or removed since keeps its chart under its own figures).
       paths={Object.fromEntries(f.goals.map((g) => [g.id, goalPath({

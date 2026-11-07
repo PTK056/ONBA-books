@@ -6,7 +6,9 @@ import { acceptAction, dismissAction, writeReport } from "@/app/(app)/performanc
 import { money as fmt } from "@/components/overview/format";
 import type { Facts, Goal, GoalPath } from "@/lib/performance/metrics";
 import type { ReportView } from "@/lib/performance/render";
+import type { Pulse as PulseData } from "@/lib/performance/pulse";
 import { Figures } from "./Figures";
+import { Pulse } from "./Pulse";
 import { GoalPanel } from "./GoalPanel";
 import { Blocks, Goals, type BlockRow } from "./Settings";
 import { day, good, monthName, neutral, primary, secondary, useAction } from "./ui";
@@ -18,6 +20,8 @@ interface Props {
   report: { status: string; error: string | null; updatedAt: string } | null;
   view: ReportView | null;
   facts: Facts;
+  /** The top of the page: the month at a glance, live. */
+  pulse: PulseData;
   done: Record<string, boolean>;
   /** By goal id. */
   paths: Record<string, GoalPath>;
@@ -30,8 +34,8 @@ interface Props {
 }
 
 /**
- * The Performance tab, in the order it is read: the verdict (the month, then the goal as needed against made),
- * what to do, the four figures, the next 60 days, then the detail and the settings folded away.
+ * The Performance tab: at a glance first (the month's profit or loss, in against out, what is left to sell, one thing to
+ * do, the goal in one line), live for the current month; the report, the charts and the calendar folded under Details.
  */
 export function PerformanceView(p: Props) {
   const f = p.facts;
@@ -39,29 +43,33 @@ export function PerformanceView(p: Props) {
   const fees = f.prepaid.length ? f.prepaid.join(", ") : null;
   const [settings, setSettings] = useState(p.goals.length === 0);
 
+  const openSettings = () => { setSettings(true); setTimeout(() => document.getElementById("settings")?.scrollIntoView({ behavior: "smooth" }), 0); };
+  // The report's first action still to do, when the month has a report; otherwise the pulse says what to sell first.
+  const action = p.view?.actions.find((a) => a.status !== "dismissed" && !p.done[a.id])?.title ?? null;
+
   return (
     <div className="flex flex-col gap-6">
       <MonthNav {...p} />
 
-      {(analysis || f.goals.length > 0) ? (
-        <section className="card flex flex-col gap-5 p-6">
-          {analysis && <p className="text-lg font-semibold leading-snug sm:text-xl">{analysis.headline}</p>}
-          {f.goals.length > 0 && <GoalPanel f={f} paths={p.paths} places={p.places} fees={fees} />}
-        </section>
-      ) : (
-        <section className="card flex flex-wrap items-center justify-between gap-3 p-5 text-sm">
-          <span>Set a goal (for example, break even by a date) and Sply tells you each month what it takes.</span>
-          <button className={primary} onClick={() => { setSettings(true); document.getElementById("settings")?.scrollIntoView({ behavior: "smooth" }); }}>Set a goal</button>
-        </section>
-      )}
+      <Pulse p={p.pulse} currency={f.currency} action={action} onSetGoal={openSettings} />
 
-      {p.view && p.view.actions.length > 0 && <Actions view={p.view} done={p.done} currency={f.currency} />}
-
-      <Figures f={f} fees={fees} />
-
-      <Calendar f={f} />
-
-      <Detail f={f} analysis={analysis} />
+      <details className="group card p-5">
+        <summary className="cursor-pointer select-none font-semibold marker:text-zinc-400">
+          Details <span className="font-normal text-zinc-500">· {analysis ? "the month's report, " : ""}month by month, the next 60 days{f.goals.length ? ", the goals" : ""}</span>
+        </summary>
+        <div className="mt-5 flex flex-col gap-6">
+          {(analysis || f.goals.length > 0) && (
+            <section className="flex flex-col gap-5">
+              {analysis && <p className="text-lg font-semibold leading-snug sm:text-xl">{analysis.headline}</p>}
+              {f.goals.length > 0 && <GoalPanel f={f} paths={p.paths} places={p.places} fees={fees} />}
+            </section>
+          )}
+          {p.view && p.view.actions.length > 0 && <Actions view={p.view} done={p.done} currency={f.currency} />}
+          <Figures f={f} fees={fees} />
+          <Calendar f={f} />
+          <Detail f={f} analysis={analysis} />
+        </div>
+      </details>
 
       <details id="settings" className="card p-5" open={settings} onToggle={(e) => setSettings(e.currentTarget.open)}>
         <summary className="cursor-pointer select-none font-semibold">Settings: goals and blocked nights</summary>
