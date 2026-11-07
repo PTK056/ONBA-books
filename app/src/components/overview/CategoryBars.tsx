@@ -3,6 +3,7 @@ import { money } from "./format";
 import "./chart.css";
 
 const ABOVE_AVERAGE = 1.2; // flag a category 20% above its usual month
+const pct = (x: number) => `${(x * 100).toFixed(1).replace(/\.0$/, "")}%`;
 
 /** Expenses of the month by category: amount, share, and how it compares with a usual month. */
 export function CategoryBars({ categories, currency }: { categories: CategoryLine[]; currency: string }) {
@@ -22,7 +23,14 @@ export function CategoryBars({ categories, currency }: { categories: CategoryLin
               <span className="shrink-0 tabular-nums">{money(c.amount, currency)}</span>
             </div>
             <div className="h-2 rounded-r" style={{ width: `${Math.max(2, (c.amount / max) * 100)}%`, background: "var(--series-expenses)" }} />
-            {vsAverage !== null && vsAverage >= ABOVE_AVERAGE && (
+            {c.ofStayIncome ? (
+              // Platform fees follow the bookings: their share of stay income is what tells something.
+              c.ofStayIncome.now >= c.ofStayIncome.usual * ABOVE_AVERAGE
+                ? <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                    ▲ {pct(c.ofStayIncome.now)} of stay income, usually {pct(c.ofStayIncome.usual)}
+                  </p>
+                : <p className="mt-1 text-xs text-zinc-500">{pct(c.ofStayIncome.now)} of stay income</p>
+            ) : vsAverage !== null && vsAverage >= ABOVE_AVERAGE && (
               <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
                 ▲ {Math.round((vsAverage - 1) * 100)}% above a usual month ({money(c.monthlyAverage, currency)})
               </p>

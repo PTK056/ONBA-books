@@ -40,12 +40,13 @@ export function OverviewView({ data: o }: { data: Overview }) {
       {editor && <TodoBar o={o} monthName={monthName} />}
 
       <Stat label="Net result" icon={<Wallet size={16} />} tint="emerald" value={o.totals.net} previous={o.previous.net} currency={cur} goodWhenUp featured
-        note={margin !== null ? `${Math.round(margin * 100)}% margin` : undefined} />
+        note={[margin !== null ? `${Math.round(margin * 100)}% margin` : null, o.ahead.income ? "includes nights still to come" : null].filter(Boolean).join(" · ") || undefined} />
 
       <section className="-mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Income" icon={<TrendingUp size={16} />} tint="blue" value={o.totals.income} previous={o.previous.income} currency={cur} goodWhenUp />
+        <Stat label="Income" icon={<TrendingUp size={16} />} tint="blue" value={o.totals.income} previous={o.previous.income} currency={cur} goodWhenUp
+          note={o.ahead.income ? `${money(o.ahead.income, cur)} still to come` : undefined} />
         <Stat label="Expenses" icon={<TrendingDown size={16} />} tint="orange" value={o.totals.expenses} previous={o.previous.expenses} currency={cur} goodWhenUp={false} />
-        <OccupancyStat current={occ} previous={occPrev} />
+        <OccupancyStat current={occ} previous={occPrev} ahead={o.ahead.nights} />
         <Stat label="Nightly rate" icon={<Moon size={16} />} tint="violet" value={occ.adr ?? 0} previous={occPrev.adr ?? 0} currency={cur} goodWhenUp
           note={occ.booked ? `RevPAR ${money(occ.revpar, cur)}` : "No nights booked"} />
       </section>
@@ -156,11 +157,20 @@ function TodoLink({ href, children }: { href: string; children: React.ReactNode 
   );
 }
 
+/**
+ * The month's stays in the same terms as the Income tile: revenue (what guests paid after discounts). Airbnb's fees are
+ * among the expenses; what is left after them is said once, in the header.
+ */
 function StaysList({ stays, currency, showVilla }: { stays: Overview["stays"]; currency: string; showVilla: boolean }) {
-  const total = stays.reduce((s, x) => s + x.net, 0);
+  const revenue = stays.reduce((s, x) => s + x.revenue, 0);
+  const net = stays.reduce((s, x) => s + x.net, 0);
   const nights = stays.reduce((s, x) => s + x.nightsInMonth, 0);
   return (
-    <Panel title={`Stays · ${stays.length}`} action={stays.length > 0 && <span className="text-xs text-zinc-500">{nights} nights · net {money(total, currency)}</span>}>
+    <Panel title={`Stays · ${stays.length}`} action={stays.length > 0 && (
+      <span className="text-right text-xs text-zinc-500" title="Revenue: what guests paid after discounts. After fees: what the platforms pay out.">
+        {nights} nights · {money(revenue, currency)} revenue · {money(net, currency)} after platform fees
+      </span>
+    )}>
       {stays.length === 0 ? (
         <p className="text-sm text-zinc-500">No stays this month.</p>
       ) : (
@@ -172,7 +182,10 @@ function StaysList({ stays, currency, showVilla }: { stays: Overview["stays"]; c
                 <span className="block truncate font-medium">{x.guest ?? x.code}{x.upcoming && <span className="ml-2 text-xs font-normal">upcoming</span>}</span>
                 <span className="block text-xs text-zinc-500">{shortDate(x.checkIn)} – {shortDate(x.checkOut)} · {x.nightsInMonth} night{x.nightsInMonth === 1 ? "" : "s"} this month{showVilla && ` · ${x.villa}`}</span>
               </span>
-              <span className="shrink-0 tabular-nums">{money(x.net, currency)}</span>
+              <span className="shrink-0 text-right tabular-nums" title={`Revenue ${money(x.revenue, currency)} − platform fees ${money(x.fees, currency)} = ${money(x.net, currency)}`}>
+                {money(x.revenue, currency)}
+                {x.fees > 0 && <span className="block text-xs text-zinc-500">{money(x.net, currency)} after fees</span>}
+              </span>
             </li>
           ))}
         </ul>
@@ -276,7 +289,7 @@ function StatementLinks({ villas, month }: { villas: Overview["villas"]; month: 
   );
 }
 
-function OccupancyStat({ current, previous }: { current: Overview["occupancy"][number]; previous: Overview["occupancy"][number] }) {
+function OccupancyStat({ current, previous, ahead }: { current: Overview["occupancy"][number]; previous: Overview["occupancy"][number]; ahead: number }) {
   const points = previous.available ? Math.round((current.occupancy - previous.occupancy) * 100) : null;
   return (
     <div className="card p-5">
@@ -292,6 +305,7 @@ function OccupancyStat({ current, previous }: { current: Overview["occupancy"][n
       </div>
       <p className="mt-2 text-xs text-zinc-400">
         {points === null ? "No figures last month" : `${points >= 0 ? "+" : "−"}${Math.abs(points)} pts vs last month`}
+        {ahead > 0 && <span className="text-zinc-500"> · {ahead} still to come</span>}
       </p>
     </div>
   );

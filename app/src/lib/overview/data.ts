@@ -42,6 +42,11 @@ export interface CategoryLine {
   count: number;
   share: number;          // of the month's expenses, 0..1
   monthlyAverage: number; // over the months before this one that had expenses in the window
+  /**
+   * Costs that follow the stays (Airbnb's host fees): what they usually are as a share of stay income, compared with
+   * this month's. Their amount grows with the bookings, so only a higher share is worth a flag. null for other costs.
+   */
+  ofStayIncome?: { now: number; usual: number } | null;
 }
 
 export interface VillaMonth {
@@ -67,7 +72,9 @@ export interface MonthStay {
   checkIn: string;
   checkOut: string;
   nightsInMonth: number;
-  net: number;               // this month's share, reporting currency
+  revenue: number;           // this month's share of what the guest paid after discounts (the stay's turnover)
+  fees: number;              // this month's share of the platform's fees
+  net: number;               // revenue − fees, reporting currency
   upcoming: boolean;         // arrives after today
 }
 
@@ -90,6 +97,8 @@ export interface Overview {
   missingEvidence: { id: string; date: string; description: string | null; amount: number; currency: string }[];
   toReview: number;
   toRead: number;
+  /** In the month shown, what is booked for the days after today: counted in the figures, not happened yet. */
+  ahead: { income: number; expenses: number; nights: number };
 }
 
 export type OverviewResult =
@@ -126,13 +135,14 @@ export async function loadOverview(requested?: string): Promise<OverviewResult> 
   const { org, scope } = await scopedOrg(full);
   const db = await createClient();
 
+  const { data: tz } = await db.from("organizations").select("timezone").eq("id", org.id).single();
+  const today = todayIn(tz?.timezone ?? "UTC");
   let month: Date;
   if (requested && /^\d{4}-\d{2}$/.test(requested)) {
     month = new Date(`${requested}-01T00:00:00Z`);
   } else {
     // Not the latest month with entries: prepaid costs (a lease spread ahead) would open a future month.
-    const { data: o } = await db.from("organizations").select("timezone").eq("id", org.id).single();
-    month = new Date(`${todayIn(o?.timezone ?? "UTC").slice(0, 7)}-01T00:00:00Z`);
+    month = new Date(`${today.slice(0, 7)}-01T00:00:00Z`);
   }
   const from = iso(month);
   const to = iso(addMonths(month, 1));
@@ -230,17 +240,43 @@ export async function loadOverview(requested?: string): Promise<OverviewResult> 
   const expenses = monthRows.filter((r) => r.direction === "out");
   const pastMonthsWithExpenses = trend.slice(0, -1).filter((t) => t.expenses > 0).map((t) => t.month);
 
+  // Categories booked only with stays (Airbnb's host fees) grow with the bookings: compared as a share of the income of
+  // the stays that carry them (a direct booking has none). The usual share is the median of the last 3 months that had
+  // some: it follows a change of the platform's terms (Airbnb went from ~3% to 15.5% + VAT for hosts in 2026) instead of
+  // flagging every month after it.
+  const withStays = new Set<string>(), alone = new Set<string>();
+  const staysWith = new Map<string, Set<string>>(); // category -> stays carrying it
+  for (const r of rows) {
+    if (r.direction !== "out") continue;
+    const name = r.category?.name ?? "Uncategorized";
+    (r.source === "stay" ? withStays : alone).add(name);
+    if (r.source === "stay" && r.stay_id) staysWith.set(name, (staysWith.get(name) ?? new Set()).add(r.stay_id));
+  }
+  const incomeOf = (stayIds: Set<string>, m: string) => rows
+    .filter((r) => r.direction === "in" && r.source === "stay" && r.stay_id && stayIds.has(r.stay_id) && r.date.startsWith(m.slice(0, 7)))
+    .reduce((s, r) => s + Number(r.amount_reporting), 0);
+  const median = (xs: number[]) => { const v = [...xs].sort((a, b) => a - b); return v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2; };
   const categories: CategoryLine[] = [];
   for (const [name, perMonth] of catByMonth) {
     const amount = perMonth.get(from) ?? 0;
     if (!amount) continue;
     const past = pastMonthsWithExpenses.map((m) => perMonth.get(m) ?? 0);
+    let ofStayIncome: CategoryLine["ofStayIncome"] = null;
+    const carrying = staysWith.get(name);
+    const income = carrying ? incomeOf(carrying, from) : 0;
+    if (withStays.has(name) && !alone.has(name) && carrying && income) {
+      const shares = trend.slice(0, -1).map((t) => t.month).reverse()
+        .map((m) => ({ fees: perMonth.get(m) ?? 0, income: incomeOf(carrying, m) }))
+        .filter((x) => x.fees > 0 && x.income > 0).slice(0, 3).map((x) => x.fees / x.income);
+      ofStayIncome = { now: amount / income, usual: shares.length ? median(shares) : amount / income };
+    }
     categories.push({
       name,
       amount,
       count: expenses.filter((r) => (r.category?.name ?? "Uncategorized") === name).length,
       share: totals.expenses ? amount / totals.expenses : 0,
       monthlyAverage: past.length ? past.reduce((s, x) => s + x, 0) / past.length : 0,
+      ofStayIncome,
     });
   }
   categories.sort((a, b) => b.amount - a.amount);
@@ -268,7 +304,7 @@ export async function loadOverview(requested?: string): Promise<OverviewResult> 
     data: {
       org: { id: org.id, name: org.name, reportingCurrency: org.reportingCurrency, role: org.role, fiscalYearStart: fyStart },
       month: from,
-      monthEnded: from < `${new Date().toISOString().slice(0, 7)}-01`,
+      monthEnded: from < `${today.slice(0, 7)}-01`,
       trend,
       totals,
       previous,
@@ -276,7 +312,6 @@ export async function loadOverview(requested?: string): Promise<OverviewResult> 
       categories,
       merchants: [...merchants].map(([name, m]) => ({ name, ...m })).sort((a, b) => b.amount - a.amount).slice(0, 6),
       stays: (() => {
-        const today = new Date().toISOString().slice(0, 10);
         const DAY = 86_400_000;
         const by = new Map<string, MonthStay>();
         for (const r of monthRows) {
@@ -289,9 +324,10 @@ export async function loadOverview(requested?: string): Promise<OverviewResult> 
             guest: st.guest_name?.split(/\s+/)[0] ?? null, villa: villaName.get(r.villa_id) ?? "",
             checkIn: st.check_in, checkOut: st.check_out,
             nightsInMonth: Math.max(0, Math.round((inEnd - inStart) / DAY)),
-            net: 0, upcoming: st.check_in > today,
+            revenue: 0, fees: 0, net: 0, upcoming: st.check_in > today,
           };
-          m.net += (r.direction === "in" ? 1 : -1) * Number(r.amount_reporting);
+          if (r.direction === "in") m.revenue += Number(r.amount_reporting); else m.fees += Number(r.amount_reporting);
+          m.net = m.revenue - m.fees;
           by.set(r.stay_id, m);
         }
         return [...by.values()].sort((a, b) => a.checkIn.localeCompare(b.checkIn));
@@ -333,6 +369,22 @@ export async function loadOverview(requested?: string): Promise<OverviewResult> 
       missingEvidence: (missing.data ?? []).map((m) => ({ ...m, amount: Number(m.amount) })),
       toReview: toReview.count ?? 0,
       toRead: toRead.count ?? 0,
+      // Stay income and fees are booked night by night: those dated after today are nights still to come.
+      ahead: {
+        income: monthRows.filter((r) => r.date > today && r.direction === "in").reduce((s, r) => s + Number(r.amount_reporting), 0),
+        expenses: monthRows.filter((r) => r.date > today && r.direction === "out" && r.source === "stay").reduce((s, r) => s + Number(r.amount_reporting), 0),
+        nights: (() => {
+          let n = 0;
+          for (const st of stays.data ?? []) {
+            if (Number(st.net_amount) <= REFUNDED_SHARE * Number(st.gross_amount)) continue;
+            for (let d = Date.parse(`${st.check_in}T00:00:00Z`); d < Date.parse(`${st.check_out}T00:00:00Z`); d += 86_400_000) {
+              const day = new Date(d).toISOString().slice(0, 10);
+              if (day > today && day >= from && day < to) n++;
+            }
+          }
+          return n;
+        })(),
+      },
     },
   };
 }
