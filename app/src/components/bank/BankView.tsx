@@ -1,14 +1,18 @@
 "use client";
 
-import { AlertTriangle, BedDouble, Check, ChevronDown, Copy, FileText, Landmark, Link2, Search, Undo2, UserRound } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, BedDouble, Check, ChevronDown, Copy, FileText, FolderInput, Landmark, Link2, StickyNote, Undo2, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { acceptAllSure, addStatement, askSply, bookCharges, createFromLine, decide, findEntries, linkLine, linkStay, markPersonal, matchAgain, resetLine, type EntryCandidate, type FullEntry, type Result } from "@/app/(app)/bank/actions";
+import {
+  acceptAllSure, addStatement, askSply, bookCharges, cancelTogether, createFromLine, decide, findEntries, findStays, linkLine, linkStay,
+  linkWithLines, markPersonal, matchAgain, resetLine, saveNote, type EntryCandidate, type FullEntry, type Result, type StayOption,
+} from "@/app/(app)/bank/actions";
 import { isSure, oneChargePerStatement, proposalLabel, type ProposalView } from "@/lib/bank/accountant/render";
 import { money } from "@/components/overview/format";
 import { Highlight, MiniStat } from "@/components/shell/Highlight";
-import type { BankLineRow, BankStatementRow, ExpectedPayout, UnpaidStay } from "@/lib/bank/data";
+import type { BankLineRow, BankStatementRow, ExpectedPayout, GuessView, UnpaidStay } from "@/lib/bank/data";
+import type { PersonalReason } from "@/lib/bank/handle";
 import { shortDate } from "@/lib/format/date";
 import { createClient } from "@/lib/supabase/client";
 
@@ -299,38 +303,65 @@ function Amount({ line }: { line: BankLineRow }) {
   );
 }
 
+const PERSONAL_REASONS: Record<"in" | "out", { value: PersonalReason; label: string }[]> = {
+  out: [
+    { value: "owner_transfer", label: "Paid to the owner" }, { value: "private_expense", label: "Private spending" },
+    { value: "internal_transfer", label: "To another own account" },
+  ],
+  in: [{ value: "owner_contribution", label: "Money from the owner" }, { value: "internal_transfer", label: "From another own account" }],
+};
+
+type Choice = { key: string; title: string; run: () => void; label: React.ReactNode; why?: string; score?: number };
+
+/** One guess as a button: what the line is, and why in small print. */
+function choiceOf(g: GuessView, line: BankLineRow, go: ReturnType<typeof useAction>["go"]): Choice {
+  const base = { key: `${g.kind}:${g.kind === "cancel" ? g.lineIds.join(",") : g.id}`, why: g.reasons.join(" · "), score: g.score };
+  if (g.kind === "entry") {
+    const fee = g.withLines.reduce((n, x) => n + x.amount, 0);
+    return {
+      ...base,
+      title: g.withLines.length ? "This line and its Wise fee are that entry" : g.part ? "This line is one more payment of that entry" : "This line is that entry",
+      run: () => go(() => (g.withLines.length
+        ? linkWithLines([line.id, ...g.withLines.map((x) => x.id)], g.id)
+        : linkLine(line.id, g.id, g.part))),
+      label: <><Link2 size={13} /> {g.part ? "One more payment of " : ""}{shortDate(g.date)} {g.label}
+        {fee > 0 && <span className="text-zinc-500"> (with its fee, {money(fee, line.currency)})</span>}</>,
+    };
+  }
+  if (g.kind === "stay") {
+    return {
+      ...base, title: "This transfer pays this stay (deposit, balance or extension); its income is already in the books",
+      run: () => go(() => linkStay(line.id, g.id)),
+      label: <><BedDouble size={13} /> Pays the stay of {g.guest ?? g.platform}, {shortDate(g.checkIn)} → {shortDate(g.checkOut)}</>,
+    };
+  }
+  const other = g.others.find((o) => o.direction !== line.direction) ?? g.others[0];
+  return {
+    ...base, title: "The money went out and came back: these lines cancel out, nothing goes in the books",
+    run: () => go(() => cancelTogether(g.lineIds, line.direction === "out" ? "Came back" : "Sent back")),
+    label: <><ArrowLeftRight size={13} /> Cancels out with {other.direction === "in" ? "+" : "−"}{money(other.amount, line.currency)} of {shortDate(other.date)}
+      {g.lineIds.length > 2 && <span className="text-zinc-500"> (and its fee)</span>}</>,
+  };
+}
+
 function TodoLine({ line, villas, categories, reportingCurrency }: { line: BankLineRow } & Props) {
-  const [open, setOpen] = useState<"add" | "find" | null>(null);
+  const [filing, setFiling] = useState(false);
+  const [noting, setNoting] = useState(false);
   const [more, setMore] = useState(false);
   const { error, pending, go } = useAction();
-  const kind = line.direction === "in" ? "income" : "expense";
 
-  function submit(form: FormData) {
-    const get = (k: string) => String(form.get(k) ?? "");
-    go(() => createFromLine(line.id, {
-      villaId: get("villa") || villas[0].id, categoryId: get("category") || null,
-      description: get("description"), fxRate: Number(get("fx")) || null,
-    }), () => setOpen(null));
-  }
-
-  const toggle = (what: "add" | "find") => setOpen((o) => (o === what ? null : what));
-  // What the line most likely is, best guess first: only that one shows, the rest wait behind "More".
-  const suggested: { key: string; title: string; run: () => void; label: React.ReactNode }[] = [
-    ...line.suggestions.map((s) => ({
-      key: s.id, title: "This line is that entry", run: () => go(() => linkLine(line.id, s.id)),
-      label: <><Link2 size={13} /> {shortDate(s.date)} {s.category ?? ""} {s.description && `· ${s.description}`}</>,
-    })),
-    ...line.stays.map((x) => ({
-      key: x.id, title: "This transfer pays this stay (deposit, balance or extension); its income is already in the books",
-      run: () => go(() => linkStay(line.id, x.id)),
-      label: <><BedDouble size={13} /> Pays the stay of {x.guest ?? x.platform}, {shortDate(x.checkIn)} → {shortDate(x.checkOut)}</>,
-    })),
+  // Strong guesses first, then how this payee was booked before, then the weaker guesses.
+  const guesses = line.guesses.map((g) => choiceOf(g, line, go));
+  const strong = guesses.filter((_, i) => line.guesses[i].first);
+  const weak = guesses.filter((_, i) => !line.guesses[i].first);
+  const like: Choice[] = [
     ...(line.known ? [{
       key: "known", title: `Booked like the last ${line.known.uses > 1 ? `${line.known.uses} payments` : "payment"} to this payee`,
       run: () => go(() => createFromLine(line.id, {
         villaId: line.known!.villaId, categoryId: line.known!.categoryId, description: line.known!.description ?? "", fxRate: null,
       })),
       label: <><Copy size={13} /> Like last time: {[line.known.category, line.known.villa, line.known.description].filter(Boolean).join(" · ")}</>,
+      why: `how this payee was booked ${line.known.uses > 1 ? `the last ${line.known.uses} times` : "last time"}`,
     }] : []),
     ...(line.template && !line.known ? [{
       key: "template", title: `Same villa, category and description as the entry of ${shortDate(line.template.fromDate)}`,
@@ -338,11 +369,13 @@ function TodoLine({ line, villas, categories, reportingCurrency }: { line: BankL
         villaId: line.template!.villaId, categoryId: line.template!.categoryId, description: line.template!.description, fxRate: null,
       })),
       label: <><Copy size={13} /> Like {monthName(line.template.fromDate)}: {[line.template.category, line.template.description].filter(Boolean).join(" · ")}</>,
+      why: `same amount as the entry of ${shortDate(line.template.fromDate)}, a month apart`,
     }] : []),
   ];
-  const suggestion = (x: (typeof suggested)[number], className: string) => (
-    <button key={x.key} className={className} disabled={pending} onClick={x.run} title={x.title}>{x.label}</button>
-  );
+  const all = [...strong, ...like, ...weak];
+  // The one-click button only for a guess strong enough (or the payee's usual booking); the rest behind "Other guesses".
+  const first = strong[0] ?? like[0] ?? null;
+  const others = all.filter((c) => c !== first);
 
   return (
     <div className="flex flex-col gap-2 p-4 text-sm">
@@ -354,30 +387,100 @@ function TodoLine({ line, villas, categories, reportingCurrency }: { line: BankL
       {line.counterparty && line.description !== line.counterparty && (
         <p className="truncate pl-20 text-xs text-zinc-500 max-sm:pl-0">{line.description}</p>
       )}
+      {line.ownNote && !noting && <OwnNote line={line} onEdit={() => setNoting(true)} />}
+      {noting && <NoteEditor line={line} onClose={() => setNoting(false)} />}
       {line.proposal && <Proposal p={line.proposal} />}
+      {first && (
+        <div className="flex flex-col gap-0.5 pl-20 max-sm:pl-0">
+          <span><button className={main} disabled={pending} onClick={first.run} title={first.title}>{first.label}</button></span>
+          {first.why && <span className="text-xs text-zinc-500"><Score c={first} />{first.why}</span>}
+        </div>
+      )}
       <div className="flex flex-wrap gap-2 pl-20 max-sm:pl-0">
-        {suggested[0] && suggestion(suggested[0], main)}
-        {!suggested.length && <button className={main} disabled={pending} onClick={() => toggle("add")}>Add to the books</button>}
-        {more && suggested.slice(1).map((x) => suggestion(x, small))}
-        {more && (
-          <>
-            <button className={small} disabled={pending} onClick={() => toggle("find")}
-              title="Already in the books with another amount or date: link this line to it instead of adding it twice">
-              <Search size={13} /> Already in the books
-            </button>
-            {suggested.length > 0 && <button className={small} disabled={pending} onClick={() => toggle("add")}>Add to the books</button>}
-            <button className={small} disabled={pending} onClick={() => go(() => markPersonal(line.id))}>
-              <UserRound size={13} /> Personal
-            </button>
-          </>
+        {others.length > 0 && (
+          <button className={small} onClick={() => setMore((m) => !m)} aria-expanded={more}>
+            Other guesses ({others.length}) <ChevronDown size={13} className={more ? "rotate-180" : ""} />
+          </button>
         )}
-        <button className={`${small} border-transparent text-zinc-500`} onClick={() => setMore((m) => !m)} aria-expanded={more}>
-          {more ? "Less" : "More"} <ChevronDown size={13} className={more ? "rotate-180" : ""} />
+        <button className={first ? small : main} onClick={() => setFiling((f) => !f)} aria-expanded={filing}
+          title="Say yourself what this line is: an entry in the books, a stay, a new entry, personal">
+          <FolderInput size={13} /> File it myself
         </button>
+        {!line.ownNote && !noting && (
+          <button className={`${small} border-transparent text-zinc-500`} onClick={() => setNoting(true)}>
+            <StickyNote size={13} /> Note
+          </button>
+        )}
       </div>
-      {open === "find" && <FindEntry line={line} />}
-      {open === "add" && (
-        <form action={submit} className="flex flex-wrap items-end gap-2 pl-20 max-sm:pl-0">
+      {more && (
+        <ul className="ml-20 flex flex-col divide-y divide-zinc-100 rounded-lg border border-zinc-200 max-sm:ml-0 dark:divide-zinc-800 dark:border-zinc-800">
+          {others.map((c) => (
+            <li key={c.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+              <span className="min-w-0 flex-1">
+                <span className="block">{c.label}</span>
+                {c.why && <span className="block text-xs text-zinc-500"><Score c={c} />{c.why}</span>}
+              </span>
+              <button className={small} disabled={pending} onClick={c.run} title={c.title}><Check size={13} /> This</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {filing && <FilePanel line={line} villas={villas} categories={categories} reportingCurrency={reportingCurrency} onDone={() => setFiling(false)} />}
+      {error && <p className="pl-20 text-red-600 max-sm:pl-0">{error}</p>}
+    </div>
+  );
+}
+
+/** How likely a guess is, as a percentage; nothing for the payee's usual booking. */
+function Score({ c }: { c: Choice }) {
+  if (c.score === undefined) return null;
+  const pct = Math.round(c.score * 100);
+  return <span className={`mr-1.5 font-medium tabular-nums ${pct >= 80 ? "text-brand-700 dark:text-brand-400" : ""}`}>{pct}%</span>;
+}
+
+/**
+ * Filing a line by hand: what it is (an entry already in the books, a stay, a new entry, personal) and a note kept
+ * with it. Every choice goes through the same checked actions as the guesses.
+ */
+function FilePanel({ line, villas, categories, reportingCurrency, onDone }: {
+  line: BankLineRow; villas: Option[]; categories: (Option & { kind: "income" | "expense" })[]; reportingCurrency: string; onDone: () => void;
+}) {
+  const tabs = [
+    { key: "entry", label: "In the books already" },
+    ...(line.direction === "in" ? [{ key: "stay", label: "Pays a stay" }] : []),
+    { key: "add", label: "Add to the books" },
+    { key: "personal", label: "Personal" },
+  ] as const;
+  const [tab, setTab] = useState<(typeof tabs)[number]["key"]>("entry");
+  const [note, setNote] = useState("");
+  const [reason, setReason] = useState<PersonalReason | "">("");
+  const { error, pending, go } = useAction();
+  const kind = line.direction === "in" ? "income" : "expense";
+
+  function submit(form: FormData) {
+    const get = (k: string) => String(form.get(k) ?? "");
+    go(() => createFromLine(line.id, {
+      villaId: get("villa") || villas[0].id, categoryId: get("category") || null,
+      description: get("description"), fxRate: Number(get("fx")) || null, note,
+    }), onDone);
+  }
+
+  return (
+    <div className="ml-20 flex flex-col gap-3 rounded-lg border border-zinc-200 p-3 max-sm:ml-0 dark:border-zinc-800">
+      <div className="flex flex-wrap gap-1" role="tablist">
+        {tabs.map((t) => (
+          <button key={t.key} role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}
+            className={`h-8 rounded-md px-2.5 text-xs ${tab === t.key ? "bg-brand-600 text-white" : "border border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <input className={`${field} w-full`} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500}
+        placeholder="Note, kept with the line (optional)" aria-label="Note" />
+      {tab === "entry" && <FindEntry line={line} note={note} onDone={onDone} />}
+      {tab === "stay" && <FindStay line={line} note={note} onDone={onDone} />}
+      {tab === "add" && (
+        <form action={submit} className="flex flex-wrap items-end gap-2">
           {villas.length > 1 && (
             <select name="villa" required className={field} aria-label="Villa" defaultValue={line.known?.villaId ?? (villas.length === 2 ? villas[0].id : "")}>
               <option value="" disabled>Villa…</option>
@@ -395,8 +498,86 @@ function TodoLine({ line, villas, categories, reportingCurrency }: { line: BankL
           <button className={primary} disabled={pending}>Save</button>
         </form>
       )}
-      {error && <p className="pl-20 text-red-600 max-sm:pl-0">{error}</p>}
+      {tab === "personal" && (
+        <div className="flex flex-wrap items-center gap-2">
+          <select className={field} value={reason} onChange={(e) => setReason(e.target.value as PersonalReason | "")} aria-label="Why it is not in the books">
+            <option value="">Why? (optional)</option>
+            {PERSONAL_REASONS[line.direction].map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
+          <button className={primary} disabled={pending} onClick={() => go(() => markPersonal(line.id, reason || null, note), onDone)}>
+            <UserRound size={14} className="mr-1 inline" /> Not in the books
+          </button>
+        </div>
+      )}
+      {error && <p className="text-red-600">{error}</p>}
     </div>
+  );
+}
+
+/** The stays this transfer could pay, by guest name or the closest arrivals. */
+function FindStay({ line, note, onDone }: { line: BankLineRow; note: string; onDone: () => void }) {
+  const [search, setSearch] = useState("");
+  const [stays, setStays] = useState<StayOption[] | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const { error, pending, go } = useAction();
+
+  useEffect(() => {
+    let live = true;
+    const t = setTimeout(async () => {
+      const r = await findStays(line.id, search);
+      if (!live) return;
+      if (r.ok) { setStays(r.stays); setFailed(null); } else setFailed(r.error);
+    }, search ? 300 : 0);
+    return () => { live = false; clearTimeout(t); };
+  }, [line.id, search]);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <input className={`${field} max-w-sm`} value={search} onChange={(e) => setSearch(e.target.value)} autoFocus
+        placeholder="Guest name or booking code (optional)" aria-label="Search the stays" />
+      {stays === null && !failed && <p className="text-xs text-zinc-500">Looking…</p>}
+      {stays?.length === 0 && <p className="text-xs text-zinc-500">No stay found{search ? " with that name" : " around this date"}.</p>}
+      {stays && stays.length > 0 && (
+        <ul className="flex flex-col divide-y divide-zinc-100 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+          {stays.map((x) => (
+            <li key={x.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+              <span className="min-w-0 flex-1 truncate">
+                {x.guest ?? "Guest"} · {shortDate(x.checkIn)} → {shortDate(x.checkOut)}
+                <span className="text-xs text-zinc-500"> · {x.platform}{x.reference ? ` ${x.reference}` : ""}</span>
+              </span>
+              <button className={small} disabled={pending} onClick={() => go(() => linkStay(line.id, x.id, note), onDone)}>
+                <BedDouble size={13} /> Pays this stay
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {(failed || error) && <p className="text-red-600">{failed ?? error}</p>}
+    </div>
+  );
+}
+
+/** The owner's note on a line, with a way to change it. */
+function OwnNote({ line, onEdit }: { line: BankLineRow; onEdit: () => void }) {
+  return (
+    <button onClick={onEdit} title="Change the note"
+      className="ml-20 flex items-start gap-1.5 self-start rounded-md bg-amber-50 px-2 py-1 text-left text-xs text-amber-900 hover:bg-amber-100 max-sm:ml-0 dark:bg-amber-950/40 dark:text-amber-200">
+      <StickyNote size={12} className="mt-0.5 shrink-0" /> {line.ownNote}
+    </button>
+  );
+}
+
+function NoteEditor({ line, onClose }: { line: BankLineRow; onClose: () => void }) {
+  const [text, setText] = useState(line.ownNote ?? "");
+  const { error, pending, go } = useAction();
+  return (
+    <form className="ml-20 flex flex-wrap items-center gap-2 max-sm:ml-0" action={() => go(() => saveNote(line.id, text), onClose)}>
+      <input className={`${field} min-w-48 flex-1`} value={text} onChange={(e) => setText(e.target.value)} maxLength={500} autoFocus
+        placeholder="What this line is, what to check…" aria-label="Note" />
+      <button className={primary} disabled={pending}>Save</button>
+      <button type="button" className={secondary} onClick={onClose}>Cancel</button>
+      {error && <p className="w-full text-xs text-red-600">{error}</p>}
+    </form>
   );
 }
 
@@ -404,7 +585,7 @@ function TodoLine({ line, villas, categories, reportingCurrency }: { line: BankL
  * Search the books for the entry this line pays, when no suggestion came up; the closest amounts first. An entry
  * other lines already pay in part (a purchase paid in several transfers) shows what is left; this line joins it.
  */
-function FindEntry({ line }: { line: BankLineRow }) {
+function FindEntry({ line, note, onDone }: { line: BankLineRow; note: string; onDone: () => void }) {
   const [search, setSearch] = useState("");
   const [entries, setEntries] = useState<EntryCandidate[] | null>(null);
   const [full, setFull] = useState<FullEntry[]>([]);
@@ -422,7 +603,7 @@ function FindEntry({ line }: { line: BankLineRow }) {
   }, [line.id, search]);
 
   return (
-    <div className="flex flex-col gap-2 pl-20 max-sm:pl-0">
+    <div className="flex flex-col gap-2">
       <input className={`${field} max-w-sm`} value={search} onChange={(e) => setSearch(e.target.value)} autoFocus
         placeholder="Search a description (optional)" aria-label="Search the books" />
       {entries === null && !failed && <p className="text-xs text-zinc-500">Looking…</p>}
@@ -454,7 +635,7 @@ function FindEntry({ line }: { line: BankLineRow }) {
                   {money(e.amount, e.currency)} <span className="text-xs text-zinc-400">{e.currency}</span>
                   {gap !== 0 && <span className="ml-1 text-xs text-amber-700 dark:text-amber-400">({gap > 0 ? "+" : "−"}{money(Math.abs(gap), line.currency)})</span>}
                 </span>
-                <button className={small} disabled={pending} onClick={() => go(() => linkLine(line.id, e.id, !!e.paidBy))}
+                <button className={small} disabled={pending} onClick={() => go(() => linkLine(line.id, e.id, !!e.paidBy, note), onDone)}
                   title={e.paidBy ? "This line is one more payment of that entry" : "This line is that entry"}>
                   <Link2 size={13} /> {e.paidBy ? "One of its payments" : "This one"}
                 </button>
@@ -470,38 +651,53 @@ function FindEntry({ line }: { line: BankLineRow }) {
 
 const REASONS: Record<string, string> = {
   owner_transfer: "owner transfer", owner_contribution: "owner contribution", private_expense: "private expense", internal_transfer: "between own accounts",
+  returned: "sent back, cancels out",
 };
 
 function Done({ title, lines }: { title: string; lines: BankLineRow[] }) {
-  const { pending, go } = useAction();
   return (
     <details className="group">
       <summary className="cursor-pointer text-lg font-semibold marker:text-zinc-400">
         {title} <span className="text-zinc-400">· {lines.length}</span>
       </summary>
       <div className="card mt-3 divide-y divide-zinc-100 dark:divide-zinc-800">
-        {lines.map((l) => (
-          <div key={l.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 p-3 text-sm">
-            <span className="w-16 tabular-nums text-zinc-500">{shortDate(l.date)}</span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate">
-                {l.counterparty ?? l.description}
-                {l.linkedTo && <span className="text-zinc-500"> → {l.linkedTo}{l.matchedBy === "auto" ? " (auto)" : ""}</span>}
-                {l.personalReason && <span className="text-zinc-500"> · {REASONS[l.personalReason] ?? l.personalReason}</span>}
-              </span>
-              {l.handledVia === "agent" && (
-                <span className="block truncate text-xs text-zinc-500" title={l.note ?? undefined}>
-                  By the assistant{l.note ? `: ${l.note}` : ""}
-                </span>
-              )}
-            </span>
-            <Amount line={l} />
-            <button className={small} disabled={pending} onClick={() => go(() => resetLine(l.id))} title="Put back in the list">
-              <Undo2 size={13} />
-            </button>
-          </div>
-        ))}
+        {lines.map((l) => <DoneLine key={l.id} l={l} />)}
       </div>
     </details>
+  );
+}
+
+function DoneLine({ l }: { l: BankLineRow }) {
+  const [noting, setNoting] = useState(false);
+  const { pending, go } = useAction();
+  return (
+    <div className="flex flex-col gap-1.5 p-3 text-sm">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span className="w-16 tabular-nums text-zinc-500">{shortDate(l.date)}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate">
+            {l.counterparty ?? l.description}
+            {l.linkedTo && <span className="text-zinc-500"> → {l.linkedTo}{l.matchedBy === "auto" ? " (auto)" : ""}</span>}
+            {l.personalReason && <span className="text-zinc-500"> · {REASONS[l.personalReason] ?? l.personalReason}</span>}
+          </span>
+          {l.note && (
+            <span className="block truncate text-xs text-zinc-500" title={l.note}>
+              {l.handledVia === "agent" ? `By the assistant: ${l.note}` : l.note}
+            </span>
+          )}
+        </span>
+        <Amount line={l} />
+        {!l.ownNote && !noting && (
+          <button className={`${small} border-transparent text-zinc-500`} onClick={() => setNoting(true)} title="Add a note">
+            <StickyNote size={13} />
+          </button>
+        )}
+        <button className={small} disabled={pending} onClick={() => go(() => resetLine(l.id))} title="Put back in the list">
+          <Undo2 size={13} />
+        </button>
+      </div>
+      {l.ownNote && !noting && <OwnNote line={l} onEdit={() => setNoting(true)} />}
+      {noting && <NoteEditor line={l} onClose={() => setNoting(false)} />}
+    </div>
   );
 }

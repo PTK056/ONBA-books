@@ -45,7 +45,8 @@ export async function buildDossiers(db: SupabaseClient, org: AccountantOrg, line
     const batch = await Promise.all(lines.slice(i, i + 5).map(async (l, j): Promise<Dossier> => {
       const line = { date: l.date, direction: l.direction, amount: Number(l.amount), currency: l.currency, counterparty: l.counterparty, description: l.description };
       const [entries, stays] = await Promise.all([
-        entryCandidates(db, org.id, org.reportingCurrency, line, { windowDays: 10, tolerancePct: 3, limit: 5 }),
+        // Within 5%, booked up to 45 days before (a bill paid late) or 10 after.
+        entryCandidates(db, org.id, org.reportingCurrency, line, { windowDays: 10, beforeDays: 45, tolerancePct: 5, limit: 6 }),
         stayCandidates(db, org.id, line),
       ]);
       const usual = known(l);

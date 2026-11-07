@@ -103,6 +103,10 @@ le signale avec un bouton : « Airbnb Support wrote about HM2BER4THH (Emil). Can
 S'il manque un seul élément attendu, l'e-mail est **non reconnu** : journal + alerte dans le brief de Sply.
 Un modèle inconnu venant d'`automated@airbnb.com` est simplement journalisé (Airbnb en envoie beaucoup).
 
+> 06/11/2026 : Airbnb envoie aussi la confirmation sans « €X x N nights » ni « N nights room fee » (une ligne « Accommodation »,
+> puis « Total Stay Price »). Les deux formats sont lus ; les nuits viennent alors des dates, et le bloc versement doit toujours
+> tomber juste au centime.
+
 ## 4. Deux e-mails, deux devises
 **Confirmation (devise de l'annonce, ex. EUR)** : guest Beck, HMR55K89B9, 30/10 → 6/11, 7 nuits.
 Brut = 670.00 − 56.95 − 100.50 = **512.55**, frais Airbnb **87.40**, net **425.15 EUR**. Le séjour compte tout de suite

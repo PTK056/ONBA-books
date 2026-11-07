@@ -4,7 +4,7 @@ import { bookStatementCharges } from "@/lib/bank/book-charges";
 import { entryCandidates, nearestRate, RATE_MAX_AGE_DAYS, stayCandidates, staysFit, whereIn } from "@/lib/bank/candidates";
 import { CHARGE } from "@/lib/bank/charges";
 import { payeeMemory } from "@/lib/bank/data";
-import { BankError, bookLine, linkEntry, linkStays, markLinePersonal, resetLine, type PersonalReason } from "@/lib/bank/handle";
+import { BankError, bookLine, cancelLines, linkEntry, linkStays, markLinePersonal, resetLine, type PersonalReason } from "@/lib/bank/handle";
 import { learnPayees, shift } from "@/lib/bank/ops";
 import { payoutStates } from "@/lib/bank/payouts";
 import { APP_URL as APP } from "@/lib/app-url";
@@ -50,6 +50,7 @@ function stateOf(l: LineRow): string {
   if (l.status === "unmatched") return "still in the list";
   const via = l.handled_via ?? (l.matched_by === "auto" ? "auto" : null);
   const by = via ? ` ${BY[via]}` : "";
+  if (l.status === "personal" && l.personal_reason === "returned") return `set aside: it cancels out with money sent back${by}`;
   if (l.status === "personal") return `marked personal${l.personal_reason ? ` (${l.personal_reason})` : ""}${by}`;
   return `${l.matched_by === "created" ? "added to the books" : "linked"}${by}: ${linkedTo(l) ?? "an entry"}`;
 }
@@ -327,6 +328,24 @@ export function defineBank(server: Registrar) {
     mustBeOpen(l);
     await write(s, l.id, () => markLinePersonal(s.db, l.id, a.reason, "agent", a.note));
     return { status: "personal", line: { date: l.date, direction: l.direction, amount: num(l.amount), currency: l.currency, counterparty: l.counterparty }, reason: a.reason, undo: "unmatch_bank_line" };
+  }));
+
+  server.registerTool("cancel_bank_lines", {
+    title: "Set aside bank lines that cancel out",
+    description:
+      "For money that went out and came back (a transfer the bank sent back, a deposit refunded): 2 to 10 lines still in the list, money "
+      + "out and money in, one currency, that add up to exactly zero (with a Wise fee refunded too, include the fee line). They are set "
+      + "aside together, nothing is booked. Refused if they do not cancel out to the cent.",
+    inputSchema: z.object({ bank_line_ids: z.array(UUID).min(2).max(10), note: NOTE }),
+  }, (async (s, a: { bank_line_ids: string[]; note?: string }) => {
+    requireAdmin(s);
+    const lines = await Promise.all(a.bank_line_ids.map((id) => loadLine(s, id)));
+    lines.forEach(mustBeOpen);
+    await write(s, lines[0].id, () => cancelLines(s.db, lines.map((l) => l.id), "agent", a.note), false);
+    return {
+      status: "set_aside", lines: lines.map((l) => ({ date: l.date, direction: l.direction, amount: num(l.amount), currency: l.currency, counterparty: l.counterparty })),
+      undo: "unmatch_bank_line, for each line",
+    };
   }));
 
   server.registerTool("book_bank_charges", {

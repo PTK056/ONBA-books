@@ -52,10 +52,22 @@ export async function linkStays(db: SupabaseClient, lineId: string, stayIds: str
   });
 }
 
-export type PersonalReason = "owner_transfer" | "owner_contribution" | "private_expense" | "internal_transfer";
+export type PersonalReason = "owner_transfer" | "owner_contribution" | "private_expense" | "internal_transfer" | "returned";
 
 export async function markLinePersonal(db: SupabaseClient, lineId: string, reason: PersonalReason | null, via: Via, note?: string | null): Promise<void> {
   await call(db, "bank_line_personal", { p_line: lineId, p_reason: reason, p_via: via, p_note: note ?? null });
+}
+
+/** Several lines that together are exactly one entry no line pays yet (a Wise transfer and its fee): all or none. */
+export async function linkLinesToEntry(db: SupabaseClient, lineIds: string[], transactionId: string, via: Via, note?: string | null): Promise<void> {
+  await call(db, "bank_lines_link_entry", {
+    p_lines: lineIds, p_transaction: transactionId, p_by: via === "auto" ? "auto" : "manual", p_via: via, p_note: note ?? null,
+  });
+}
+
+/** Lines that cancel each other out (a transfer sent back): set aside together, nothing booked. */
+export async function cancelLines(db: SupabaseClient, lineIds: string[], via: Via, note?: string | null): Promise<void> {
+  await call(db, "bank_lines_cancel", { p_lines: lineIds, p_via: via, p_note: note ?? null });
 }
 
 export interface Undone { was: "matched" | "personal"; transaction_id: string | null; matched_by: string | null; entry_deleted: boolean }

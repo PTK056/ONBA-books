@@ -156,6 +156,8 @@ export function days(a: string, b: string): number {
 const COMMON = new Set([
   "wise", "fee", "fees", "transfer", "transfert", "card", "carte", "received", "top", "money", "sent", "via", "payment", "bank",
   "the", "and", "for", "from", "pt", "cv", "tbk", "toko", "badung", "kab", "denpasar", "bali",
+  // Indonesian banks' fixed wording, on every line of a statement.
+  "trsf", "banking", "ftscy", "bifast", "skn", "rtgs", "biaya", "adm", "pcm", "kami", "sendiri", "kliring", "transaksi",
   "i", "ni", "wayan", "made", "nyoman", "ketut", "putu", "kadek", "komang", "gede", "gusti", "ayu", "desak", "luh", "ngurah", "anak", "agung",
 ]);
 

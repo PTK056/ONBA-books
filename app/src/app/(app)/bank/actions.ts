@@ -7,7 +7,7 @@ import { acceptSure, decideProposal } from "@/lib/bank/accountant/apply";
 import { refreshTelegram, notifyRun, runTitle } from "@/lib/bank/accountant/notify";
 import { runAccountant } from "@/lib/bank/accountant/run";
 import { bookStatementCharges } from "@/lib/bank/book-charges";
-import { BankError, bookLine, linkEntry, linkStays, markLinePersonal, resetLine as reset } from "@/lib/bank/handle";
+import { BankError, bookLine, cancelLines, linkEntry, linkLinesToEntry, linkStays, markLinePersonal, resetLine as reset, type PersonalReason } from "@/lib/bank/handle";
 import { whereIn } from "@/lib/bank/candidates";
 import { autoMatch, ingestStatement, learnPayees, shift } from "@/lib/bank/ops";
 import { readStatementPdf, StatementError } from "@/lib/bank/statement-pdf";
@@ -39,6 +39,20 @@ function failure(e: unknown): string {
 async function ours(db: Awaited<ReturnType<typeof createClient>>, orgId: string, lineId: string): Promise<boolean> {
   const { data } = await db.from("bank_lines").select("id").eq("id", lineId).eq("organization_id", orgId).maybeSingle();
   return !!data;
+}
+
+/** A note typed by the user: trimmed, at most 500 characters, null when empty. */
+function noteOf(note: unknown): string | null {
+  return typeof note === "string" ? note.replace(/\s+/g, " ").trim().slice(0, 500) || null : null;
+}
+
+/** Whether all these lines belong to the organization (2 to 10 of them). */
+async function allOurs(db: Awaited<ReturnType<typeof createClient>>, orgId: string, lineIds: unknown): Promise<string[] | null> {
+  if (!Array.isArray(lineIds)) return null;
+  const ids = [...new Set(lineIds)];
+  if (ids.length < 2 || ids.length > 10 || !ids.every((x) => typeof x === "string" && UUID.test(x))) return null;
+  const { data } = await db.from("bank_lines").select("id").eq("organization_id", orgId).in("id", ids);
+  return data?.length === ids.length ? ids : null;
 }
 
 function done(message?: string): Result {
@@ -117,7 +131,9 @@ export async function matchAgain(): Promise<Result> {
 }
 
 /** Books a line that is at the bank but not in the books. */
-export async function createFromLine(lineId: string, input: { villaId: string; categoryId: string | null; description: string; fxRate: number | null }): Promise<Result> {
+export async function createFromLine(
+  lineId: string, input: { villaId: string; categoryId: string | null; description: string; fxRate: number | null; note?: string | null },
+): Promise<Result> {
   const org = await admin();
   if (!org || !UUID.test(lineId)) return { ok: false, error: "Not allowed." };
   if (!places(org).some((v) => v.id === input.villaId)) return { ok: false, error: "Choose a villa." };
@@ -129,7 +145,9 @@ export async function createFromLine(lineId: string, input: { villaId: string; c
   if (!fx || !(fx > 0)) return { ok: false, error: `Enter the ${line.currency} → ${org.reportingCurrency} rate.` };
 
   try {
-    await bookLine(db, lineId, { villaId: input.villaId, categoryId: input.categoryId, description: input.description, fxRate: fx, via: "app" });
+    await bookLine(db, lineId, {
+      villaId: input.villaId, categoryId: input.categoryId, description: input.description, fxRate: fx, via: "app", note: noteOf(input.note),
+    });
   } catch (e) {
     return { ok: false, error: failure(e) };
   }
@@ -155,15 +173,14 @@ export async function bookCharges(statementId: string): Promise<Result> {
   }
 }
 
-/** Links a line to an entry already in the books, chosen by the user. */
 /** Links a line to an entry; with part, as one more payment of an entry other lines already pay (never more than it). */
-export async function linkLine(lineId: string, transactionId: string, part = false): Promise<Result> {
+export async function linkLine(lineId: string, transactionId: string, part = false, note: string | null = null): Promise<Result> {
   const org = await admin();
   if (!org || !UUID.test(lineId) || !UUID.test(transactionId)) return { ok: false, error: "Not allowed." };
   const db = await createClient();
   if (!(await ours(db, org.id, lineId))) return { ok: false, error: "Not allowed." };
   try {
-    await linkEntry(db, lineId, transactionId, "app", null, false, part === true);
+    await linkEntry(db, lineId, transactionId, "app", noteOf(note), false, part === true);
   } catch (e) {
     return { ok: false, error: failure(e) };
   }
@@ -246,30 +263,103 @@ export async function findEntries(lineId: string, search: string): Promise<
 }
 
 /** Links an incoming transfer to the stay it pays (a deposit, the balance, an extension); the income is already booked. */
-export async function linkStay(lineId: string, stayId: string): Promise<Result> {
+export async function linkStay(lineId: string, stayId: string, note: string | null = null): Promise<Result> {
   const org = await admin();
   if (!org || !UUID.test(lineId) || !UUID.test(stayId)) return { ok: false, error: "Not allowed." };
   const db = await createClient();
   if (!(await ours(db, org.id, lineId))) return { ok: false, error: "Not allowed." };
   try {
-    await linkStays(db, lineId, [stayId], "app");
+    await linkStays(db, lineId, [stayId], "app", noteOf(note));
   } catch (e) {
     return { ok: false, error: failure(e) };
   }
   return done();
 }
 
-export async function markPersonal(lineId: string): Promise<Result> {
+/** A line and other lines (its Wise fee) that together are exactly one entry: linked together, or not at all. */
+export async function linkWithLines(lineIds: string[], transactionId: string, note: string | null = null): Promise<Result> {
   const org = await admin();
-  if (!org || !UUID.test(lineId)) return { ok: false, error: "Not allowed." };
+  if (!org || !UUID.test(transactionId)) return { ok: false, error: "Not allowed." };
   const db = await createClient();
-  if (!(await ours(db, org.id, lineId))) return { ok: false, error: "Not allowed." };
+  const ids = await allOurs(db, org.id, lineIds);
+  if (!ids) return { ok: false, error: "Not allowed." };
   try {
-    await markLinePersonal(db, lineId, null, "app");
+    await linkLinesToEntry(db, ids, transactionId, "app", noteOf(note));
+  } catch (e) {
+    return { ok: false, error: failure(e) };
+  }
+  await learnPayees(db, org.id);
+  return done();
+}
+
+/** Lines that cancel each other out (a transfer sent back): set aside together, nothing booked. */
+export async function cancelTogether(lineIds: string[], note: string | null = null): Promise<Result> {
+  const org = await admin();
+  if (!org) return { ok: false, error: "Not allowed." };
+  const db = await createClient();
+  const ids = await allOurs(db, org.id, lineIds);
+  if (!ids) return { ok: false, error: "Not allowed." };
+  try {
+    await cancelLines(db, ids, "app", noteOf(note));
   } catch (e) {
     return { ok: false, error: failure(e) };
   }
   return done();
+}
+
+/** The reasons a person can give: money out to the owner or for them, money in from the owner, between own accounts. */
+const PERSONAL: Record<"in" | "out", PersonalReason[]> = {
+  out: ["owner_transfer", "private_expense", "internal_transfer"],
+  in: ["owner_contribution", "internal_transfer"],
+};
+
+export async function markPersonal(lineId: string, reason: PersonalReason | null = null, note: string | null = null): Promise<Result> {
+  const org = await admin();
+  if (!org || !UUID.test(lineId)) return { ok: false, error: "Not allowed." };
+  const db = await createClient();
+  const { data: line } = await db.from("bank_lines").select("direction").eq("id", lineId).eq("organization_id", org.id).maybeSingle();
+  if (!line) return { ok: false, error: "Not allowed." };
+  if (reason !== null && !PERSONAL[line.direction as "in" | "out"].includes(reason)) return { ok: false, error: "That reason does not fit this line." };
+  try {
+    await markLinePersonal(db, lineId, reason, "app", noteOf(note));
+  } catch (e) {
+    return { ok: false, error: failure(e) };
+  }
+  return done();
+}
+
+/** The owner's own note on a line, still to do or handled; empty removes it. */
+export async function saveNote(lineId: string, note: string): Promise<Result> {
+  const org = await admin();
+  if (!org || !UUID.test(lineId)) return { ok: false, error: "Not allowed." };
+  const db = await createClient();
+  const { data, error } = await db.from("bank_lines").update({ note: noteOf(note) })
+    .eq("id", lineId).eq("organization_id", org.id).select("id");
+  if (error || !data?.length) return { ok: false, error: "Could not save the note. Try again." };
+  return done();
+}
+
+export interface StayOption { id: string; guest: string | null; platform: string; reference: string | null; checkIn: string; checkOut: string }
+
+/** Stays an incoming transfer could pay, for the user to choose: by guest name, or the closest arrivals around the line. */
+export async function findStays(lineId: string, search: string): Promise<{ ok: true; stays: StayOption[] } | { ok: false; error: string }> {
+  const org = await admin();
+  if (!org || !UUID.test(lineId)) return { ok: false, error: "Not allowed." };
+  const db = await createClient();
+  const { data: line } = await db.from("bank_lines").select("date, direction, status").eq("id", lineId).eq("organization_id", org.id).single();
+  if (!line || line.status !== "unmatched") return { ok: false, error: "This line was already handled." };
+  if (line.direction !== "in") return { ok: false, error: "Only money in pays a stay." };
+  // Letters, digits, spaces and dashes only: the words go inside a PostgREST or() filter.
+  const words = (typeof search === "string" ? search : "").slice(0, 60).replace(/[^\p{L}\p{N} -]/gu, " ").replace(/\s+/g, " ").trim();
+  let q = db.from("stays").select("id, guest_name, platform, external_ref, check_in, check_out").eq("organization_id", org.id);
+  q = words
+    ? q.or(`guest_name.ilike.%${words}%,external_ref.ilike.%${words}%`).gte("check_out", shift(line.date, -365)).lte("check_in", shift(line.date, 365))
+    : q.gte("check_out", shift(line.date, -30)).lte("check_in", shift(line.date, 120));
+  const { data, error } = await q.limit(200);
+  if (error) return { ok: false, error: "Could not search the stays. Try again." };
+  const gap = (d: string) => Math.abs(Date.parse(d) - Date.parse(line.date));
+  return { ok: true, stays: (data ?? []).sort((a, b) => gap(a.check_in) - gap(b.check_in)).slice(0, 8)
+    .map((x) => ({ id: x.id, guest: x.guest_name, platform: x.platform, reference: x.external_ref, checkIn: x.check_in, checkOut: x.check_out })) };
 }
 
 /** Puts a line back in the list. An entry created from it stays in the books (delete it from Transactions if wrong). */

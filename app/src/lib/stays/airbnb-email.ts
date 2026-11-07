@@ -166,12 +166,21 @@ function readConfirmed(text: string, subject: string, sentAt: string | null): Co
   if (!checkIn || !checkOut || checkOut <= checkIn) return fail("unreadable dates");
   const nights = nightsBetween(checkIn, checkOut);
 
+  // "€56.11 x 3 nights" in the guest's block; since Nov 2026 some e-mails show one
+  // "Accommodation" line instead, and the dates alone give the nights.
   const stated = /x (\d+) nights?\s/.exec(text);
-  if (!stated || Number(stated[1]) !== nights) return fail("nights don't match the dates");
+  // Only in the guest's price block (GUEST PAID … TOTAL), never in the guest's free text.
+  const paidAt = lines.indexOf("GUEST PAID");
+  const totalAt = lines.findIndex((l, i) => i > paidAt && /^TOTAL \([A-Z]{3}\)/.test(l));
+  const accommodation = paidAt >= 0 && totalAt > paidAt && lines.slice(paidAt + 1, totalAt).some((l) => /^Accommodation\s{2,}\S/.test(l));
+  if (stated ? Number(stated[1]) !== nights : !accommodation) {
+    return fail("nights don't match the dates");
+  }
   const currency = /^TOTAL \(([A-Z]{3})\)/m.exec(text)?.[1];
   if (!currency) return fail("no currency");
 
-  // Host payout block: "7 nights room fee €670.00", adjustments, "Host service fee … -€87.40", "YOU EARN €425.15".
+  // Host payout block: "7 nights room fee €670.00" (or "Total Stay Price €32.00"), adjustments,
+  // "Host service fee … -€87.40", "YOU EARN €425.15".
   const payoutAt = lines.lastIndexOf("HOST PAYOUT");
   if (payoutAt < 0) return fail("no host payout");
   let gross = 0, fees = 0, net: number | null = null, roomFee = false;
@@ -182,7 +191,7 @@ function readConfirmed(text: string, subject: string, sentAt: string | null): Co
     const amount = (m[2] ? -1 : 1) * Number(m[3].replace(/,/g, ""));
     if (/^YOU EARN$/i.test(m[1])) { net = amount; break; }
     if (/service fee/i.test(m[1])) fees += -amount;
-    else { gross += amount; if (/room fee/i.test(m[1])) roomFee = true; }
+    else { gross += amount; if (/room fee|^Total Stay Price$/i.test(m[1])) roomFee = true; }
   }
   if (net === null || !roomFee) return fail("host payout block incomplete");
   gross = round2(gross);

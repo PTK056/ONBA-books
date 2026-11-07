@@ -31,7 +31,7 @@ async function Content() {
   if (org.role !== "admin") notFound();
   const db = await createClient();
   const [data, { data: cats }, settings] = await Promise.all([
-    bankPage(db, org.id),
+    bankPage(db, org.id, org.reportingCurrency),
     db.from("categories").select("id, name, kind").eq("organization_id", org.id).is("archived_at", null).order("name"),
     bankSettings(db, org.id),
   ]);

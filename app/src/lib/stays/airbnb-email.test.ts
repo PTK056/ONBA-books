@@ -29,6 +29,20 @@ test("booking confirmed with the guest's message: the free text is never read", 
   assert.deepEqual([e.gross, e.fees, e.net], [1147.5, 195.65, 951.85]);
 });
 
+test("booking confirmed in the newer layout: one Accommodation line, Total Stay Price, nights from the dates", () => {
+  const raw = fixture("confirmed").toString()
+    .replace("€73.22 x 7 nights   €512.55", "Accommodation   €512.55")
+    .replace("7 nights room fee   €670.00", "Total Stay Price   €670.00");
+  const e = readAirbnbEmail(raw);
+  assert.equal(e.kind, "confirmed");
+  if (e.kind !== "confirmed") return;
+  assert.deepEqual([e.checkIn, e.checkOut, e.nights, e.gross, e.fees, e.net], ["2026-10-30", "2026-11-06", 7, 512.55, 87.4, 425.15]);
+  // Neither a stated number of nights nor an Accommodation line: not read.
+  assert.equal(readAirbnbEmail(raw.replace("Accommodation   €512.55", "Something   €512.55")).kind, "unrecognised");
+  // A stated number of nights that contradicts the dates: still not read.
+  assert.equal(readAirbnbEmail(fixture("confirmed").toString().replace("x 7 nights", "x 6 nights")).kind, "unrecognised");
+});
+
 test("the same booking as an inquiry and as a request is not a booking", () => {
   assert.deepEqual([read("inquiry").kind, read("inquiry-same-day").kind, read("request").kind], ["ignored", "ignored", "ignored"]);
   const request = read("request");

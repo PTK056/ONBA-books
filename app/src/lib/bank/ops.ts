@@ -2,7 +2,9 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { matchLines, type BookEntry, type PayoutIn, type StayNet } from "./match";
 import { payoutStates } from "./payouts";
-import { BankError, isRace, linkEntry, linkStays } from "./handle";
+import { BankError, isRace, linkEntry, linkLinesToEntry, linkStays } from "./handle";
+import { feePairs } from "./reconcile";
+import { sameAsKnown, type NewLine } from "./dedupe";
 import { payeeKey } from "./payees";
 import type { Statement } from "./statement-pdf";
 
@@ -49,8 +51,12 @@ export async function ingestStatement(
       reference: l.reference, balance: l.balance, payee_last4: l.payee_last4 ?? null, fingerprint: `${base}|${n}`,
     };
   });
-  const { data: added, error } = await db.from("bank_lines")
-    .upsert(rows, { onConflict: "account_id,fingerprint", ignoreDuplicates: true }).select("id");
+  // A statement read again may word a line differently (the PDF is read by Claude): a line with the same day, direction,
+  // amount and running balance as one already there is that line, whatever its text.
+  const fresh = await notYetKnown(db, accountId, rows);
+  const { data: added, error } = fresh.length
+    ? await db.from("bank_lines").upsert(fresh, { onConflict: "account_id,fingerprint", ignoreDuplicates: true }).select("id")
+    : { data: [], error: null };
   if (error) throw new Error(`bank_lines: ${error.message}`);
   const count = added?.length ?? 0;
   // Lines already known from an earlier import may lack the payee's last 4 digits: fill them in.
@@ -63,9 +69,25 @@ export async function ingestStatement(
   return { statementId: st.id, accountId, added: count, skipped: rows.length - count };
 }
 
+/** The rows not already in the account, by fingerprint or by day, direction, amount and running balance. */
+async function notYetKnown<T extends NewLine>(db: SupabaseClient, accountId: string, rows: T[]): Promise<T[]> {
+  if (!rows.length) return rows;
+  const dates = rows.map((r) => r.date).sort();
+  // Page by page: the API returns at most 1000 rows at once, and a line missed here could come in twice.
+  const known: NewLine[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db.from("bank_lines").select("id, date, direction, amount, balance, fingerprint")
+      .eq("account_id", accountId).gte("date", dates[0]).lte("date", dates.at(-1)!).order("id").range(from, from + PAGE - 1);
+    if (error) throw new Error(`bank_lines: ${error.message}`);
+    known.push(...(data ?? []).map((x) => ({ ...x, amount: Number(x.amount), balance: x.balance === null ? null : Number(x.balance) })));
+    if ((data ?? []).length < PAGE) break;
+  }
+  return sameAsKnown(rows, known);
+}
+
 /** Links every unmatched line of the organization that has an obvious counterpart in the books. Returns how many. */
 export async function autoMatch(db: SupabaseClient, orgId: string, reportingCurrency: string): Promise<number> {
-  const { data: lines } = await db.from("bank_lines").select("id, date, direction, amount, currency, description, counterparty")
+  const { data: lines } = await db.from("bank_lines").select("id, account_id, date, direction, amount, currency, description, counterparty, reference")
     .eq("organization_id", orgId).eq("status", "unmatched").order("date");
   if (!lines?.length) return 0;
   const from = shift(lines[0].date, -40);
@@ -102,19 +124,31 @@ export async function autoMatch(db: SupabaseClient, orgId: string, reportingCurr
     lines.map((l) => ({ ...l, amount: Number(l.amount), text: [l.counterparty, l.description].filter(Boolean).join(" · ") })), entries, nets, reportingCurrency,
     payouts,
   );
+  // Then a Wise transfer and its fee that are exactly one receipt's total.
+  const pairs = feePairs(
+    lines.map((l) => ({ id: l.id, accountId: l.account_id, date: l.date, direction: l.direction, amount: Number(l.amount), currency: l.currency,
+      counterparty: l.counterparty, description: l.description, reference: l.reference })),
+    entries.map((e) => ({ ...e, description: e.description ?? null })),
+    { lines: new Set(matches.map((m) => m.lineId)), entries: new Set(matches.flatMap((m) => (m.kind === "transaction" ? [m.transactionId] : []))) },
+    reportingCurrency,
+  );
+
   // Each link is one atomic call: a line handled meanwhile (in the app, by the assistant) is skipped, never relinked.
   let linked = 0;
-  for (const m of matches) {
+  const run = async (fn: () => Promise<void>, n: number) => {
     try {
-      if (m.kind === "transaction") await linkEntry(db, m.lineId, m.transactionId, "auto");
-      else await linkStays(db, m.lineId, m.stayIds, "auto");
-      linked++;
+      await fn();
+      linked += n;
     } catch (e) {
       // Handled meanwhile, or its entry or stay changed since it was read: leave that line for a person, go on.
       if (!(e instanceof BankError)) throw e;
       if (!isRace(e)) console.error("[bank] auto-match skipped a line:", e.code, e.message);
     }
+  };
+  for (const m of matches) {
+    await run(() => (m.kind === "transaction" ? linkEntry(db, m.lineId, m.transactionId, "auto") : linkStays(db, m.lineId, m.stayIds, "auto")), 1);
   }
+  for (const p of pairs) await run(() => linkLinesToEntry(db, p.lineIds, p.transactionId, "auto"), p.lineIds.length);
   return linked;
 }
 

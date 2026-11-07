@@ -3,6 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { BankError } from "./errors";
 import { shift } from "./ops";
 import { payoutStates } from "./payouts";
+import { nameTokens } from "./match";
+import { STAY_AFTER_CHECKOUT, STAY_BEFORE_CHECKIN } from "./reconcile";
 import { partRoom, scoreEntry } from "./suggest";
 
 // What a bank line still to do could be: entries already in the books, and for money in the stays it could pay.
@@ -55,15 +57,17 @@ export async function whereIn<T>(
  */
 export async function entryCandidates(
   db: SupabaseClient, orgId: string, reportingCurrency: string, line: LineToExplain,
-  opts: { windowDays?: number; tolerancePct?: number; text?: string; limit?: number; parts?: boolean } = {},
+  opts: { windowDays?: number; /** Further back than windowDays: a bill paid weeks after it was booked. */ beforeDays?: number;
+    tolerancePct?: number; text?: string; limit?: number; parts?: boolean } = {},
 ): Promise<EntryCandidate[]> {
   const windowDays = opts.windowDays ?? 10;
+  const beforeDays = Math.max(opts.beforeDays ?? windowDays, windowDays);
   const tolerance = (opts.tolerancePct ?? 0) / 100;
   const words = opts.text?.replace(/[%_,()*]/g, " ").trim();
   let q = db.from("transactions")
     .select("id, date, amount, currency, amount_reporting, description, villa:villas (name), category:categories (name)")
     .eq("organization_id", orgId).eq("status", "validated").eq("direction", line.direction).is("stay_id", null)
-    .gte("date", shift(line.date, words ? -90 : -windowDays)).lte("date", shift(line.date, words ? 30 : windowDays)).limit(300);
+    .gte("date", shift(line.date, words ? -90 : -beforeDays)).lte("date", shift(line.date, words ? 30 : windowDays)).limit(300);
   if (words) q = q.ilike("description", `%${words}%`);
   const { data, error } = await q;
   // Never "nothing matches" because a search failed: that would lead to booking the same money twice.
@@ -99,16 +103,22 @@ export async function entryCandidates(
 /** For money in: the stays it could pay (arrival within 90 days after it, departure up to 5 days before), and payouts announced by e-mail. */
 export async function stayCandidates(db: SupabaseClient, orgId: string, line: LineToExplain): Promise<StayCandidate[]> {
   if (line.direction !== "in") return [];
-  const [{ data: around, error }, payouts] = await Promise.all([
+  // A guest paying a stay themselves (a deposit, instalments) is named in the transfer: their stays come first.
+  const names = nameTokens(line.counterparty ?? line.description).slice(0, 3);
+  const [{ data: around, error }, payouts, { data: named, error: namedError }] = await Promise.all([
     db.from("stays").select("id, check_in")
       .eq("organization_id", orgId).gte("check_out", shift(line.date, -5)).lte("check_in", shift(line.date, 90)).limit(200),
     payoutStates(db, orgId, shift(line.date, -30)),
+    names.length
+      ? db.from("stays").select("id").eq("organization_id", orgId).or(names.map((n) => `guest_name.ilike.%${n}%`).join(","))
+        .gte("check_out", shift(line.date, -STAY_AFTER_CHECKOUT)).lte("check_in", shift(line.date, STAY_BEFORE_CHECKIN)).limit(3)
+      : Promise.resolve({ data: [] as { id: string }[], error: null }),
   ]);
-  if (error) throw new BankError("failed", "Could not search the stays. Try again before adding anything.");
+  if (error || namedError) throw new BankError("failed", "Could not search the stays. Try again before adding anything.");
   const pending = payouts.filter((p) => p.stayId && !p.lineId && p.sentOn <= line.date && shift(p.sentOn, 15) >= line.date);
   const closest = (around ?? [])
     .sort((x, y) => Math.abs(Date.parse(x.check_in) - Date.parse(line.date)) - Math.abs(Date.parse(y.check_in) - Date.parse(line.date)));
-  const ids = [...new Set([...pending.map((p) => p.stayId!), ...closest.slice(0, 5).map((x) => x.id)])].slice(0, 8);
+  const ids = [...new Set([...(named ?? []).map((x) => x.id), ...pending.map((p) => p.stayId!), ...closest.slice(0, 5).map((x) => x.id)])].slice(0, 8);
   if (!ids.length) return [];
   const [info, incomes, links] = await Promise.all([
     whereIn<{ id: string; external_ref: string | null; guest_name: string | null; platform: string; check_in: string; check_out: string }>(
@@ -117,7 +127,9 @@ export async function stayCandidates(db: SupabaseClient, orgId: string, line: Li
       db, orgId, "transactions", "stay_id, direction, amount_reporting", "stay_id", ids, (q) => q.eq("status", "validated")),
     whereIn<{ stay_id: string }>(db, orgId, "bank_line_stays", "stay_id", "stay_id", ids),
   ]);
-  return info.map((x) => {
+  // In the order of ids: the guest's own stays first, then announced payouts, then the closest arrivals.
+  const order = new Map(ids.map((id, i) => [id, i]));
+  return info.sort((a, b) => order.get(a.id)! - order.get(b.id)!).map((x) => {
     const payout = pending.find((p) => p.stayId === x.id);
     return {
       stayId: x.id, reference: x.external_ref, guest: x.guest_name, platform: x.platform, checkIn: x.check_in, checkOut: x.check_out,

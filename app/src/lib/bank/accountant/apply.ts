@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { bookStatementCharges } from "../book-charges";
 import { nearestRate } from "../candidates";
 import { BankError, bankErrorOf } from "../errors";
-import { bookLine, linkEntry, linkStays, markLinePersonal, type PersonalReason } from "../handle";
+import { bookLine, cancelLines, linkEntry, linkStays, markLinePersonal, type PersonalReason } from "../handle";
 import { learnPayees } from "../ops";
 import { loadOrg } from "./context";
 import { isSure, oneChargePerStatement } from "./render";
@@ -16,6 +16,8 @@ type Row = {
   id: string; organization_id: string; line_id: string; action: string; villa_id: string | null; category_id: string | null;
   description: string | null; transaction_id: string | null; stay_ids: string[] | null; personal_reason: string | null;
   statement_id: string | null; amount_differs: boolean; fx_rate: number | null; why: string; status: string;
+  /** Lines that cancel out, proposed together: the whole set, this line included. */
+  line_ids: string[] | null;
 };
 
 export interface Decided { id: string; status: "applied" | "rejected" | "failed" | "stale"; outcome: string | null }
@@ -30,6 +32,7 @@ export async function decideProposal(db: SupabaseClient, proposalId: string, dec
   const p = (Array.isArray(data) ? data[0] : data) as Row;
   if (decision === "reject") {
     if (p.action === "charges") await db.rpc("bank_proposal_group", { p_proposal: p.id, p_status: "rejected" });
+    if (p.line_ids) await db.rpc("bank_proposal_set_rejected", { p_proposal: p.id });
     return { id: p.id, status: "rejected", outcome: null };
   }
 
@@ -80,6 +83,12 @@ async function apply(db: SupabaseClient, p: Row): Promise<string> {
       await linkStays(db, p.line_id, p.stay_ids ?? [], "agent", note);
       return "Linked to the stays.";
     case "personal":
+      if (p.personal_reason === "returned") {
+        // The whole set or nothing: the database checks they are all still to do and come to zero.
+        if (!p.line_ids || p.line_ids.length < 2) throw new BankError("failed", "The lines that cancel out are missing: handle them in the Bank tab.");
+        await cancelLines(db, p.line_ids, "agent", note);
+        return `Set aside with the ${p.line_ids.length - 1} line${p.line_ids.length === 2 ? "" : "s"} it cancels out with.`;
+      }
       await markLinePersonal(db, p.line_id, p.personal_reason as PersonalReason, "agent", note);
       return "Marked personal.";
     case "charges": {

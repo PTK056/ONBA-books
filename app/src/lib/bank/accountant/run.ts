@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { nearestRate } from "../candidates";
 import { CHARGE } from "../charges";
 import { BankError, bankErrorOf } from "../errors";
+import { cancelSets } from "../reconcile";
 import { buildDossiers, loadOrg, OPEN_LINE_FIELDS, type OpenLine } from "./context";
 import { buildInput, Output, SYSTEM, toDrafts, type Draft } from "./propose";
 import { money } from "./render";
@@ -48,11 +49,25 @@ export async function runAccountant(
   const todo = ((lines ?? []) as OpenLine[]).filter((l) => !skip.has(l.id)).map((l) => ({ ...l, amount: Number(l.amount) }));
   if (!todo.length) return { runId: null, proposed: 0, left: 0, error: null };
 
-  const charges = todo.filter((l) => CHARGE.test(l.description));
-  const now = todo.filter((l) => !CHARGE.test(l.description)).slice(0, MAX_LINES);
+  // Money that went out and came back (a transfer sent back): set aside together, proposed by code. The other line may
+  // be in another statement: every open line counts.
+  let open = (lines ?? []) as OpenLine[];
+  if (opts.statementId) {
+    const { data: all } = await db.from("bank_lines").select(OPEN_LINE_FIELDS).eq("organization_id", orgId).eq("status", "unmatched").limit(1000);
+    open = (all ?? []) as OpenLine[];
+  }
+  const todoIds = new Set(todo.map((l) => l.id));
+  const cancels = cancelSets(open.map((l) => ({
+    id: l.id, accountId: l.account_id, date: l.date, direction: l.direction, amount: Number(l.amount), currency: l.currency,
+    counterparty: l.counterparty, description: l.description, reference: l.reference,
+  }))).filter((c) => c.lineIds.some((id) => todoIds.has(id)));
+  const cancelOf = new Map(cancels.flatMap((c) => c.lineIds.filter((id) => todoIds.has(id)).map((id) => [id, c] as const)));
+
+  const charges = todo.filter((l) => !cancelOf.has(l.id) && CHARGE.test(l.description));
+  const now = todo.filter((l) => !cancelOf.has(l.id) && !CHARGE.test(l.description)).slice(0, MAX_LINES);
 
   const { data: runId, error: startError } = await db.rpc("bank_run_start", {
-    p_org: orgId, p_statement: opts.statementId ?? null, p_trigger: opts.trigger, p_lines: charges.length + now.length,
+    p_org: orgId, p_statement: opts.statementId ?? null, p_trigger: opts.trigger, p_lines: charges.length + cancelOf.size + now.length,
     p_model: now.length ? MODEL : null,
   });
   if (startError) {
@@ -61,10 +76,16 @@ export async function runAccountant(
     throw e;
   }
 
-  const rows: Record<string, unknown>[] = charges.map((l) => ({
-    action: "charges", line_id: l.id, statement_id: l.statement_id, confidence: "high",
-    why: "Bank fees and interest are booked together, one entry a month, where Settings says.",
-  }));
+  const rows: Record<string, unknown>[] = [
+    ...charges.map((l) => ({
+      action: "charges", line_id: l.id, statement_id: l.statement_id, confidence: "high",
+      why: "Bank fees and interest are booked together, one entry a month, where Settings says.",
+    })),
+    // Each line of a set carries the whole set: accepting any one sets them all aside at once, or none.
+    ...[...cancelOf].map(([lineId, c]) => ({
+      action: "personal", line_id: lineId, personal_reason: "returned", line_ids: c.lineIds, confidence: c.sure ? "high" : "medium", why: c.why,
+    })),
+  ];
   let failure: string | null = null;
   let usage: { input_tokens: number; output_tokens: number } | null = null;
 

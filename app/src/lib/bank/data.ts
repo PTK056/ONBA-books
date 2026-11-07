@@ -1,30 +1,41 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { nameFit, namesOf } from "./match";
+import { whereIn } from "./candidates";
+import { guessLine, PART_BEFORE_DAYS, PART_AFTER_DAYS, STAY_AFTER_CHECKOUT, STAY_BEFORE_CHECKIN, WEAK, type BookedEntry, type OpenLine, type StayToPay } from "./reconcile";
 import { listProposals } from "./accountant/views";
 import type { ProposalView } from "./accountant/render";
 import { payeeKey } from "./payees";
 import { CHARGE, shift } from "./ops";
 import { payoutStates } from "./payouts";
-import { LINK_DAYS, monthlyTemplate, retitle, type PastEntry, type Template } from "./recurring";
+import { monthlyTemplate, retitle, type PastEntry, type Template } from "./recurring";
 
 export interface BankStatementRow {
   id: string; account: string; periodStart: string | null; periodEnd: string | null;
   linesAdded: number; linesSkipped: number; balanced: boolean | null; notes: string | null; charges: number;
 }
-export interface Suggestion { id: string; date: string; description: string; category: string | null }
+/**
+ * What a line still to do most likely is (lib/bank/reconcile), best first, with the reasons in words. `first`: strong
+ * enough to be the one-click button; the others wait behind More.
+ */
+export type GuessView = { score: number; reasons: string[]; first: boolean } & (
+  | { kind: "entry"; id: string; date: string; label: string; amount: number; currency: string; part: boolean;
+      /** Other lines linked with it: its Wise fee. */
+      withLines: { id: string; amount: number }[] }
+  | { kind: "stay"; id: string; guest: string | null; platform: string; checkIn: string; checkOut: string }
+  | { kind: "cancel"; lineIds: string[]; others: { date: string; direction: "in" | "out"; amount: number }[] }
+);
 export interface BankLineRow {
   id: string; statementId: string; account: string; date: string; direction: "in" | "out"; amount: number; currency: string;
   description: string; counterparty: string | null; status: "unmatched" | "matched" | "personal"; matchedBy: string | null;
   /** Who handled it (auto, app, agent: the assistant), with its note and, for a personal line, the reason. */
   handledVia: "auto" | "app" | "agent" | null; note: string | null; personalReason: string | null;
+  /** The owner's own note, on any line. */
+  ownNote: string | null;
   /** What the line is linked to, in words. */
   linkedTo: string | null;
-  suggestions: Suggestion[];
+  guesses: GuessView[];
   /** A monthly payment whose month is missing: book it like the neighbouring month's entry. */
   template: Template | null;
-  /** Incoming: stays this transfer could pay (deposit before arrival, balance, extension). */
-  stays: StaySuggestion[];
   /** A regular payee: where their last payment was booked. */
   known: KnownPayee | null;
   /** What Sply Accountant proposes for it, waiting for OK or Decline. */
@@ -33,8 +44,6 @@ export interface BankLineRow {
 export interface KnownPayee {
   villaId: string; villa: string; categoryId: string | null; category: string | null; description: string | null; uses: number;
 }
-export interface StaySuggestion { id: string; guest: string | null; platform: string; checkIn: string; checkOut: string }
-
 const AROUND_DAYS = 45; // wide enough to see last month's and next month's entries
 
 /** A payout Airbnb sent (read from its e-mail) that no bank line has brought yet. */
@@ -50,15 +59,15 @@ const PAYOUTS_SINCE_DAYS = 120;
 const LATE_AFTER_DAYS = 3;   // past Airbnb's "should arrive by"
 const UNPAID_AFTER_DAYS = 3; // Airbnb pays about a day after arrival
 
-export async function bankPage(db: SupabaseClient, orgId: string) {
+export async function bankPage(db: SupabaseClient, orgId: string, reportingCurrency: string) {
   const [{ data: accounts }, { data: statements }, { data: lines }, knownFor, proposals] = await Promise.all([
     db.from("bank_accounts").select("id, name, last4").eq("organization_id", orgId),
     db.from("bank_statements")
       .select("id, account_id, period_start, period_end, lines_added, lines_skipped, balanced, notes")
       .eq("organization_id", orgId).order("period_start", { ascending: false }),
     db.from("bank_lines")
-      .select("id, statement_id, account_id, date, direction, amount, currency, description, counterparty, payee_last4, status, matched_by, "
-        + "transaction_id, handled_via, handled_note, personal_reason, "
+      .select("id, statement_id, account_id, date, direction, amount, currency, description, counterparty, reference, payee_last4, status, matched_by, "
+        + "transaction_id, handled_via, handled_note, personal_reason, note, "
         + "transaction:transactions (date, description, category:categories (name)), stays:bank_line_stays (stay:stays (external_ref, guest_name, check_in))")
       .eq("organization_id", orgId).order("date", { ascending: false }).limit(1000),
     payeeMemory(db, orgId),
@@ -69,8 +78,9 @@ export async function bankPage(db: SupabaseClient, orgId: string) {
 
   type Row = {
     id: string; statement_id: string; account_id: string; date: string; direction: "in" | "out"; amount: number; currency: string;
-    description: string; counterparty: string | null; payee_last4: string | null; status: BankLineRow["status"]; matched_by: string | null;
-    transaction_id: string | null; handled_via: BankLineRow["handledVia"]; handled_note: string | null; personal_reason: string | null;
+    description: string; counterparty: string | null; reference: string | null; payee_last4: string | null; status: BankLineRow["status"];
+    matched_by: string | null; transaction_id: string | null; handled_via: BankLineRow["handledVia"]; handled_note: string | null;
+    personal_reason: string | null; note: string | null;
     transaction: { date: string; description: string | null; category: { name: string } | null } | null;
     stays: { stay: { external_ref: string | null; guest_name: string | null; check_in: string } }[];
   };
@@ -79,66 +89,100 @@ export async function bankPage(db: SupabaseClient, orgId: string) {
   const payments = new Map<string, number>();
   for (const r of rows) if (r.transaction_id && r.matched_by !== "created") payments.set(r.transaction_id, (payments.get(r.transaction_id) ?? 0) + 1);
 
-  // Entries around the unmatched lines: to link one (close and not linked yet), or to copy last month's.
+  // Entries around the unmatched lines: to link one (with what other lines already pay of it), or to copy last month's.
   const open = rows.filter((r) => r.status === "unmatched");
-  const around: (PastEntry & { linked: boolean })[] = [];
+  const around: (PastEntry & { currency: string; villa: string | null; paidBy: BookedEntry["paidBy"] })[] = [];
+  let stays: StayToPay[] = [];
   if (open.length) {
     const dates = open.map((r) => r.date).sort();
-    const [{ data: txs }, { data: taken }] = await Promise.all([
-      db.from("transactions").select("id, date, direction, amount, amount_reporting, villa_id, category_id, description, category:categories (name)")
+    // Page by page (the API returns at most 1000 rows at once): an entry missed here could be added a second time.
+    const txs: unknown[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await db.from("transactions")
+        .select("id, date, direction, amount, currency, amount_reporting, villa_id, category_id, description, category:categories (name), villa:villas (name)")
         .eq("organization_id", orgId).eq("status", "validated").is("stay_id", null)
-        .gte("date", shift(dates[0], -AROUND_DAYS)).lte("date", shift(dates.at(-1)!, AROUND_DAYS)),
-      db.from("bank_lines").select("transaction_id").eq("organization_id", orgId).not("transaction_id", "is", null),
-    ]);
-    const used = new Set((taken ?? []).map((t) => t.transaction_id));
-    type Tx = { id: string; date: string; direction: "in" | "out"; amount: number; amount_reporting: number; villa_id: string; category_id: string | null; description: string | null; category: { name: string } | null };
-    around.push(...((txs ?? []) as unknown as Tx[]).map((t) => ({
-      id: t.id, date: t.date, direction: t.direction, amount: Number(t.amount), amountReporting: Number(t.amount_reporting),
-      villaId: t.villa_id, categoryId: t.category_id, category: t.category?.name ?? null, description: t.description, linked: used.has(t.id),
+        .gte("date", shift(dates[0], -Math.max(AROUND_DAYS, PART_BEFORE_DAYS))).lte("date", shift(dates.at(-1)!, Math.max(AROUND_DAYS, PART_AFTER_DAYS)))
+        .order("id").range(from, from + 999);
+      if (error) throw new Error(`transactions: ${error.message}`);
+      txs.push(...(data ?? []));
+      if ((data ?? []).length < 1000) break;
+    }
+    type Tx = { id: string; date: string; direction: "in" | "out"; amount: number; currency: string; amount_reporting: number; villa_id: string;
+      category_id: string | null; description: string | null; category: { name: string } | null; villa: { name: string } | null };
+    const list = txs as Tx[];
+    const taken = await whereIn<{ transaction_id: string; amount: number; currency: string }>(
+      db, orgId, "bank_lines", "transaction_id, amount, currency", "transaction_id", list.map((t) => t.id));
+    const paidBy = new Map<string, BookedEntry["paidBy"]>();
+    for (const x of taken) paidBy.set(x.transaction_id, [...(paidBy.get(x.transaction_id) ?? []), { amount: Number(x.amount), currency: x.currency }]);
+    around.push(...list.map((t) => ({
+      id: t.id, date: t.date, direction: t.direction, amount: Number(t.amount), currency: t.currency, amountReporting: Number(t.amount_reporting),
+      villaId: t.villa_id, villa: t.villa?.name ?? null, categoryId: t.category_id, category: t.category?.name ?? null, description: t.description,
+      paidBy: paidBy.get(t.id) ?? [],
     })));
-  }
-  // Stays an incoming transfer could pay: arrival up to 90 days after it, or departure up to 5 days before it.
-  const incoming = open.filter((r) => r.direction === "in");
-  let staysAround: StaySuggestion[] = [];
-  if (incoming.length) {
-    const dates = incoming.map((r) => r.date).sort();
-    const { data } = await db.from("stays").select("id, guest_name, platform, check_in, check_out")
-      .eq("organization_id", orgId).gte("check_out", shift(dates[0], -5)).lte("check_in", shift(dates.at(-1)!, 90)).order("check_in");
-    staysAround = (data ?? []).map((x) => ({ id: x.id, guest: x.guest_name, platform: x.platform, checkIn: x.check_in, checkOut: x.check_out }));
-  }
-  const staysFor = (date: string) => staysAround
-    .filter((x) => shift(date, 90) >= x.checkIn && shift(x.checkOut, 5) >= date)
-    .sort((a, b) => Math.abs(Date.parse(a.checkIn) - Date.parse(date)) - Math.abs(Date.parse(b.checkIn) - Date.parse(date)))
-    .slice(0, 3);
 
-  const near = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) <= LINK_DAYS * 86_400_000;
+    // Stays an incoming transfer could pay: a deposit months before arrival, the balance, an extension.
+    const incoming = open.filter((r) => r.direction === "in").map((r) => r.date).sort();
+    if (incoming.length) {
+      const { data } = await db.from("stays").select("id, guest_name, platform, check_in, check_out")
+        .eq("organization_id", orgId).gte("check_out", shift(incoming[0], -STAY_AFTER_CHECKOUT))
+        .lte("check_in", shift(incoming.at(-1)!, STAY_BEFORE_CHECKIN)).limit(1000);
+      const ids = (data ?? []).map((x) => x.id);
+      const [incomes, links] = await Promise.all([
+        whereIn<{ stay_id: string; direction: string; amount_reporting: number }>(
+          db, orgId, "transactions", "stay_id, direction, amount_reporting", "stay_id", ids, (q) => q.eq("status", "validated")),
+        whereIn<{ stay_id: string; line: { amount: number } | null }>(db, orgId, "bank_line_stays", "stay_id, line:bank_lines (amount)", "stay_id", ids),
+      ]);
+      stays = (data ?? []).map((x) => {
+        const mine = links.filter((k) => k.stay_id === x.id);
+        return {
+          id: x.id, guest: x.guest_name, platform: x.platform, checkIn: x.check_in, checkOut: x.check_out,
+          net: incomes.filter((t) => t.stay_id === x.id).reduce((n, t) => n + (t.direction === "in" ? 1 : -1) * Number(t.amount_reporting), 0),
+          paid: mine.reduce((n, k) => n + Number(k.line?.amount ?? 0), 0), lines: mine.length,
+        };
+      });
+    }
+  }
+  const openLines: OpenLine[] = open.map((r) => ({
+    id: r.id, accountId: r.account_id, date: r.date, direction: r.direction, amount: Number(r.amount), currency: r.currency,
+    counterparty: r.counterparty, description: r.description, reference: r.reference,
+  }));
+  const openById = new Map(openLines.map((l) => [l.id, l]));
+  const entryById = new Map(around.map((e) => [e.id, e]));
+  const stayById = new Map(stays.map((x) => [x.id, x]));
 
-  const named = namesOf(open.map((r) => ({ id: r.id, text: [r.counterparty, r.description].filter(Boolean).join(" · ") })));
+  const viewOf = (g: ReturnType<typeof guessLine>[number]): GuessView => {
+    const base = { score: g.score, reasons: g.reasons, first: g.score > WEAK };
+    if (g.kind === "entry") {
+      const e = entryById.get(g.entryId)!;
+      return { ...base, kind: "entry", id: e.id, date: e.date, amount: e.amount, currency: e.currency, part: g.part,
+        label: [e.category, e.description].filter(Boolean).join(" · ") || "An entry",
+        withLines: g.withLines.map((id) => ({ id, amount: openById.get(id)!.amount })) };
+    }
+    if (g.kind === "stay") {
+      const x = stayById.get(g.stayId)!;
+      return { ...base, kind: "stay", id: x.id, guest: x.guest, platform: x.platform, checkIn: x.checkIn, checkOut: x.checkOut };
+    }
+    return { ...base, kind: "cancel", lineIds: g.lineIds,
+      others: g.lineIds.slice(1).map((id) => openById.get(id)!).map((l) => ({ date: l.date, direction: l.direction, amount: l.amount })) };
+  };
+
   const out: BankLineRow[] = rows.map((r) => {
-    const stays = r.stays.map((x) => x.stay);
+    const linkedStays = r.stays.map((x) => x.stay);
     const parts = r.transaction_id && r.matched_by !== "created" ? payments.get(r.transaction_id) ?? 0 : 0;
     const linkedTo = r.transaction
       ? ([r.transaction.category?.name, r.transaction.description].filter(Boolean).join(" · ") || "An entry")
         + (parts > 1 ? ` (one of ${parts} payments)` : "")
-      : stays.length ? `Airbnb ${stays.map((x) => x.external_ref ?? x.check_in).join(", ")}` : null;
+      : linkedStays.length ? `Airbnb ${linkedStays.map((x) => x.external_ref ?? x.check_in).join(", ")}` : null;
+    const todo = r.status === "unmatched";
     const line = { date: r.date, direction: r.direction, amount: Number(r.amount) };
-    // Same amount within two weeks; an entry naming this line's payee first, one naming another payee left out.
-    const close = r.status !== "unmatched" ? [] : around
-      .filter((t) => !t.linked && t.direction === r.direction && near(t.date, r.date)
-        && (t.amount === line.amount || Math.abs(t.amountReporting - line.amount) < 1))
-      .map((t) => ({ t, fit: nameFit(t.description, { id: r.id }, named) }))
-      .filter((x) => x.fit !== "other");
-    const suggestions = (close.some((x) => x.fit === "this") ? close.filter((x) => x.fit === "this") : close)
-      .slice(0, 3)
-      .map(({ t }) => ({ id: t.id, date: t.date, description: t.description ?? "", category: t.category }));
-    const template = r.status === "unmatched" ? monthlyTemplate(line, around) : null;
-    const payable = r.status === "unmatched" && r.direction === "in" ? staysFor(r.date) : [];
-    const known = r.status === "unmatched" ? knownFor(r) : null;
+    const template = todo ? monthlyTemplate(line, around) : null;
     return {
       id: r.id, statementId: r.statement_id, account: accountName.get(r.account_id) ?? "", date: r.date, direction: r.direction,
       amount: Number(r.amount), currency: r.currency, description: r.description, counterparty: r.counterparty,
-      status: r.status, matchedBy: r.matched_by, handledVia: r.handled_via, note: r.handled_note, personalReason: r.personal_reason, linkedTo,
-      proposal: r.status === "unmatched" ? proposalOf.get(r.id) ?? null : null, suggestions, template, stays: payable, known,
+      status: r.status, matchedBy: r.matched_by, handledVia: r.handled_via, note: r.handled_note, personalReason: r.personal_reason,
+      ownNote: r.note, linkedTo, proposal: todo ? proposalOf.get(r.id) ?? null : null,
+      guesses: todo ? guessLine(openById.get(r.id)!, openLines, around, stays, reportingCurrency).map(viewOf) : [],
+      template, known: todo ? knownFor(r) : null,
     };
   });
 

@@ -81,6 +81,12 @@ fonction Supabase) ; `app/.env.local` (URL + clé publique Supabase).
    Claude (solde vérifié au centime), rapprochement auto des cas évidents (écritures, séjours Airbnb y compris paiement en
    2 fois, sans date de versement après la migration Airtable), frais bancaires en un clic, « perso ». Sur août 2026 réel :
    12/24 lignes auto, 11 frais/intérêts en un clic, 2 à regarder. Reste : Wise CSV, virements multiples, espèces.
+   **V2 (06/11/2026)** : chaque ligne reçoit des propositions classées (score 0–100 % et raisons : même montant, jours d'écart,
+   bénéficiaire nommé) — écritures à ±5 % jusqu'à 60 j avant (jamais en premier choix au-delà de 14 j : peut être le mois suivant),
+   virement Wise + ses frais = une écriture (auto si unique et exact), virements renvoyés (lignes qui s'annulent, motif `returned`),
+   paiements en plusieurs fois, client nommé dans le virement → son séjour. « File it myself » pour ranger soi-même (écriture,
+   séjour, ajout, perso avec motif) et note libre par ligne (`bank_lines.note`). Réimport d'un relevé : une ligne de même date,
+   sens, montant et solde est reconnue même si Claude l'a lue autrement. Code pur : `app/src/lib/bank/reconcile.ts`.
    Avant d'ouvrir aux clients : société, CGU + DPA, politique de confidentialité (`docs/securite.md`).
 2 bis. Agent WhatsApp (adaptateur sur le cœur Telegram) quand le compte Meta Business est prêt.
 3. Couche gestionnaire : frais de gestion, relevés propriétaires à la marque, accès propriétaires.

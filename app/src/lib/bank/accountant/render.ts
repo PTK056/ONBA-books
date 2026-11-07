@@ -41,7 +41,8 @@ export function proposalLabel(v: ProposalView): string {
       ? `Already in the books: ${day(v.entry.date)} ${v.entry.description ?? ""} (${money(v.entry.amount, v.entry.currency)})`.replace(/\s+\(/, " (")
       : "Already in the books";
     case "link_stays": return `Pays ${v.stays.length > 1 ? "the stays" : "the stay"} of ${v.stays.map((x) => x.guest ?? x.reference ?? day(x.checkIn)).join(", ")}`;
-    case "personal": return `Personal: ${REASON[v.personalReason ?? ""] ?? "not in the books"}`;
+    case "personal": return v.personalReason === "returned"
+      ? "Sent back: cancels out, nothing to book" : `Personal: ${REASON[v.personalReason ?? ""] ?? "not in the books"}`;
     case "charges": return "Bank charges: booked with the statement's other charges, one entry a month";
     case "ask": return v.question ?? "Sply has a question";
   }
