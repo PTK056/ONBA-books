@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { PerformanceView } from "@/components/performance/PerformanceView";
+import { PeriodSwitch } from "@/components/overview/PeriodSwitch";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { getCurrentOrg } from "@/lib/org";
 import { addMonths, facts as liveFacts, goalPath, monthOf } from "@/lib/performance/metrics";
@@ -16,6 +17,7 @@ export default function PerformancePage({ searchParams }: PageProps<"/performanc
       <PageHeader
         title="Performance"
         description="Once a month is closed, Sply Performance compares it with last year and with your goals, and proposes what to do next. Admins only."
+        actions={<PeriodSwitch view="performance" performance />}
       />
       <Suspense fallback={<div className="card h-64 animate-pulse" />}>
         <Content searchParams={searchParams} />

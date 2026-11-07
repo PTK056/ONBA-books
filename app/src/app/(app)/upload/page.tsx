@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { receiptTabs, ViewTabs } from "@/components/shell/ViewTabs";
 import { Uploader } from "@/components/upload/Uploader";
 import { getCurrentOrg, selectedPlace } from "@/lib/org";
 
@@ -8,8 +9,9 @@ export default function UploadPage() {
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8 sm:px-8">
       <PageHeader
-        title="Scan receipts"
+        title="Receipts"
         description="Photos or PDFs of receipts, invoices and transfer slips. Each one is read for you, then waits for your review."
+        actions={<ViewTabs tabs={receiptTabs()} current="scan" label="Receipts" />}
       />
       <Suspense fallback={<div className="card h-64 animate-pulse" />}>
         <Upload />

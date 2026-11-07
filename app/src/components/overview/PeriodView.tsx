@@ -27,7 +27,7 @@ export function PeriodView({ data: p }: { data: PeriodOverview }) {
         description={`${p.org.name} · ${p.kind === "year" ? `year ${p.year}` : "since the first entry"} · figures in ${cur}`}
         actions={
           <>
-            <PeriodSwitch view={p.kind} year={p.year ?? p.years[0]} />
+            <PeriodSwitch view={p.kind} year={p.year ?? p.years[0]} performance={p.org.role === "admin"} />
             {p.kind === "year" && p.year && <YearNav year={p.year} years={p.years} />}
             {editor && <NewMenu />}
           </>

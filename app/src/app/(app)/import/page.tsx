@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/shell/PageHeader";
@@ -10,6 +11,7 @@ export default function ImportPage() {
       <PageHeader
         title="Import stays"
         description="Your Airbnb transaction history becomes income and platform fees, split across months by nights."
+        actions={<Link href="/connections" className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">← Connections</Link>}
       />
       <Suspense fallback={<div className="card h-64 animate-pulse" />}>
         <Content />

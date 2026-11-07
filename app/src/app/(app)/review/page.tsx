@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { ReadPending } from "@/components/review/ReadPending";
 import { ReviewQueue } from "@/components/review/ReviewQueue";
+import { receiptTabs, ViewTabs } from "@/components/shell/ViewTabs";
 import { getCurrentOrg } from "@/lib/org";
 import { loadReviewQueue } from "@/lib/review/data";
 import { acceptItem, rejectItem } from "./actions";
@@ -9,6 +10,11 @@ import { acceptItem, rejectItem } from "./actions";
 export default function ReviewPage({ searchParams }: PageProps<"/review">) {
   return (
     <main className="flex h-[calc(100dvh-3.5rem)] flex-col bg-white lg:h-dvh dark:bg-zinc-950">
+      {/* Receipts: scanning and reviewing are one section of the sidebar. */}
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-100 px-4 py-2 dark:border-zinc-800">
+        <h1 className="text-base font-semibold">Receipts</h1>
+        <ViewTabs tabs={receiptTabs()} current="review" label="Receipts" />
+      </div>
       <Suspense fallback={<p className="p-6 text-sm text-zinc-500">Loading receipts…</p>}>
         <Queue searchParams={searchParams} />
       </Suspense>

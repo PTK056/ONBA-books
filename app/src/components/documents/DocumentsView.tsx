@@ -2,6 +2,7 @@ import { Archive, ChevronRight, Download, FileText, Folder, Image as ImageIcon, 
 import Link from "next/link";
 import { money } from "@/components/overview/format";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { BOOKS_TABS, ViewTabs } from "@/components/shell/ViewTabs";
 import { shortDate } from "@/lib/format/date";
 import type { Tx, TxFileLinks } from "@/lib/transactions/data";
 
@@ -39,9 +40,12 @@ export function DocumentsView({ q, month, year, category, all, categories, admin
       <PageHeader
         title="Documents"
         description="Every receipt and invoice behind your entries, filed by month."
-        actions={admin && (
-          <Link href="/documents/activity" className="h-9 rounded-lg border border-zinc-300 px-3 text-sm font-medium leading-9 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800">Activity</Link>
-        )}
+        actions={<>
+          <ViewTabs tabs={BOOKS_TABS} current="documents" label="Transactions" />
+          {admin && (
+            <Link href="/documents/activity" className="h-9 rounded-lg border border-zinc-300 px-3 text-sm font-medium leading-9 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800">Activity</Link>
+          )}
+        </>}
       />
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center">

@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ConnectorGrid, LOGOS, type Connector } from "@/components/connections/ConnectorGrid";
+import { FileSpreadsheet } from "lucide-react";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { getCurrentOrg } from "@/lib/org";
 import { adminClient } from "@/lib/supabase/admin";
@@ -49,6 +50,11 @@ async function Content() {
       description: "Sply, your assistant: receipts, expenses and stays in a chat, and the morning brief.",
       detail: chat ? (chat.external_name ? `Chat with ${chat.external_name}` : "Your chat is linked") : bot ? `Open @${bot} and send /start` : null,
       href: bot ? `https://t.me/${bot}` : undefined, external: true,
+    },
+    {
+      key: "airbnb_csv", name: "Airbnb export (CSV)", status: "file", href: "/import",
+      logo: <FileSpreadsheet className="size-8 text-brand-600" aria-hidden />,
+      description: "Airbnb's transaction history: past stays, income and fees at once. Gmail keeps new ones coming on its own.",
     },
     { key: "whatsapp", name: "WhatsApp", logo: LOGOS.whatsapp, status: "soon", description: "Sply on WhatsApp, for you and your staff." },
     { key: "outlook", name: "Outlook", logo: LOGOS.outlook, status: "soon", description: "Airbnb bookings from an Outlook or Hotmail mailbox." },

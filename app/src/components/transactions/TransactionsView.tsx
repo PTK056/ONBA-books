@@ -4,6 +4,7 @@ import { money } from "@/components/overview/format";
 import { Highlight, MiniStat } from "@/components/shell/Highlight";
 import { NewMenu } from "@/components/shell/NewMenu";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { BOOKS_TABS, ViewTabs } from "@/components/shell/ViewTabs";
 import { shortDate } from "@/lib/format/date";
 import { needsReceipt, type Tx, type TxFilters } from "@/lib/transactions/data";
 
@@ -31,7 +32,7 @@ export function TransactionsView({ filters, type, rows, truncated, categories, v
       <PageHeader
         title="Transactions"
         description="Every validated entry, with its receipt."
-        actions={editor && <NewMenu />}
+        actions={<><ViewTabs tabs={BOOKS_TABS} current="entries" label="Transactions" />{editor && <NewMenu />}</>}
       />
 
       <form className="flex flex-col gap-2">

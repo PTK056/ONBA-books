@@ -29,7 +29,7 @@ export function OverviewView({ data: o }: { data: Overview }) {
         description={`${o.org.name} · figures in ${cur}`}
         actions={
           <>
-            <PeriodSwitch view="month" year={o.month.slice(0, 4)} />
+            <PeriodSwitch view="month" year={o.month.slice(0, 4)} performance={o.org.role === "admin"} />
             <MonthNav month={o.month} />
             <StatementLinks villas={o.villas} month={o.month} />
             {editor && <NewMenu />}

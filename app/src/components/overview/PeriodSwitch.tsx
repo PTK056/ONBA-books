@@ -1,13 +1,16 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
-/** Month | Year | All time, the same on every overview. */
-export function PeriodSwitch({ view, year }: { view: "month" | "year" | "all"; year: string }) {
+/** Month | Year | All time, the same on every overview; Performance (the analysis of closed months) for admins. */
+export function PeriodSwitch({ view, year, performance = false }: {
+  view: "month" | "year" | "all" | "performance"; /** Without one, the year view opens on the latest year. */ year?: string; performance?: boolean;
+}) {
   const tabs = [
     { key: "month", label: "Month", href: "/overview" },
-    { key: "year", label: "Year", href: `/overview?view=year&year=${year}` },
+    { key: "year", label: "Year", href: year ? `/overview?view=year&year=${year}` : "/overview?view=year" },
     { key: "all", label: "All time", href: "/overview?view=all" },
-  ] as const;
+    ...(performance ? [{ key: "performance", label: "Performance", href: "/performance" }] : []),
+  ];
   return (
     <nav className="inline-flex h-9 items-center rounded-lg bg-zinc-200/60 p-0.5 text-sm dark:bg-zinc-800" aria-label="Period">
       {tabs.map((t) => (

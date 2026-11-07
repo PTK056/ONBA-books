@@ -6,7 +6,7 @@ import { BookingLogo, GmailLogo, OutlookLogo, TelegramLogo, WhatsAppLogo } from 
 // The connections page: one card per service, its logo, what it does and whether it is on.
 // Details (settings, e-mails read) live on each connector's own page.
 
-export type ConnectorStatus = "connected" | "attention" | "off" | "soon";
+export type ConnectorStatus = "connected" | "attention" | "off" | "soon" | "file";
 
 export interface Connector {
   key: string;
@@ -82,6 +82,7 @@ export function Status({ status }: { status: ConnectorStatus }) {
     attention: { label: "Needs attention", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400", dot: "bg-amber-500" },
     off: { label: "Not connected", cls: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400", dot: "bg-zinc-400" },
     soon: { label: "Coming soon", cls: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500", dot: "bg-zinc-300 dark:bg-zinc-600" },
+    file: { label: "Import a file", cls: "bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300", dot: "bg-brand-500" },
   }[status];
   return (
     <span className={`inline-flex items-center gap-2 px-2.5 py-1 badge-label ${look.cls}`}>

@@ -5,18 +5,19 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Logo } from "./Logo";
 import { NAV_ICONS as I } from "./NavIcons";
 
+// Five sections for every day, two for settings at the bottom. Each section may span several pages (its views):
+// `match` lists them, so the section stays highlighted on each.
 const NAV = [
-  { href: "/overview", label: "Overview", icon: I.overview },
-  { href: "/transactions", label: "Transactions", icon: I.transactions },
-  { href: "/documents", label: "Documents", icon: I.documents },
-  { href: "/upload", label: "Scan receipts", icon: I.scan },
-  { href: "/review", label: "Review", icon: I.review, badge: true },
-  { href: "/import", label: "Import stays", icon: I.stays },
-  { href: "/team", label: "Team", icon: I.team },
-  { href: "/bank", label: "Bank", icon: I.bank, adminOnly: true },
-  { href: "/performance", label: "Performance", icon: I.performance, adminOnly: true },
-  { href: "/connections", label: "Connections", icon: I.connections, adminOnly: true },
-  { href: "/settings", label: "Settings", icon: I.settings, adminOnly: true },
+  { href: "/overview", label: "Overview", icon: I.overview, match: ["/overview", "/performance"] },
+  { href: "/transactions", label: "Transactions", icon: I.transactions, match: ["/transactions", "/documents"] },
+  { href: "/review", label: "Receipts", icon: I.scan, match: ["/review", "/upload"], badge: true },
+  { href: "/bank", label: "Bank", icon: I.bank, match: ["/bank"], adminOnly: true },
+  { href: "/team", label: "Team", icon: I.team, match: ["/team"] },
+] as const;
+
+const SETUP = [
+  { href: "/connections", label: "Connections", icon: I.connections, match: ["/connections", "/import"], adminOnly: true },
+  { href: "/settings", label: "Settings", icon: I.settings, match: ["/settings"], adminOnly: true },
 ] as const;
 
 interface Props {
@@ -26,7 +27,7 @@ interface Props {
   /** The villa chooser, under the organization (and in the top bar on small screens). */
   place?: React.ReactNode;
   placeCompact?: React.ReactNode;
-  /** Shows the admin-only pages (Bank, Settings). */
+  /** Shows the admin-only pages (Bank, Connections, Settings). */
   admin?: boolean;
 }
 
@@ -41,8 +42,11 @@ export function Sidebar(props: Props) {
 
 /** The same sidebar with no current page highlighted, shown while the path is resolved. */
 export function SidebarView({ org, reviewBadge, user, path, admin, place, placeCompact }: Props & { path: string | null }) {
-  const active = (href: string) => path !== null && (path === href || path.startsWith(`${href}/`));
+  const on = (href: string) => path !== null && (path === href || path.startsWith(`${href}/`));
+  const active = (match: readonly string[]) => match.some(on);
   const nav = NAV.filter((item) => admin || !("adminOnly" in item));
+  const setup = SETUP.filter(() => admin);
+  const link = "group flex items-center gap-2.5 rounded-full px-3 py-2 text-sm text-white/70 [--icon-dot:var(--color-accent)] aria-[current=page]:[--icon-dot:currentColor] hover:bg-white/5 hover:text-white aria-[current=page]:bg-accent aria-[current=page]:font-semibold aria-[current=page]:text-sidebar";
 
   return (
     <>
@@ -57,27 +61,34 @@ export function SidebarView({ org, reviewBadge, user, path, admin, place, placeC
           </>
         )}
         <nav className="mt-6 flex flex-col gap-0.5">
-          {nav.map(({ href, label, icon: Icon, ...rest }) => (
-            <Link
-              key={href} href={href} aria-current={active(href) ? "page" : undefined}
-              className="group flex items-center gap-2.5 rounded-full px-3 py-2 text-sm text-white/70 [--icon-dot:var(--color-accent)] aria-[current=page]:[--icon-dot:currentColor] hover:bg-white/5 hover:text-white aria-[current=page]:bg-accent aria-[current=page]:font-semibold aria-[current=page]:text-sidebar"
-            >
+          {nav.map(({ href, label, icon: Icon, match, ...rest }) => (
+            <Link key={href} href={href} aria-current={active(match) ? "page" : undefined} className={link}>
               <Icon size={17} className="text-white/50 group-aria-[current=page]:text-sidebar" />
               <span className="flex-1">{label}</span>
               {"badge" in rest && reviewBadge}
             </Link>
           ))}
         </nav>
-        <div className="mt-auto border-t border-white/10 pt-3">{user}</div>
+        {setup.length > 0 && (
+          <nav className="mt-auto flex flex-col gap-0.5 border-t border-white/10 pt-3" aria-label="Setup">
+            {setup.map(({ href, label, icon: Icon, match }) => (
+              <Link key={href} href={href} aria-current={active(match) ? "page" : undefined} className={link}>
+                <Icon size={17} className="text-white/50 group-aria-[current=page]:text-sidebar" />
+                <span className="flex-1">{label}</span>
+              </Link>
+            ))}
+          </nav>
+        )}
+        <div className={`${setup.length ? "mt-3" : "mt-auto"} border-t border-white/10 pt-3`}>{user}</div>
       </aside>
 
       <header className="dark-surface sticky top-0 z-20 flex h-14 items-center gap-3 bg-sidebar/95 px-4 text-white backdrop-blur lg:hidden">
         <Link href="/overview"><Logo className="text-xl" /></Link>
         {placeCompact}
         <nav className="ml-auto flex gap-1 overflow-x-auto">
-          {nav.map(({ href, label, icon: Icon, ...rest }) => (
+          {[...nav, ...setup].map(({ href, label, icon: Icon, match, ...rest }) => (
             <Link
-              key={href} href={href} aria-label={label} aria-current={active(href) ? "page" : undefined}
+              key={href} href={href} aria-label={label} aria-current={active(match) ? "page" : undefined}
               className="relative flex h-9 items-center gap-1.5 rounded-full px-2.5 text-sm text-white/70 [--icon-dot:var(--color-accent)] aria-[current=page]:[--icon-dot:currentColor] aria-[current=page]:bg-accent aria-[current=page]:font-semibold aria-[current=page]:text-sidebar"
             >
               <Icon size={17} />
